@@ -20,6 +20,9 @@ except ImportError:
 # 2. 고정 NewsAPI Key 설정
 NEWS_API_KEY = "13cfedc9823541c488732fb27b02fa25"
 
+# 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
+COVID_EVENT_DATE = "2020-02-19"
+
 # 3. 제목 및 설명
 st.title("📊 종합 시장 위험 지수(Total Market Risk Index) 모니터링")
 st.markdown(f"""
@@ -76,7 +79,7 @@ try:
         except: return 50.0
 
     @st.cache_data(ttl=3600)
-    def calculate_sem_weights(_ks_s, _sp_s, _nk_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s):
+    def calculate_regression_weights(_ks_s, _sp_s, _nk_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s):
         dates = _ks_s.index[-252:]
         data_rows = []
         for d in dates:
@@ -85,20 +88,17 @@ try:
             m_score = (get_hist_score_val(_fx_s, d) + get_hist_score_val(_b10_s, d) + get_hist_score_val(_cp_s, d, True)) / 3
             t_score = max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500))
             data_rows.append([m_score, g_risk, get_hist_score_val(_vx_s, d), t_score, _ks_s.loc[d]])
-        df_sem = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI'])
-        
-        # 실제 통계 분석 수행: 표준화 다중 회귀분석
-        X = (df_sem.iloc[:, :4] - df_sem.iloc[:, :4].mean()) / df_sem.iloc[:, :4].std()
-        Y = (df_sem['KOSPI'] - df_sem['KOSPI'].mean()) / df_sem['KOSPI'].std()
+        df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI'])
+        X = (df_reg.iloc[:, :4] - df_reg.iloc[:, :4].mean()) / df_reg.iloc[:, :4].std()
+        Y = (df_reg['KOSPI'] - df_reg['KOSPI'].mean()) / df_reg['KOSPI'].std()
         coeffs = np.linalg.lstsq(X, Y, rcond=None)[0]
         abs_coeffs = np.abs(coeffs)
         return abs_coeffs / np.sum(abs_coeffs)
 
-    sem_w = calculate_sem_weights(ks_s, sp_s, nk_s, fx_s, b10_s, cp_s, ma20, vx_s)
+    sem_w = calculate_regression_weights(ks_s, sp_s, nk_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
-    # 5. 사이드바 - 복귀 로직
+    # 5. 사이드바 - 복귀 및 슬라이더
     st.sidebar.header("⚙️ 지표별 가중치 설정")
-    
     if 'slider_m' not in st.session_state: st.session_state.slider_m = float(round(sem_w[0], 2))
     if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
     if 'slider_f' not in st.session_state: st.session_state.slider_f = float(round(sem_w[2], 2))
@@ -116,16 +116,14 @@ try:
     w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, key="slider_f", step=0.01)
     w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
 
-    # 가중치 산출 방법 상세 설명 (수정된 부분)
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 가중치 산출 근거 (회귀 분석)")
+    st.sidebar.subheader("📋 가중치 산출 근거 (표준화 회귀분석)")
     st.sidebar.write("""
-    본 대시보드의 초기 가중치는 **'표준화 다중 회귀분석(Standardized Multiple Regression)'** 기법을 통해 산출되었습니다.
+    본 대시보드의 초기 가중치는 **'표준화 다중 회귀분석(Standardized Multiple Regression)'**을 통해 산출되었습니다.
     
-    1. **데이터 전처리**: 최근 252거래일(1년) 동안의 매크로, 글로벌, 공포, 기술적 지표 점수와 KOSPI 지수를 모두 수집합니다.
-    2. **단위 표준화**: 각 지표의 단위가 다르므로 통계적 비교가 가능하도록 모든 데이터를 평균 0, 표준편차 1인 상태로 표준화합니다.
-    3. **영향력 추출**: 표준화된 독립변수들이 종속변수인 KOSPI의 변동을 얼마나 잘 설명하는지 **최소제곱법(OLS)**으로 분석하여 회귀계수($\\beta$)를 구합니다.
-    4. **가중치 결정**: 산출된 회귀계수의 절대값을 기준으로 각 지표의 상대적 중요도를 백분율로 환산하여 슬라이더의 기본값으로 적용합니다.
+    1. **단위 표준화**: 모든 지표(독립변수)와 KOSPI(종속변수)를 평균 0, 표준편차 1로 변환하여 서로 다른 단위 간의 직접 비교를 가능하게 했습니다.
+    2. **기여도 추출**: 최근 1년간의 데이터를 바탕으로 각 지표가 KOSPI 변동에 미치는 통계적 영향력(회귀계수)을 측정했습니다.
+    3. **동적 최적화**: 시장 상황 변화에 따라 KOSPI와 상관성이 높은 지표에 더 높은 비중이 실시간으로 자동 할당됩니다.
     """)
 
     total_w = w_macro + w_tech + w_global + w_fear
@@ -164,9 +162,7 @@ try:
     # 7. 백테스팅 섹션
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
-    st.info("""
-    **백테스팅(Backtesting)**: 과거 데이터를 사용하여 모델의 유효성을 검증하는 과정입니다. 위험 지수가 선행하여 상승했는지 확인하십시오.
-    """)
+    st.info("**백테스팅(Backtesting)**: 과거 데이터를 사용하여 모델의 유효성을 검증하는 과정입니다. 위험 지수가 선행하여 상승했는지 확인하십시오.")
     
     dates = ks_s.index[-252:]
     hist_risks = []
@@ -224,6 +220,11 @@ try:
         fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title))
         fig.add_hline(y=threshold, line_width=2, line_color="red")
         fig.add_annotation(x=series.index[len(series)//2], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
+        
+        # 코로나19 폭락 기점 표시 (모든 그래프 동일 시점)
+        fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
+        fig.add_annotation(x=COVID_EVENT_DATE, y=series.max(), text="코로나19 폭락 기점", showarrow=True, arrowhead=1, font=dict(color="blue"), bgcolor="white", yshift=20)
+        
         fig.update_layout(title=title, height=300, margin=dict(l=10, r=10, t=40, b=10))
         return fig
 
@@ -249,6 +250,8 @@ try:
         fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ks_recent.values, name="현재가"))
         fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ma20.reindex(ks_recent.index).values, name="20일선", line=dict(dash='dot')))
         fig_ks.add_annotation(x=ks_recent.index[-1], y=ma20.iloc[-1], text="평균선 하회 시 위험", showarrow=True, font=dict(color="red"))
+        
+        # KOSPI 1개월 차트에는 전체 시계열 상의 코로나 기점이 보이지 않으므로 텍스트만 유지하거나 조건부 추가
         fig_ks.update_layout(title="KOSPI 최근 1개월 집중 분석", height=300)
         st.plotly_chart(fig_ks, use_container_width=True)
         st.info("**기술적 분석**: 주가가 20일 이동평균선을 하회할 경우 단기 추세 하락 전환 가능성이 높습니다.")
@@ -266,4 +269,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 회귀 모델 기반 가중치 최적화 엔진 가동 중")
+st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 표준화 회귀분석 가중치 최적화 엔진 가동 중")
