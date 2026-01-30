@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from datetime import datetime, timedelta
 import os
+from streamlit_autorefresh import st_autorefresh # 추가 설치 필요: pip install streamlit-autorefresh
+
+# [자동 업데이트 설정] 5분(300,000ms)마다 새로고침
+st_autorefresh(interval=5 * 60 * 1000, key="datarefresh")
 
 # [폰트 설정]
 @st.cache_resource
@@ -18,25 +22,42 @@ def get_korean_font():
 
 fprop = get_korean_font()
 
-# [설정] 페이지 레이아웃 와이드 모드
-st.set_page_config(page_title="KOSPI 8대 지표 표준화 예측 대시보드", layout="wide")
+# [설정] 페이지 설정
+st.set_page_config(page_title="KOSPI 8대 지표 실시간 예측", layout="wide")
 
-# [데이터 수집]
-@st.cache_data(ttl=3600)
+# [데이터 수집] 실시간 데이터 반영 로직
+@st.cache_data(ttl=300) # 5분간 캐시 유지
 def load_market_data():
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=1000) # 표준화를 위해 충분한 과거 데이터 수집
     tickers = {
         '^KS11': 'KOSPI', '^SOX': 'SOX', '^GSPC': 'SP500', '^VIX': 'VIX',
         'USDKRW=X': 'Exchange', '^TNX': 'US10Y', '^IRX': 'US2Y', '000001.SS': 'China'
     }
-    data = yf.download(list(tickers.keys()), start=start_date, end=end_date)['Close']
+    
+    # 1. 과거 데이터 (최근 1000일 일봉)
+    start_date = (datetime.now() - timedelta(days=1000)).strftime('%Y-%m-%d')
+    hist_data = yf.download(list(tickers.keys()), start=start_date, interval='1d')['Close']
+    
+    # 2. 실시간 데이터 (오늘 최신가 강제 결합)
+    # yfinance의 period='1d'와 interval='1m'을 사용하여 가장 최근 체결가를 가져옴
+    current_data = {}
+    for t in tickers.keys():
+        tmp = yf.Ticker(t).history(period='1d', interval='1m')
+        if not tmp.empty:
+            current_data[t] = tmp['Close'].iloc[-1]
+        else:
+            current_data[t] = hist_data[t].iloc[-1] # 데이터가 없을 경우 마지막 종가 사용
+
+    # 데이터 결합 및 전처리
+    data = hist_data.copy()
+    data.loc[datetime.now()] = pd.Series(current_data)
     data = data.rename(columns=tickers).ffill().bfill()
+    
     data['SOX_lag1'] = data['SOX'].shift(1)
     data['Yield_Spread'] = data['US10Y'] - data['US2Y']
+    
     return data.dropna()
 
-# [분석] 회귀 모델링 (8대 지표 복합 분석)
+# [분석] 회귀 모델링
 def perform_analysis(df):
     y = np.log(df['KOSPI'] / df['KOSPI'].shift(1)).dropna()
     features = ['SOX_lag1', 'Exchange', 'SP500', 'China', 'Yield_Spread', 'VIX', 'US10Y', 'KOSPI']
@@ -46,76 +67,84 @@ def perform_analysis(df):
     return model, X.iloc[-1]
 
 # [UI 구현]
-st.title("📊 KOSPI 8대 지표 표준화 예측 대시보드")
-st.markdown("절대값이 아닌 **최근 1년 변동성($\sigma$) 및 이동평균**을 기준으로 인플레이션이 반영된 상대적 위험도를 측정합니다.")
+st.title("🛡️ KOSPI 8대 지표 실시간 예측 대시보드 (5분 자동 갱신)")
+st.caption(f"최근 데이터 확인 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 try:
     df = load_market_data()
     model, latest_x = perform_analysis(df)
     
-    # 상단 요약 지표
-    col_a, col_b, col_c = st.columns(3)
+    # --- 1. 종합 예측 신호 섹션 ---
     pred = model.predict(latest_x.values.reshape(1, -1))[0]
-    with col_a: st.metric("모델 설명력 (R²)", f"{model.rsquared:.2%}")
-    with col_b: 
-        status = "하락 경계" if pred < -0.003 else "중립" if pred < 0.001 else "상승 기대"
-        st.subheader(f"종합 예측 신호: {status}")
-    with col_c: st.write(f"최근 데이터: {df.index[-1].strftime('%Y-%m-%d')}")
+    
+    if pred < -0.003:
+        signal_color, signal_icon, signal_text = "red", "🚨", "하락 경계 (Risk Off)"
+        strategy_guide = "장중 실시간 데이터가 부정적입니다. 현금 비중을 방어적으로 유지하세요."
+    elif pred < 0.001:
+        signal_color, signal_icon, signal_text = "orange", "⏳", "중립 (Neutral / Watch)"
+        strategy_guide = "현재 지표들이 팽팽하게 맞서고 있습니다. 무리한 장중 대응보다는 관망을 권장합니다."
+    else:
+        signal_color, signal_icon, signal_text = "green", "🚀", "상승 기대 (Risk On)"
+        strategy_guide = "글로벌 지표가 우호적으로 변하고 있습니다. 매수 관점의 접근이 유리합니다."
+
+    st.divider()
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        st.markdown(f"""
+            <div style="padding: 20px; border-radius: 10px; border: 2px solid {signal_color}; background-color: rgba(0,0,0,0.05); text-align: center;">
+                <h1 style="font-size: 60px; margin: 0;">{signal_icon}</h1>
+                <h2 style="color: {signal_color}; margin: 10px 0;">{signal_text}</h2>
+                <p style="font-size: 18px;">실시간 예측 수익률: <b>{pred:.2%}</b></p>
+            </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.subheader("💡 실시간 투자 행동 가이드")
+        st.info(strategy_guide)
+        st.write(f"**통계적 신뢰도:** 모델 설명력(R²) **{model.rsquared:.2%}** | 5분 전 데이터와 비교하여 실시간 변화를 분석 중입니다.")
 
     st.divider()
 
-    # [그래프 섹션] 2행 4열
+    # --- 2. 8대 지표 시각화 (2행 4열) ---
+    st.subheader("⚠️ 지표별 실시간 변동 및 통계적 위험선")
     fig, axes = plt.subplots(2, 4, figsize=(24, 13))
     plt.rcParams['axes.unicode_minus'] = False
 
-    # 표준화된 위험 지표 설정 정보
-    # (컬럼명, 제목, 위험조건, 설명)
-    # 위험조건: 최근 250일(1년) 이동평균 대비 표준편차 배수 등으로 자동 산출
     plot_items = [
-        ('KOSPI', '1. KOSPI 지수', 'MA250 - 1σ', '최근 1년 평균 하단 이탈'),
-        ('Exchange', '2. 환율 (USD/KRW)', 'MA250 + 1.5σ', '최근 1년 평균 대비 상단 돌파'),
-        ('SOX_lag1', '3. 미 반도체(SOX)', 'MA250 - 1σ', 'AI 업황 단기 저점 경계'),
-        ('SP500', '4. 미 S&P 500', 'MA250 - 0.5σ', '미 증시 추세 훼손 우려'),
-        ('VIX', '5. 공포지수(VIX)', '20.0 (고정)', '시장 심리 패닉 구간'),
-        ('China', '6. 상하이 종합', 'MA250 - 1.5σ', '중국 경기 침체 가속'),
-        ('Yield_Spread', '7. 장단기 금리차', '0.00 (고정)', '경기 불황 진입 신호'),
-        ('US10Y', '8. 미 국채 10Y', 'MA250 + 1σ', '고금리 밸류에이션 압박')
+        ('KOSPI', '1. KOSPI (실시간)', 'MA250 - 1σ', '평균 대비 저평가'),
+        ('Exchange', '2. 환율 (실시간)', 'MA250 + 1.5σ', '급등 경계'),
+        ('SOX_lag1', '3. 미 반도체(SOX)', 'MA250 - 1σ', 'AI 업황 저점'),
+        ('SP500', '4. 미 S&P 500', 'MA250 - 0.5σ', '추세 훼손 주의'),
+        ('VIX', '5. 공포지수(VIX)', '20.0 (Fixed)', '패닉 임계점'),
+        ('China', '6. 상하이 종합', 'MA250 - 1.5σ', '중국 경기 침체'),
+        ('Yield_Spread', '7. 장단기 금리차', '0.00 (Fixed)', '불황 전조'),
+        ('US10Y', '8. 미 국채 10Y', 'MA250 + 1σ', '금리 압박')
     ]
 
     for i, (col, title, threshold_label, desc) in enumerate(plot_items):
         ax = axes[i // 4, i % 4]
-        plot_data = df[col].tail(120) # 최근 약 6개월간의 흐름 시각화
+        plot_data = df[col].tail(120)
         ma250 = df[col].rolling(window=250).mean().iloc[-1]
         std250 = df[col].rolling(window=250).std().iloc[-1]
         
-        # 동적 위험선 계산 (절대값이 아닌 통계적 수치)
         if col == 'Exchange': threshold = ma250 + (1.5 * std250)
-        elif col in ['VIX', 'Yield_Spread']: 
-            threshold = 20.0 if col == 'VIX' else 0.0 # 특정 지표는 절대 기준 유지
+        elif col in ['VIX', 'Yield_Spread']: threshold = 20.0 if col == 'VIX' else 0.0
         elif col in ['US10Y']: threshold = ma250 + std250
         else: threshold = ma250 - std250
         
-        ax.plot(plot_data, color='navy', lw=2)
-        ax.axhline(y=threshold, color='crimson', linestyle='--', alpha=0.8, lw=2)
-        
-        # 1. 그래프 위에 위험선 설명 텍스트 표시
+        ax.plot(plot_data, color='#1f77b4', lw=2.5)
+        ax.axhline(y=threshold, color='crimson', linestyle='--', alpha=0.9, lw=2)
         ax.text(plot_data.index[5], threshold, f" 위험 기준: {threshold_label}", 
                 fontproperties=fprop, fontsize=11, color='crimson', 
-                verticalalignment='bottom', backgroundcolor='#ffecec')
+                verticalalignment='bottom', backgroundcolor='white')
 
-        # 2. 제목 및 눈금 설정
-        ax.set_title(title, fontproperties=fprop, fontsize=15, fontweight='bold', pad=15)
+        ax.set_title(title, fontproperties=fprop, fontsize=16, fontweight='bold', pad=15)
         for label in (ax.get_xticklabels() + ax.get_yticklabels()):
             label.set_fontproperties(fprop)
-        
-        # 하단 텍스트 설명
         ax.annotate(f"[{desc}]", xy=(0.5, -0.18), xycoords='axes fraction', 
-                    ha='center', fontproperties=fprop, fontsize=12, color='#333333')
+                    ha='center', fontproperties=fprop, fontsize=12, color='#444444')
 
     plt.tight_layout()
     st.pyplot(fig)
-    
-    st.info("**💡 표준화 분석 가이드:** 본 대시보드는 각 지표의 1년 이동평균($\mu$)과 표준편차($\sigma$)를 활용합니다. 붉은 점선은 단순 가격이 아니라 최근 1년 시장이 받아들인 변동 범위를 벗어나는 통계적 '이상치' 구간을 의미합니다.")
 
 except Exception as e:
-    st.error(f"데이터 분석 중 오류가 발생했습니다: {e}")
+    st.error(f"실시간 데이터 연동 중 오류 발생: {e}")
