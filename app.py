@@ -43,7 +43,7 @@ if not check_password(): st.stop()
 def get_data():
     end = datetime.now().strftime("%Y%m%d")
     start = (datetime.now() - timedelta(days=730)).strftime("%Y%m%d")
-    df_kospi = stock.get_market_ohlcv(start, end, "KOSPI", adjusted=False)['종지'
+    df_kospi = stock.get_market_ohlcv(start, end, "KOSPI", adjusted=False)['종지']
         df_inv = stock.get_market_mkt_purchases_of_equities_by_ticker(start, end, "KOSPI", adjusted=False)[['일자']]
     
     tickers = {'^SOX': 'SOX', '^GSPC': 'SP500', '^VIX': 'VIX', 'USDKRW=X': 'USD_KRW', '^TNX': 'US10Y', '^IRX': 'US2Y'}
@@ -60,6 +60,7 @@ data = get_data()
 st.success("데이터 로드 성공!")
 
 st.line_chart(data[['종가', 'USD_KRW']]) # 테스트용 차트
+
 
 
 
