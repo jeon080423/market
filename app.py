@@ -5,7 +5,6 @@ import sys
 # [중요] 최상단에서 라이브러리 체크
 try:
     import yfinance as yf
-    import FinanceDataReader as fdr
     from pykrx import stock
     import pandas as pd
     import numpy as np
@@ -61,3 +60,4 @@ data = get_data()
 st.success("데이터 로드 성공!")
 
 st.line_chart(data[['종가', 'USD_KRW']]) # 테스트용 차트
+
