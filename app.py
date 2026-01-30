@@ -9,6 +9,7 @@ import matplotlib.font_manager as fm
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 import os
+import time
 
 # [자동 업데이트] 15분 주기
 st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
@@ -20,6 +21,7 @@ def save_prediction_history(date_str, pred_val, actual_close, prev_close):
     """예측 데이터를 로컬 CSV 파일에 저장하여 메모리 유지"""
     pred_close = prev_close * (1 + pred_val)
     diff = actual_close - pred_close 
+    
     new_data = pd.DataFrame([[
         date_str, f"{pred_val:.4%}", f"{pred_close:,.2f}", f"{actual_close:,.2f}",
         f"{diff:,.2f}", datetime.now().strftime('%H:%M:%S')
@@ -61,19 +63,33 @@ def load_expert_data():
         '^VIX': 'VIX', '000001.SS': 'China', '^TNX': 'US10Y', '^IRX': 'US2Y',
         '005930.KS': 'Samsung', '000660.KS': 'Hynix', '005380.KS': 'Hyundai', '373220.KS': 'LG_Energy'
     }
-    start_date = (datetime.now() - timedelta(days=600)).strftime('%Y-%m-%d')
+    # 데이터 수집 기간 충분히 확보 (최근 2년)
+    start_date = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
     combined_df = pd.DataFrame()
+    
     for ticker, name in tickers.items():
-        try:
-            raw = yf.download(ticker, start=start_date, interval='1d', progress=False)
-            if not raw.empty:
-                rt = yf.download(ticker, period='1d', interval='1m', progress=False)
-                val = rt['Close'].iloc[-1] if not rt.empty else raw['Close'].iloc[-1]
-                series = raw['Close'].copy()
-                series.iloc[-1] = val
-                combined_df[name] = series
-        except: continue
-    if combined_df.empty: raise Exception("데이터 수집 실패")
+        for _ in range(3): # 최대 3회 재시도
+            try:
+                raw = yf.download(ticker, start=start_date, interval='1d', progress=False)
+                if not raw.empty:
+                    # 실시간 데이터 병합 시도
+                    try:
+                        rt = yf.download(ticker, period='1d', interval='1m', progress=False)
+                        val = rt['Close'].iloc[-1] if not rt.empty else raw['Close'].iloc[-1]
+                        series = raw['Close'].copy()
+                        series.iloc[-1] = val
+                    except:
+                        series = raw['Close']
+                    
+                    combined_df[name] = series
+                    break # 성공 시 반복 종료
+                time.sleep(1) # API 호출 제한 방지
+            except: 
+                continue
+                
+    if combined_df.empty or 'KOSPI' not in combined_df.columns: 
+        raise Exception("주요 데이터 수집 실패. 네트워크 상태를 확인하세요.")
+        
     df = combined_df.ffill().interpolate()
     df['SOX_lag1'] = df['SOX'].shift(1)
     df['Yield_Spread'] = df['US10Y'] - df['US2Y']
@@ -84,15 +100,20 @@ def get_analysis(df):
     df_smooth = df.rolling(window=3).mean().dropna()
     y = df_smooth['KOSPI']
     X = df_smooth[features_list]
-    X_scaled = (X - X.mean()) / X.std()
+    
+    # 정규화 파라미터 저장
+    X_mean = X.mean()
+    X_std = X.std()
+    X_scaled = (X - X_mean) / X_std
     X_scaled['SOX_SP500'] = X_scaled['SOX_lag1'] * X_scaled['SP500']
+    
     X_final = sm.add_constant(X_scaled)
     model = sm.OLS(y, X_final).fit()
     
     abs_coeffs = np.abs(model.params.drop(['const', 'SOX_SP500']))
     contribution = (abs_coeffs / abs_coeffs.sum()) * 100
-    # 행렬 연산을 위해 계수 딕셔너리 및 정규화 파라미터 반환
-    return model, contribution, X.mean(), X.std()
+    
+    return model, contribution, X_mean, X_std
 
 def custom_date_formatter(x, pos):
     dt = mdates.num2date(x)
@@ -102,30 +123,39 @@ try:
     df = load_expert_data()
     model, contribution_pct, train_mean, train_std = get_analysis(df)
     
-    # --- 데이터 계산 영역 (계수 직접 연산 방식으로 변경하여 에러 원천 차단) ---
-    def manual_predict(target_mean_series):
-        # 1. 정규화
-        scaled = (target_mean_series[contribution_pct.index] - train_mean) / train_std
-        # 2. 상호작용항 생성
-        sox_sp500 = scaled['SOX_lag1'] * scaled['SP500']
-        # 3. 모델 계수와 매칭하여 직접 합산 (Constant + Beta*X + Interaction)
+    # --- 핵심 수정: 예측 함수 (수동 행렬 연산) ---
+    def manual_predict(target_series):
+        # 1. 입력 데이터 정규화
+        features = contribution_pct.index
+        scaled = (target_series[features] - train_mean) / train_std
+        
+        # 2. 모델 계수 가져오기
         params = model.params
-        pred_val = params['const']
-        for col in contribution_pct.index:
-            pred_val += params[col] * scaled[col]
-        pred_val += params['SOX_SP500'] * sox_sp500
-        return pred_val
+        
+        # 3. 예측값 계산 (Y = a + b1*X1 + ... + bn*Xn + c*Interaction)
+        pred_y = params['const']
+        for col in features:
+            pred_y += params[col] * scaled[col]
+            
+        # 4. 상호작용항 계산 및 추가
+        interaction_val = scaled['SOX_lag1'] * scaled['SP500']
+        pred_y += params['SOX_SP500'] * interaction_val
+        
+        return pred_y
 
+    # 단기 예측 (최근 3일 평균)
     current_pred_level = manual_predict(df.tail(3).mean())
     pred_val = (current_pred_level - df['KOSPI'].iloc[-2]) / df['KOSPI'].iloc[-2]
     
+    # 중기 예측 (최근 20일 평균)
     mid_pred_level = manual_predict(df.tail(20).mean())
     mid_pred_val = (mid_pred_level - df['KOSPI'].tail(20).iloc[0]) / df['KOSPI'].tail(20).iloc[0]
 
+    # 신뢰도 계산
     r2 = model.rsquared
     reliability = "강함" if r2 > 0.85 else "보통" if r2 > 0.7 else "주의"
 
-    # --- 레이아웃 구현 ---
+    # --- 레이아웃 ---
     st.markdown(f"## 🏛️ KOSPI 인텔리전스 진단 시스템 <small>v3.0</small>", unsafe_allow_html=True)
     
     h1, h2 = st.columns([3, 1])
@@ -138,7 +168,7 @@ try:
 
     st.divider()
 
-    c1, c2, c3 = st.columns([1, 1.2, 1])
+    c1, c2, c3 = st.columns([1, 1.4, 1])
     with c1:
         today_str = datetime.now().strftime('%Y-%m-%d')
         save_prediction_history(today_str, pred_val, df['KOSPI'].iloc[-1], df['KOSPI'].iloc[-2])
@@ -166,13 +196,13 @@ try:
 
         st.markdown(f"""
             <div style="display: flex; gap: 10px; height: 260px;">
-                <div style="flex: 1; padding: 15px; border-radius: 10px; background-color: {s_color}; color: white; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                <div style="flex: 1.1; padding: 15px; border-radius: 10px; background-color: {s_color}; color: white; text-align: center; display: flex; flex-direction: column; justify-content: center;">
                     <h5 style="margin: 0;">⚡ 전략 신호</h5>
-                    <h2 style="margin: 10px 0; font-weight: bold; font-size: 28px;">{signal}</h2>
+                    <h2 style="margin: 5px 0 0 0; font-weight: bold; font-size: 24px;">{signal}</h2>
                 </div>
-                <div style="flex: 1.2; padding: 15px; border-radius: 10px; border: 1px solid #ddd; background-color: #fff; overflow-y: auto;">
-                    <h6 style="margin: 0 0 5px 0; color: #333;">🧐 판단 이유</h6>
-                    <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #555;">{reason}</p>
+                <div style="flex: 1.4; padding: 12px; border-radius: 10px; border: 1px solid #ddd; background-color: #fff; overflow-y: auto;">
+                    <h6 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">🧐 판단 이유</h6>
+                    <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #555;">{reason}</p>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -243,4 +273,4 @@ try:
     st.pyplot(fig)
 
 except Exception as e:
-    st.error(f"분석 엔진 오류 발생: {e}")
+    st.error(f"⚠️ 시스템 오류: {e}")
