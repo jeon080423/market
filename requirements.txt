@@ -1,9 +1,0 @@
-streamlit
-pandas
-numpy
-yfinance
-finance-datareader
-pykrx
-statsmodels
-setuptools
-
