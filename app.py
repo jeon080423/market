@@ -15,44 +15,56 @@ from google.oauth2.service_account import Credentials
 # [자동 업데이트] 5분 주기
 st_autorefresh(interval=5 * 60 * 1000, key="datarefresh")
 
-# [구글 시트 설정] 
-# 1. Google Cloud Console에서 받은 JSON 키 파일명을 아래에 입력하세요.
-# 2. 해당 JSON 파일 내의 'client_email' 주소로 구글 시트를 공유해 주셔야 합니다.
-SERVICE_ACCOUNT_FILE = 'service_account.json'  # 파일명을 실제 파일과 맞추세요.
+# [구글 시트 설정]
+SERVICE_ACCOUNT_FILE = 'service_account.json' 
 SHEET_NAME = 'KOSPI_Prediction_History'
 
 def get_gsheet_client():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
-    return gspread.authorize(creds)
+    if not os.path.exists(SERVICE_ACCOUNT_FILE):
+        return None
+    try:
+        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+        return gspread.authorize(creds)
+    except Exception as e:
+        st.error(f"인증 파일 오류: {e}")
+        return None
 
 def update_gsheet_history(date_str, pred_val, actual_close):
     try:
         client = get_gsheet_client()
-        # 시트 열기 (없을 경우 에러 방지를 위해 try-except)
+        if client is None: return
+        
         try:
             sh = client.open(SHEET_NAME).get_worksheet(0)
         except gspread.SpreadsheetNotFound:
-            # 시트가 없으면 생성 시도 (수동 생성을 권장하지만 자동화 대비)
-            sh = client.create(SHEET_NAME).get_worksheet(0)
-        
-        # 헤더 설정
-        if not sh.get_all_values():
+            # 시트가 없으면 생성 권한이 있는 경우 시도
+            return
+
+        # 데이터 존재 여부 확인 및 헤더 생성
+        try:
+            values = sh.get_all_values()
+        except:
+            values = []
+
+        if not values:
             sh.append_row(["날짜", "KOSPI 기대 수익률", "실제 종가", "기록시각"])
             
-        # 당일 데이터 중복 기록 체크
-        existing_dates = sh.col_values(1)
+        # 중복 기록 방지 (첫 열이 날짜라고 가정)
+        existing_dates = sh.col_values(1) if values else []
         if date_str not in existing_dates:
             sh.append_row([date_str, f"{pred_val:.4%}", f"{actual_close:,.2f}", datetime.now().strftime('%H:%M:%S')])
     except Exception as e:
-        # 시트 에러가 메인 대시보드를 방해하지 않도록 에러 메시지만 출력
-        pass
+        # 시트 업데이트 실패 시 로그만 표시
+        st.sidebar.warning(f"시트 업데이트 실패: {e}")
 
 def load_gsheet_history():
     try:
         client = get_gsheet_client()
+        if client is None: return pd.DataFrame()
         sh = client.open(SHEET_NAME).get_worksheet(0)
         data = sh.get_all_records()
+        if not data: return pd.DataFrame()
         return pd.DataFrame(data)
     except:
         return pd.DataFrame()
@@ -90,7 +102,7 @@ def load_expert_data():
                 combined_df[name] = series
         except:
             continue
-
+    
     df = combined_df.ffill().interpolate()
     df['SOX_lag1'] = df['SOX'].shift(1)
     df['Yield_Spread'] = df['US10Y'] - df['US2Y']
@@ -118,7 +130,6 @@ try:
     df = load_expert_data()
     model, contribution_pct = get_analysis(df)
     
-    # 상단 요약 섹션
     c1, c2, c3 = st.columns([1.1, 1.1, 1.3])
     
     with c1:
@@ -130,7 +141,7 @@ try:
         prev_val_level = df['KOSPI'].iloc[-2]
         pred_val = (pred_val_level - prev_val_level) / prev_val_level
         
-        # [구글 시트 연동] 오늘 날짜 데이터 기록
+        # 구글 시트 업데이트
         today_str = datetime.now().strftime('%Y-%m-%d')
         update_gsheet_history(today_str, pred_val, df['KOSPI'].iloc[-1])
         
@@ -139,25 +150,24 @@ try:
             <div style="padding: 20px; border-radius: 15px; border-left: 10px solid {color}; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px;">
                 <h3 style="margin: 0; color: #555;">📈 KOSPI 기대 수익률: <span style="color:{color}">{pred_val:+.2%}</span></h3>
                 <p style="color: #444; font-size: 13px; margin-top: 10px; line-height: 1.5;">
-                    <b>[예측 데이터 저장 완료]</b><br>
-                    구글 시트 연동 계정: {st.session_state.get('gsheet_status', 'naijemi324@gmail.com')}<br>
-                    장중 실시간 종가: <b>{df['KOSPI'].iloc[-1]:,.2f}</b>
+                    <b>[진단 상태]</b><br>
+                    연동 파일: {'service_account.json (OK)' if os.path.exists(SERVICE_ACCOUNT_FILE) else '파일 없음'}<br>
+                    실시간 종가: <b>{df['KOSPI'].iloc[-1]:,.2f}</b>
                 </p>
             </div>
         """, unsafe_allow_html=True)
 
     with c2:
-        # [구글 시트 불러오기]
         history_df = load_gsheet_history()
         if not history_df.empty:
             st.markdown(f"""
                 <div style="padding: 20px; border-radius: 15px; border-left: 10px solid #3498db; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px; overflow-y: auto;">
-                    <h3 style="margin: 0; color: #555;">📊 예측 히스토리 (Google Sheets)</h3>
-                    {history_df.tail(5).to_html(index=False, classes='table table-hover')}
+                    <h3 style="margin: 0; color: #555;">📊 예측 히스토리</h3>
+                    {history_df.tail(10).to_html(index=False, classes='table table-striped')}
                 </div>
             """, unsafe_allow_html=True)
         else:
-            st.warning("구글 시트에서 데이터를 불러올 수 없습니다. 권한 설정을 확인하세요.")
+            st.warning("시트 데이터를 불러오는 중이거나 데이터가 없습니다.")
 
     with c3:
         st.subheader("📊 지표별 KOSPI 영향력 비중")
@@ -166,11 +176,11 @@ try:
             return ['color: red; font-weight: bold' if v else '' for v in is_max]
         cont_df = pd.DataFrame(contribution_pct).T
         st.table(cont_df.style.format("{:.1f}%").apply(highlight_max, axis=1))
-        st.markdown(f"<div style='font-size: 12px; color: #666;'>모델 설명력: <b>{model.rsquared:.2%}</b></div>", unsafe_allow_html=True)
+        st.caption(f"설명력(R²): {model.rsquared:.2%}")
 
     st.divider()
 
-    # 하단 그래프 영역 (기존 유지)
+    # 하단 그래프
     fig, axes = plt.subplots(2, 4, figsize=(24, 10))
     plt.subplots_adjust(hspace=0.4)
     config = [
@@ -206,5 +216,4 @@ try:
     st.pyplot(fig)
 
 except Exception as e:
-    st.error(f"오류 발생: {e}")
-
+    st.error(f"메인 로직 에러: {e}")
