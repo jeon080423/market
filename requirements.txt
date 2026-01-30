@@ -2,7 +2,7 @@ streamlit
 pandas
 numpy
 yfinance
+FinanceDataReader
 pykrx
 statsmodels
 matplotlib
-setuptools
