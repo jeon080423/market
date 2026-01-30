@@ -38,7 +38,7 @@ def load_data():
     start_date = "2019-01-01"
     kospi = yf.download("^KS11", start=start_date, end=end_date)
     sp500 = yf.download("^GSPC", start=start_date, end=end_date)
-    nikkei = yf.download("^N225", start=start_date, end=end_date)
+    # nikkei 제외
     exchange_rate = yf.download("KRW=X", start=start_date, end=end_date)
     us_10y = yf.download("^TNX", start=start_date, end=end_date)
     us_2y = yf.download("^IRX", start=start_date, end=end_date)
@@ -56,11 +56,11 @@ def load_data():
     }
     sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
     
-    return kospi, sp500, nikkei, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
+    return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
 try:
     with st.spinner('시장 데이터 분석 및 가중치 최적화 중...'):
-        kospi, sp500, nikkei, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map = load_data()
+        kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map = load_data()
 
     def get_clean_series(df):
         if df is None or df.empty: return pd.Series()
@@ -70,7 +70,7 @@ try:
 
     ks_s = get_clean_series(kospi)
     sp_s = get_clean_series(sp500).reindex(ks_s.index).ffill()
-    nk_s = get_clean_series(nikkei).reindex(ks_s.index).ffill()
+    # nk_s 제외
     fx_s = get_clean_series(fx).reindex(ks_s.index).ffill()
     b10_s = get_clean_series(bond10).reindex(ks_s.index).ffill()
     b2_s = get_clean_series(bond2).reindex(ks_s.index).ffill()
@@ -93,12 +93,13 @@ try:
         except: return 50.0
 
     @st.cache_data(ttl=3600)
-    def calculate_regression_weights(_ks_s, _sp_s, _nk_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s):
+    def calculate_regression_weights(_ks_s, _sp_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s):
         dates = _ks_s.index[-252:]
         data_rows = []
         for d in dates:
-            s_sp = get_hist_score_val(_sp_s, d, True); s_nk = get_hist_score_val(_nk_s, d, True)
-            g_risk = (s_sp * 0.6) + (s_nk * 0.4)
+            s_sp = get_hist_score_val(_sp_s, d, True)
+            # 일본 시장 제외: 글로벌 리스크를 S&P 500 단독 반영으로 수정
+            g_risk = s_sp 
             m_score = (get_hist_score_val(_fx_s, d) + get_hist_score_val(_b10_s, d) + get_hist_score_val(_cp_s, d, True)) / 3
             t_score = max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500))
             data_rows.append([m_score, g_risk, get_hist_score_val(_vx_s, d), t_score, _ks_s.loc[d]])
@@ -109,7 +110,7 @@ try:
         abs_coeffs = np.abs(coeffs)
         return abs_coeffs / np.sum(abs_coeffs)
 
-    sem_w = calculate_regression_weights(ks_s, sp_s, nk_s, fx_s, b10_s, cp_s, ma20, vx_s)
+    sem_w = calculate_regression_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
     # 5. 사이드바 - 복귀 및 슬라이더
     st.sidebar.header("⚙️ 지표별 가중치 설정")
@@ -150,7 +151,8 @@ try:
         return float(max(0, min(100, ((max_v - curr_v) / (max_v - min_v)) * 100 if inverse else ((curr_v - min_v) / (max_v - min_v)) * 100)))
 
     m_score_now = (calculate_score(fx_s, fx_s) + calculate_score(b10_s, b10_s) + calculate_score(cp_s, cp_s, True)) / 3
-    g_score_now = (calculate_score(sp_s, sp_s, True) * 0.6) + (calculate_score(nk_s, nk_s, True) * 0.4)
+    # 일본 시장 제외: 글로벌 스코어를 S&P 500 단독 반영으로 수정
+    g_score_now = calculate_score(sp_s, sp_s, True)
     t_score_now = max(0.0, min(100.0, float(100 - (float(ks_s.iloc[-1]) / float(ma20.iloc[-1]) - 0.9) * 500)))
     total_risk_index = (m_score_now * w_macro + t_score_now * w_tech + g_score_now * w_global + calculate_score(vx_s, vx_s) * w_fear) / total_w
 
@@ -184,7 +186,8 @@ try:
     hist_risks = []
     for d in dates:
         m = (get_hist_score_val(fx_s, d) + get_hist_score_val(b10_s, d) + get_hist_score_val(cp_s, d, True)) / 3
-        g = (get_hist_score_val(sp_s, d, True) * 0.6) + (get_hist_score_val(nk_s, d, True) * 0.4)
+        # 일본 시장 제외: 글로벌 리스크를 S&P 500 단독 반영으로 수정
+        g = get_hist_score_val(sp_s, d, True)
         t = max(0, min(100, 100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500))
         hist_risks.append((m * w_macro + t * w_tech + g * w_global + get_hist_score_val(vx_s, d) * w_fear) / total_w)
 
