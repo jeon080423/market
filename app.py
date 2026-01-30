@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
 
-# 자동 새로고침 설정
+# 자동 새로고침 설정 (10분 간격)
 try:
     from streamlit_autorefresh import st_autorefresh
     st_autorefresh(interval=600000, key="datarefresh")
@@ -53,6 +53,7 @@ try:
         if isinstance(df.columns, pd.MultiIndex): return df['Close'].iloc[:, 0]
         return df['Close']
 
+    # 데이터 정제 및 KOSPI 날짜 기준 동기화
     ks_s = get_clean_series(kospi)
     sp_s = get_clean_series(sp500).reindex(ks_s.index).ffill()
     nk_s = get_clean_series(nikkei).reindex(ks_s.index).ffill()
@@ -66,6 +67,7 @@ try:
     yield_curve = b10_s - b2_s
     ma20 = ks_s.rolling(window=20).mean()
 
+    # 가중치 자동 산출 로직
     def get_hist_score_val(series, current_idx, inverse=False):
         try:
             sub = series.loc[:current_idx].iloc[-252:]
@@ -94,20 +96,35 @@ try:
 
     sem_w = calculate_sem_weights(ks_s, sp_s, nk_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
-    # 5. 사이드바
+    # 5. 사이드바 - 가중치 및 복귀 버튼
     st.sidebar.header("⚙️ 지표별 가중치 설정")
-    w_macro = st.sidebar.slider("매크로 (환율/금리/물동량)", 0.0, 1.0, float(round(sem_w[0], 2)), 0.01)
-    w_global = st.sidebar.slider("글로벌 시장 위험 (미국/일본)", 0.0, 1.0, float(round(sem_w[1], 2)), 0.01)
-    w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, float(round(sem_w[2], 2)), 0.01)
-    w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, float(round(sem_w[3], 2)), 0.01)
+    
+    # 세션 상태 초기화 (복귀 기능을 위함)
+    if 'w_m' not in st.session_state: st.session_state.w_m = float(round(sem_w[0], 2))
+    if 'w_g' not in st.session_state: st.session_state.w_g = float(round(sem_w[1], 2))
+    if 'w_f' not in st.session_state: st.session_state.w_f = float(round(sem_w[2], 2))
+    if 'w_t' not in st.session_state: st.session_state.w_t = float(round(sem_w[3], 2))
+
+    w_macro = st.sidebar.slider("매크로 (환율/금리/물동량)", 0.0, 1.0, st.session_state.w_m, 0.01, key="slider_m")
+    w_global = st.sidebar.slider("글로벌 시장 위험 (미국/일본)", 0.0, 1.0, st.session_state.w_g, 0.01, key="slider_g")
+    w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, st.session_state.w_f, 0.01, key="slider_f")
+    w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, st.session_state.w_t, 0.01, key="slider_t")
+
+    # 복귀 버튼 로직
+    if st.sidebar.button("🔄 계산된 원래 가중치로 복귀"):
+        st.session_state.w_m = float(round(sem_w[0], 2))
+        st.session_state.w_g = float(round(sem_w[1], 2))
+        st.session_state.w_f = float(round(sem_w[2], 2))
+        st.session_state.w_t = float(round(sem_w[3], 2))
+        st.rerun()
+
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 가중치 산출 근거 (SEM 분석)")
-    st.sidebar.write("본 대시보드의 가중치는 **다중회귀분석**을 통해 최근 252거래일간 각 지표가 KOSPI 변동에 미친 통계적 기여도를 산출하여 적용되었습니다.")
+    st.sidebar.write("본 대시보드의 가중치는 **다중회귀분석**을 통해 최근 252거래일간 각 지표가 KOSPI 변동에 미친 통계적 기여도를 실시간 산출하여 적용되었습니다.")
 
     total_w = w_macro + w_tech + w_global + w_fear
     if total_w == 0: st.error("가중치 합이 0일 수 없습니다."); st.stop()
 
-    # 위험 점수 계산
     def calculate_score(current_series, full_series, inverse=False):
         recent = full_series.last('365D')
         min_v, max_v = float(recent.min()), float(recent.max())
@@ -138,7 +155,7 @@ try:
         fig_gauge.update_layout(height=350, margin=dict(t=50, b=0))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 7. 백테스팅 섹션 (해석 설명 복원)
+    # 7. 백테스팅 섹션
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
     st.info("**백테스팅(Backtesting)**: 과거 데이터를 사용하여 모델의 유효성을 검증하는 과정입니다. 위험 지수가 선행하여 상승했는지 확인하십시오.")
@@ -162,7 +179,6 @@ try:
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(title="KOSPI", overlaying="y", side="right"), height=400, legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_bt, use_container_width=True)
     with cb2:
-        # 상관계수와 설명력 위치 변경
         st.metric("설명력 (R²)", f"{(correlation**2)*100:.1f}%")
         st.metric("상관계수 (Corr)", f"{correlation:.2f}")
         st.write("""
@@ -192,7 +208,7 @@ try:
             st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
         except: st.write("보고서를 불러올 수 없습니다.")
 
-    # 9. 지표별 상세 분석 (설명 및 빨간선 텍스트 복원)
+    # 9. 지표별 상세 분석
     st.markdown("---")
     st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석")
     
@@ -242,4 +258,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | SEM 가중치 분석 시스템 가동 중")
+st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 가중치 초기화 및 SEM 엔진 가동 중")
