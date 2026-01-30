@@ -94,28 +94,27 @@ try:
 
     sem_w = calculate_sem_weights(ks_s, sp_s, nk_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
-    # 5. 사이드바 - 가중치 최적화 및 복귀 로직 수정
+    # 5. 사이드바 - 복귀 로직 (슬라이더 선언 전 위치 필수)
     st.sidebar.header("⚙️ 지표별 가중치 설정")
     
-    # 세션 상태 초기화 (위젯의 key값에 직접 연결)
+    # 세션 상태 초기화
     if 'slider_m' not in st.session_state: st.session_state.slider_m = float(round(sem_w[0], 2))
     if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
     if 'slider_f' not in st.session_state: st.session_state.slider_f = float(round(sem_w[2], 2))
     if 'slider_t' not in st.session_state: st.session_state.slider_t = float(round(sem_w[3], 2))
 
-    # 슬라이더 배치 (value 대신 st.session_state를 직접 참조하지 않고 key만 지정해도 Streamlit이 연결함)
-    w_macro = st.sidebar.slider("매크로 (환율/금리/물동량)", 0.0, 1.0, key="slider_m", step=0.01)
-    w_global = st.sidebar.slider("글로벌 시장 위험 (미국/일본)", 0.0, 1.0, key="slider_g", step=0.01)
-    w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, key="slider_f", step=0.01)
-    w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
-
-    # 복귀 버튼 로직: session_state의 key 값을 직접 업데이트
+    # [핵심 수정] 복귀 버튼을 슬라이더 위로 이동하여 instantiated 에러 방지
     if st.sidebar.button("🔄 계산된 원래 가중치로 복귀"):
         st.session_state.slider_m = float(round(sem_w[0], 2))
         st.session_state.slider_g = float(round(sem_w[1], 2))
         st.session_state.slider_f = float(round(sem_w[2], 2))
         st.session_state.slider_t = float(round(sem_w[3], 2))
         st.rerun()
+
+    w_macro = st.sidebar.slider("매크로 (환율/금리/물동량)", 0.0, 1.0, key="slider_m", step=0.01)
+    w_global = st.sidebar.slider("글로벌 시장 위험 (미국/일본)", 0.0, 1.0, key="slider_g", step=0.01)
+    w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, key="slider_f", step=0.01)
+    w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 가중치 산출 근거 (SEM 분석)")
@@ -154,10 +153,13 @@ try:
         fig_gauge.update_layout(height=350, margin=dict(t=50, b=0))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 7. 백테스팅 섹션
+    # 7. 백테스팅 섹션 (설명 및 가이드 복원)
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
-    st.info("**백테스팅(Backtesting)**: 과거 데이터를 사용하여 모델의 유효성을 검증하는 과정입니다. 위험 지수가 선행하여 상승했는지 확인하십시오.")
+    st.info("""
+    **백테스팅(Backtesting)이란?** 과거 데이터를 사용하여 모델의 유효성을 검증하는 과정입니다. 
+    여기서는 지난 1년간의 데이터를 바탕으로 매일의 위험 지수를 재산출하여 KOSPI 하락 시점에 지수가 선행했는지 확인합니다.
+    """)
     
     dates = ks_s.index[-252:]
     hist_risks = []
@@ -207,13 +209,14 @@ try:
             st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
         except: st.write("보고서를 불러올 수 없습니다.")
 
-    # 9. 지표별 상세 분석
+    # 9. 지표별 상세 분석 (빨간선 텍스트 및 상세 설명 복원)
     st.markdown("---")
     st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석")
     
     def create_chart(series, title, threshold, desc_text):
         fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title))
         fig.add_hline(y=threshold, line_width=2, line_color="red")
+        # 빨간 선 위 텍스트 주석 추가
         fig.add_annotation(x=series.index[len(series)//2], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
         fig.update_layout(title=title, height=300, margin=dict(l=10, r=10, t=40, b=10))
         return fig
@@ -257,4 +260,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | SEM 가중치 분석 시스템 가동 중")
+st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 가중치 초기화 및 SEM 엔진 가동 중")
