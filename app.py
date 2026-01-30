@@ -25,7 +25,7 @@ fprop = get_korean_font()
 
 st.set_page_config(page_title="KOSPI 정밀 진단 시스템", layout="wide")
 
-# [데이터 수집]
+# [데이터 수집] 한국 실업률 삭제
 @st.cache_data(ttl=300)
 def load_all_market_data():
     tickers = {
@@ -36,33 +36,22 @@ def load_all_market_data():
     
     start_date = (datetime.now() - timedelta(days=1000)).strftime('%Y-%m-%d')
     
+    # 1. 금융 데이터 수집
     try:
-        # 1. 금융 데이터 수집
         raw_data = yf.download(list(tickers.keys()), start=start_date, interval='1d', progress=False)
-        
-        # yfinance 데이터 구조(MultiIndex) 대응 로직 강화
         if isinstance(raw_data.columns, pd.MultiIndex):
-            # 'Close' 레벨이 있는지 확인 후 추출
-            if 'Close' in raw_data.columns.get_level_values(0):
-                df = raw_data.xs('Close', axis=1, level=0).copy()
-            else:
-                # 레벨 순서가 다른 경우 대응
-                df = raw_data.xs('Close', axis=1, level=1).copy()
+            df = raw_data.xs('Close', axis=1, level=0 if 'Close' in raw_data.columns.levels[0] else 1).copy()
         else:
             df = raw_data.copy()
-            
         df = df.rename(columns=tickers)
     except Exception as e:
         st.error(f"금융 데이터 수집 실패: {e}")
         df = pd.DataFrame()
 
-    # 2. 고용 지표 수집 (FRED)
+    # 2. 미국 고용 지표만 수집
     us_unemployment = pd.DataFrame()
-    kr_unemployment = pd.DataFrame()
-    
     try:
         us_unemployment = web.DataReader('ICSA', 'fred', start_date)
-        kr_unemployment = web.DataReader('LRHUTTTTKRW156S', 'fred', start_date)
     except:
         pass
 
@@ -72,49 +61,45 @@ def load_all_market_data():
         df['Yield_Spread'] = df['US10Y'] - df['US2Y']
         df = df.dropna()
     
-    return df, us_unemployment, kr_unemployment
+    return df, us_unemployment
 
 # [UI 구현]
-st.title("🛡️ KOSPI 정밀 진단 및 실물 고용 지표 모니터링")
+st.title("🛡️ KOSPI 정밀 진단 및 실물 경제 모니터링")
 st.caption(f"최종 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 try:
-    df, us_job, kr_job = load_all_market_data()
+    df, us_job = load_all_market_data()
     
     if df.empty or len(df) < 50:
-        st.warning("데이터 수집량이 충분하지 않습니다. 잠시 후 자동으로 다시 시도합니다.")
+        st.warning("데이터 수집 중입니다. 잠시만 기다려 주세요.")
         st.stop()
 
     # --- 회귀 분석 로직 ---
-    # 수익률 변환 시 inf 제거 로직 추가
     returns_df = np.log(df / df.shift(1)).replace([np.inf, -np.inf], np.nan).dropna()
-    
     y = returns_df['KOSPI']
     features = ['SOX_lag1', 'Exchange', 'SP500', 'China', 'Yield_Spread', 'VIX', 'US10Y']
-    
     X = returns_df[features].fillna(0)
     X = sm.add_constant(X)
     
     model = sm.OLS(y, X).fit()
     
-    # 최신 데이터 기반 예측 입력값 구성 (순서 일치 필수)
+    # 예측값 계산
     latest_pct = df[features].pct_change().iloc[-1].replace([np.inf, -np.inf], 0).fillna(0)
-    # [상수항(1.0), SOX_lag1, Exchange, SP500, China, Yield_Spread, VIX, US10Y] 순서
-    pred_input = [1.0] + [latest_pct[f] for f in features]
-    pred = model.predict(np.array(pred_input).reshape(1, -1))[0]
+    pred_input = np.array([1.0] + [latest_pct[f] for f in features]).reshape(1, -1)
+    pred = model.predict(pred_input)[0]
 
-    # 신호 요약 표시
+    # 상단 요약 신호
     s_color = "red" if pred < -0.003 else "orange" if pred < 0.001 else "green"
     status_msg = "하락 경계" if s_color=="red" else "중립/관망" if s_color=="orange" else "상승 기대"
     
     st.markdown(f"""<div style="padding:15px; border-radius:10px; border:2px solid {s_color}; text-align:center;">
-                <h3 style="color:{s_color}; margin:0;">종합 예측 신호: {status_msg} (예측 기대치: {pred:.2%})</h3>
+                <h3 style="color:{s_color}; margin:0;">종합 예측 신호: {status_msg} (내일 예측치: {pred:.2%})</h3>
                 </div>""", unsafe_allow_html=True)
 
     st.divider()
 
     # 섹션 1: 금융 지표 시각화
-    st.subheader("🔍 8대 핵심 금융 지표 (최근 120일)")
+    st.subheader("🔍 8대 핵심 금융 지표")
     fig1, axes1 = plt.subplots(2, 4, figsize=(24, 10))
     items = [
         ('KOSPI', 'KOSPI'), ('Exchange', '환율'), ('SOX_lag1', '미 반도체(SOX)'), ('SP500', '미 S&P 500'),
@@ -124,41 +109,31 @@ try:
         ax = axes1[i // 4, i % 4]
         ax.plot(df[col].tail(120), color='#1f77b4', lw=2)
         ax.set_title(title, fontproperties=fprop, fontsize=14)
-        ax.grid(True, alpha=0.3)
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontproperties(fprop)
+        for label in (ax.get_xticklabels() + ax.get_yticklabels()): label.set_fontproperties(fprop)
     st.pyplot(fig1)
 
     st.divider()
 
-    # 섹션 2: 고용 및 물동량 시각화
-    st.subheader("💼 실물 경제 및 고용 지표")
-    fig2, axes2 = plt.subplots(1, 3, figsize=(24, 7))
-
-    # 1. 글로벌 물동량
-    axes2[0].plot(df['Freight'].tail(120), color='green', lw=2)
-    axes2[0].set_title("글로벌 물동량 (BDRY)", fontproperties=fprop, fontsize=15)
-    axes2[0].grid(True, alpha=0.3)
-
-    # 2. 미국 실업수당
-    if not us_job.empty:
-        axes2[1].plot(us_job.tail(52), color='red', lw=2)
-        axes2[1].set_title("미국 신규 실업수당 청구 (ICSA)", fontproperties=fprop, fontsize=15)
-        axes2[1].grid(True, alpha=0.3)
-
-    # 3. 한국 고용 지표
-    if not kr_job.empty:
-        axes2[2].plot(kr_job.tail(24), color='orange', lw=2)
-        axes2[2].set_title("한국 실업률 추이 (Monthly)", fontproperties=fprop, fontsize=15)
-        axes2[2].grid(True, alpha=0.3)
-
-    for ax in axes2:
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontproperties(fprop)
+    # 섹션 2: 실물 경제 지표 (한국 실업률 삭제 후 2열 구성)
+    st.subheader("💼 실물 경제 모니터링")
+    col1, col2 = st.columns(2)
     
-    plt.tight_layout()
-    st.pyplot(fig2)
+    with col1:
+        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        ax2.plot(df['Freight'].tail(120), color='green', lw=2)
+        ax2.set_title("글로벌 물동량 (BDRY)", fontproperties=fprop, fontsize=15)
+        for label in (ax2.get_xticklabels() + ax2.get_yticklabels()): label.set_fontproperties(fprop)
+        st.pyplot(fig2)
+        st.info("글로벌 물동량(BDRY)은 해상 운임 기반 경기 선행 지표입니다.")
+
+    with col2:
+        if not us_job.empty:
+            fig3, ax3 = plt.subplots(figsize=(10, 5))
+            ax3.plot(us_job.tail(52), color='red', lw=2)
+            ax3.set_title("미국 신규 실업수당 청구 (ICSA)", fontproperties=fprop, fontsize=15)
+            for label in (ax3.get_xticklabels() + ax3.get_yticklabels()): label.set_fontproperties(fprop)
+            st.pyplot(fig3)
+            st.info("미국 실업수당 청구 건수는 고용 시장의 건강도를 나타내는 주간 지표입니다.")
 
 except Exception as e:
-    st.error(f"시스템 오류 발생: {e}")
-    st.info("데이터 로딩 중 일시적인 오류일 수 있습니다. 5분 뒤 자동 갱신됩니다.")
+    st.error(f"오류 발생: {e}")
