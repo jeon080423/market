@@ -10,6 +10,10 @@ import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 import os
 import time
+import requests
+
+# [API 설정]
+NEWS_API_KEY = "13cfedc9823541c488732fb27b02fa25"
 
 # [자동 업데이트] 15분 주기
 st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
@@ -19,13 +23,8 @@ HISTORY_FILE = 'prediction_history.csv'
 
 def save_prediction_history(date_str, pred_val, actual_close):
     """
-    예측 데이터를 로컬 CSV 파일에 저장하여 메모리 유지
-    - 전일 예측수익률: 어제 예측했던 값 (현재 로직상 오늘 예측값을 저장해둠)
-    - 예측 종가: 어제의 예측 수익률 * 그저께 종가 (오늘 시점에서 계산 불가하므로 저장된 값 활용)
+    예측 데이터를 로컬 CSV 파일에 저장 (Raw Data 저장 방식)
     """
-    # 신규 데이터 구조: [날짜, 예측수익률(오늘 기준), 실제종가(오늘), 기록시각]
-    # 내일이 되면 오늘의 '예측수익률'이 '전일 예측수익률'이 됨.
-    
     new_data = pd.DataFrame([[
         date_str, pred_val, actual_close, datetime.now().strftime('%H:%M:%S')
     ]], columns=["날짜", "예측수익률_Raw", "실제종가_Raw", "기록시각"])
@@ -33,7 +32,6 @@ def save_prediction_history(date_str, pred_val, actual_close):
     if os.path.exists(HISTORY_FILE):
         try:
             history_df = pd.read_csv(HISTORY_FILE)
-            # 당일 데이터 중복 방지 (장 마감 후 1회만 저장하는 로직 유지)
             if date_str not in history_df["날짜"].values:
                 current_time = datetime.now().time()
                 market_close = datetime.strptime("15:30", "%H:%M").time()
@@ -46,7 +44,12 @@ def save_prediction_history(date_str, pred_val, actual_close):
         new_data.to_csv(HISTORY_FILE, index=False, encoding='utf-8-sig')
 
 def load_prediction_history_display():
-    """저장된 Raw 데이터를 기반으로 사용자가 요청한 형식의 테이블 생성"""
+    """
+    저장된 Raw 데이터를 기반으로 '전일 예측' vs '금일 실제' 비교 테이블 생성
+    [전일 예측 수익률]: 어제 기록된 예측치
+    [예측 종가]: 어제 종가 * (1 + 어제 예측 수익률)
+    [예측 오차]: (오늘 종가 - 예측 종가) / 예측 종가
+    """
     if not os.path.exists(HISTORY_FILE):
         return pd.DataFrame(columns=["날짜", "전일 예측수익률", "예측 종가", "실제 종가", "예측 오차(%)", "기록시각"])
     
@@ -60,17 +63,15 @@ def load_prediction_history_display():
             actual_close = row['실제종가_Raw']
             time_str = row['기록시각']
             
-            # 전일 데이터 가져오기 (i-1 인덱스 활용)
             if i > 0:
                 prev_row = df.iloc[i-1]
-                prev_pred_val = prev_row['예측수익률_Raw'] # 전일 예측 수익률
-                
-                # 예측 종가 계산: 전일 실제 종가 * (1 + 전일 예측 수익률)
-                # (주의: 사용자는 '그제 종가'라고 했으나, 논리적으로 전일 종가 기준이 맞음. 전일 종가에 예측률을 곱해야 오늘 예상가가 나옴)
+                prev_pred_val = prev_row['예측수익률_Raw']
                 prev_actual_close = prev_row['실제종가_Raw']
+                
+                # 예측 종가 = 전일 실제 종가 * (1 + 전일 예측 수익률)
                 pred_close_price = prev_actual_close * (1 + prev_pred_val)
                 
-                # 오차율 계산: (실제 - 예측) / 예측 * 100
+                # 오차율 = (오늘 실제 - 어제 예측한 오늘 가격) / 어제 예측한 오늘 가격
                 error_rate = ((actual_close - pred_close_price) / pred_close_price) * 100
                 
                 display_list.append([
@@ -82,7 +83,6 @@ def load_prediction_history_display():
                     time_str
                 ])
             else:
-                # 첫 데이터라 전일 기록이 없는 경우
                 display_list.append([
                     date, "-", "-", f"{actual_close:,.2f}", "-", time_str
                 ])
@@ -91,7 +91,23 @@ def load_prediction_history_display():
     except:
         return pd.DataFrame(columns=["날짜", "전일 예측수익률", "예측 종가", "실제 종가", "예측 오차(%)", "기록시각"])
 
-# [폰트 설정]
+# [뉴스 수집 함수] (API 키 통합)
+@st.cache_data(ttl=3600)
+def get_market_news(api_key):
+    news_list = []
+    # 경제 위기, 주식 시장 리스크, 인플레이션 관련 키워드 검색
+    url = f"https://newsapi.org/v2/everything?q=stock+market+risk+OR+inflation+OR+economy+crisis&language=en&sortBy=publishedAt&apiKey={api_key}"
+    
+    try:
+        res = requests.get(url, timeout=10).json()
+        articles = res.get('articles', [])[:5]
+        for art in articles:
+            news_list.append({"title": art['title'], "link": art['url']})
+    except Exception as e:
+        news_list.append({"title": f"뉴스 수집 중 오류: {str(e)}", "link": "#"})
+    
+    return news_list
+
 @st.cache_resource
 def get_korean_font():
     font_path = os.path.join(os.getcwd(), 'NanumGothic.ttf')
@@ -101,7 +117,6 @@ def get_korean_font():
 fprop = get_korean_font()
 st.set_page_config(page_title="KOSPI 인텔리전스 진단 v3.0", layout="wide")
 
-# [데이터 수집] 개별 수집으로 안정성 확보 및 에러 핸들링 강화
 @st.cache_data(ttl=900)
 def load_expert_data():
     tickers = {
@@ -109,42 +124,54 @@ def load_expert_data():
         '^VIX': 'VIX', '000001.SS': 'China', '^TNX': 'US10Y', '^IRX': 'US2Y',
         '005930.KS': 'Samsung', '000660.KS': 'Hynix', '005380.KS': 'Hyundai', '373220.KS': 'LG_Energy'
     }
-    start_date = (datetime.now() - timedelta(days=600)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
     combined_df = pd.DataFrame()
-
-    for ticker, name in tickers.items():
-        try:
-            raw = yf.download(ticker, start=start_date, interval='1d', progress=False)
-            if not raw.empty:
-                rt = yf.download(ticker, period='1d', interval='1m', progress=False)
-                val = rt['Close'].iloc[-1] if not rt.empty else raw['Close'].iloc[-1]
-                series = raw['Close'].copy()
-                series.iloc[-1] = val
-                combined_df[name] = series
-        except Exception as e:
-            continue
     
-    if combined_df.empty:
-        raise Exception("데이터를 불러오지 못했습니다. 네트워크를 확인해주세요.")
-
+    for ticker, name in tickers.items():
+        for _ in range(3): 
+            try:
+                raw = yf.download(ticker, start=start_date, interval='1d', progress=False)
+                if not raw.empty:
+                    try:
+                        rt = yf.download(ticker, period='1d', interval='1m', progress=False)
+                        val = rt['Close'].iloc[-1] if not rt.empty else raw['Close'].iloc[-1]
+                        series = raw['Close'].copy()
+                        series.iloc[-1] = val
+                    except:
+                        series = raw['Close']
+                    combined_df[name] = series
+                    break 
+                time.sleep(1) 
+            except: 
+                continue
+                
+    if combined_df.empty or 'KOSPI' not in combined_df.columns: 
+        raise Exception("주요 데이터 수집 실패. 네트워크 상태를 확인하세요.")
+        
     df = combined_df.ffill().interpolate()
     df['SOX_lag1'] = df['SOX'].shift(1)
     df['Yield_Spread'] = df['US10Y'] - df['US2Y']
     return df.dropna().tail(300)
 
-# [분석] 설명력 극대화 모델
 def get_analysis(df):
     features_list = ['SOX_lag1', 'Exchange', 'SP500', 'China', 'Yield_Spread', 'VIX', 'US10Y']
     df_smooth = df.rolling(window=3).mean().dropna()
     y = df_smooth['KOSPI']
     X = df_smooth[features_list]
-    X_scaled = (X - X.mean()) / X.std()
+    
+    # 정규화 파라미터 저장
+    X_mean = X.mean()
+    X_std = X.std()
+    X_scaled = (X - X_mean) / X_std
     X_scaled['SOX_SP500'] = X_scaled['SOX_lag1'] * X_scaled['SP500']
+    
     X_final = sm.add_constant(X_scaled)
     model = sm.OLS(y, X_final).fit()
+    
     abs_coeffs = np.abs(model.params.drop(['const', 'SOX_SP500']))
     contribution = (abs_coeffs / abs_coeffs.sum()) * 100
-    return model, contribution
+    
+    return model, contribution, X_mean, X_std
 
 def custom_date_formatter(x, pos):
     dt = mdates.num2date(x)
@@ -152,40 +179,61 @@ def custom_date_formatter(x, pos):
 
 try:
     df = load_expert_data()
-    model, contribution_pct = get_analysis(df)
+    model, contribution_pct, train_mean, train_std = get_analysis(df)
     
-    # 상단 요약 가이드 섹션
-    c1, c2, c3 = st.columns([1.1, 1.1, 1.3])
+    # --- 수동 행렬 연산 예측 (에러 방지) ---
+    def manual_predict(target_series):
+        features = contribution_pct.index
+        scaled = (target_series[features] - train_mean) / train_std
+        params = model.params
+        
+        pred_y = params['const']
+        for col in features:
+            pred_y += params[col] * scaled[col]
+            
+        interaction_val = scaled['SOX_lag1'] * scaled['SP500']
+        pred_y += params['SOX_SP500'] * interaction_val
+        return pred_y
+
+    current_pred_level = manual_predict(df.tail(3).mean())
+    pred_val = (current_pred_level - df['KOSPI'].iloc[-2]) / df['KOSPI'].iloc[-2]
+    
+    mid_pred_level = manual_predict(df.tail(20).mean())
+    mid_pred_val = (mid_pred_level - df['KOSPI'].tail(20).iloc[0]) / df['KOSPI'].tail(20).iloc[0]
+
+    r2 = model.rsquared
+    reliability = "강함" if r2 > 0.85 else "보통" if r2 > 0.7 else "주의"
+
+    # --- 레이아웃 ---
+    st.markdown(f"## 🏛️ KOSPI 인텔리전스 진단 시스템 <small>v3.0</small>", unsafe_allow_html=True)
+    
+    h1, h2 = st.columns([3, 1])
+    with h1:
+        mood = "상승 우세" if pred_val > 0 else "하락 압력"
+        st.info(f"🤖 **AI 마켓 브리핑:** 현재 시장의 주동력은 **{contribution_pct.idxmax()}**이며, **모델 예측 신뢰도**는 **{reliability}**({r2:.1%})입니다. 단기적으로 **{mood}** 구간입니다.")
+    with h2:
+        cash = 10 if pred_val > 0.005 else 40 if pred_val > 0 else 70 if pred_val > -0.005 else 90
+        st.metric("권장 현금 비중", f"{cash}%", f"{'방어적' if cash >= 70 else '공격적'} 전략")
+
+    st.divider()
+
+    c1, c2, c3 = st.columns([1.1, 1.4, 1.1]) # 레이아웃 비율 미세 조정
     
     with c1:
-        # 단기 예측 로직
-        current_data = df.tail(3).mean()
-        mu, std = df[contribution_pct.index].mean(), df[contribution_pct.index].std()
-        current_scaled = (current_data[contribution_pct.index] - mu) / std
-        current_scaled['SOX_SP500'] = current_scaled['SOX_lag1'] * current_scaled['SP500']
-        
-        pred_val_level = model.predict([1] + current_scaled.tolist())[0]
-        prev_val_level = df['KOSPI'].iloc[-2]
-        pred_val = (pred_val_level - prev_val_level) / prev_val_level
-        
-        # 히스토리 저장 (Raw 데이터 저장)
         today_str = datetime.now().strftime('%Y-%m-%d')
         save_prediction_history(today_str, pred_val, df['KOSPI'].iloc[-1])
-        
-        color = "#e74c3c" if pred_val < 0 else "#2ecc71"
+        color = '#e74c3c' if pred_val < 0 else '#2ecc71'
         st.markdown(f"""
             <div style="padding: 20px; border-radius: 15px; border-left: 10px solid {color}; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px;">
                 <h3 style="margin: 0; color: #555;">📈 KOSPI 기대 수익률: <span style="color:{color}">{pred_val:+.2%}</span></h3>
                 <p style="color: #444; font-size: 13px; margin-top: 10px; line-height: 1.5;">
                     <b>[단기 수치 해석]</b><br>
-                    8대 지표의 실시간 변화를 다중 회귀 모델에 대입하여 산출한 <b>'KOSPI 기대 수익률'</b>입니다.<br>
-                    - <b>(+) 상승 압력 / (-) 하락 압력</b><br>
-                    - 절대값이 클수록 글로벌 시장의 에너지가 코스피에 강하게 작용 중임을 의미합니다.
+                    8대 지표의 실시간 변화를 다중 회귀 모델에 대입하여 산출한 기대 수익률입니다.<br>
+                    - (+) 상승 압력 / (-) 하락 압력
                 </p>
             </div>
         """, unsafe_allow_html=True)
-
-        # [수정] 예측 히스토리 표 표시 (가공된 데이터 로드)
+        
         st.write("") 
         history_display_df = load_prediction_history_display()
         if not history_display_df.empty:
@@ -197,73 +245,63 @@ try:
             """, unsafe_allow_html=True)
 
     with c2:
-        # [복원] 중기 예측 로직 (최근 20거래일 추세)
-        mid_term_df = df.tail(20).mean()
-        mid_scaled = (mid_term_df[contribution_pct.index] - mu) / std
-        mid_scaled['SOX_SP500'] = mid_scaled['SOX_lag1'] * mid_scaled['SP500']
+        if pred_val < -0.005 and mid_pred_val < 0: signal, s_color = "🔴 즉시 매도", "#ff4b4b"
+        elif pred_val < 0: signal, s_color = "🟠 매도 준비", "#ffa500"
+        elif pred_val > 0.005 and mid_pred_val > 0: signal, s_color = "🔵 매수 유효", "#1f77b4"
+        else: signal, s_color = "⚪ 보유 및 관망", "#888"
         
-        mid_pred_level = model.predict([1] + mid_scaled.tolist())[0]
-        mid_start_level = df['KOSPI'].tail(20).iloc[0]
-        mid_pred_val = (mid_pred_level - mid_start_level) / mid_start_level
-        mid_color = "#e74c3c" if mid_pred_val < 0 else "#2ecc71"
-        
+        reason = f"단기 기대치({pred_val:+.2%})와 중기 추세({mid_pred_val:+.2%}) 기반 결과입니다."
+        if "매도" in signal: reason += " 하락 압력이 포착되므로 리스크 관리가 필요합니다."
+        elif "매수" in signal: reason += " 상승 에너지가 강력하여 추가 상승이 기대됩니다."
+
         st.markdown(f"""
-            <div style="padding: 20px; border-radius: 15px; border-left: 10px solid {mid_color}; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px;">
-                <h3 style="margin: 0; color: #555;">📅 중기 투자 전망: <span style="color:{mid_color}">{mid_pred_val:+.2%}</span></h3>
-                <p style="color: #444; font-size: 13px; margin-top: 10px; line-height: 1.5;">
-                    <b>[중기 예측 설명]</b><br>
-                    최근 <b>20거래일(약 1개월)</b>간의 글로벌 지표 누적 변화를 바탕으로 산출한 추세적 방향성입니다.<br>
-                    - 단기 변동성(Noise)을 제거하고 거시적인 <b>에너지 흐름</b>을 파악하기 위한 지표입니다.<br>
-                    - 기대수익률과 방향이 일치할 경우 추세 강화로 해석합니다.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # [신규 추가] 실시간 매매 전략 신호 가이드 및 판단 이유
-        st.write("")
-        # 전략 신호 판단 로직 (괄호 내용 삭제)
-        if pred_val < -0.005 and mid_pred_val < 0:
-            signal, s_color = "🔴 즉시 매도", "#ff4b4b"
-            reason = "단기 기대수익률이 -0.5%를 하회하며 급락 신호가 발생했고, 중기 추세 에너지 역시 음수(-)로 전환되어 하락 압력이 극에 달한 상태입니다. 리스크 관리를 위해 즉각적인 비중 축소가 권고됩니다."
-        elif pred_val < 0:
-            signal, s_color = "🟠 매도 준비", "#ffa500"
-            reason = "중기 추세는 유지되고 있으나 단기 기대수익률이 음수(-)로 꺾였습니다. 글로벌 지표의 에너지가 약화되고 있으므로 수익 실현을 준비하거나 분할 매도를 검토해야 하는 시점입니다."
-        elif pred_val > 0.005 and mid_pred_val > 0:
-            signal, s_color = "🔵 매수 유효", "#1f77b4"
-            reason = "단기 기대수익률이 +0.5%를 상회하는 강한 반등 신호를 보이고 있으며, 중기 추세 또한 양수(+)로 우상향 에너지가 결합되었습니다. 추세적 상승 가능성이 높은 구간으로 판단됩니다."
-        else:
-            signal, s_color = "⚪ 보유 및 관망", "#888"
-            reason = "단기 변동성과 중기 추세가 혼조세를 보이거나 뚜렷한 방향성을 나타내지 않고 있습니다. 지표가 위험선에 근접할 때까지 추가적인 시장 관망이 필요한 중립 단계입니다."
-
-        # 신호와 이유의 폭을 넓히기 위해 컬럼 조정 (폭 확대)
-        sc1, sc2 = st.columns([1.1, 1.4])
-        with sc1:
-            st.markdown(f"""
-                <div style="padding: 15px; border-radius: 10px; background-color: {s_color}; color: white; text-align: center; height: 140px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="display: flex; gap: 10px; height: 260px;">
+                <div style="flex: 1.1; padding: 15px; border-radius: 10px; background-color: {s_color}; color: white; text-align: center; display: flex; flex-direction: column; justify-content: center;">
                     <h5 style="margin: 0; font-size: 15px;">⚡ 전략 신호</h5>
                     <h2 style="margin: 5px 0 0 0; font-weight: bold; font-size: 24px;">{signal}</h2>
                 </div>
-            """, unsafe_allow_html=True)
-        with sc2:
-            st.markdown(f"""
-                <div style="padding: 12px; border-radius: 10px; border: 1px solid #ddd; background-color: #fff; height: 140px; overflow-y: auto;">
+                <div style="flex: 1.4; padding: 12px; border-radius: 10px; border: 1px solid #ddd; background-color: #fff; overflow-y: auto;">
                     <h6 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">🧐 판단 이유</h6>
                     <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #555;">{reason}</p>
                 </div>
-            """, unsafe_allow_html=True)
-        
+            </div>
+        """, unsafe_allow_html=True)
+
     with c3:
+        m_color = '#e74c3c' if mid_pred_val < 0 else '#2ecc71'
+        st.markdown(f"""
+            <div style="padding: 20px; border-radius: 15px; border-left: 10px solid {m_color}; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px;">
+                <h3 style="margin: 0; color: #555;">📅 중기 투자 전망: <span style="color:{m_color}">{mid_pred_val:+.2%}</span></h3>
+                <p style="color: #444; font-size: 13px; margin-top: 10px; line-height: 1.5;">
+                    <b>[중기 예측 설명]</b><br>
+                    최근 <b>20거래일(약 1개월)</b>간의 글로벌 지표 누적 변화를 바탕으로 산출한 추세적 방향성입니다.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.write("")
         st.subheader("📊 지표별 KOSPI 영향력 비중")
         def highlight_max(s):
-            is_max = s == s.max()
-            return ['color: red; font-weight: bold' if v else '' for v in is_max]
+            return ['color: red; font-weight: bold' if v == s.max() else '' for v in s]
         cont_df = pd.DataFrame(contribution_pct).T
         st.table(cont_df.style.format("{:.1f}%").apply(highlight_max, axis=1))
-        st.caption(f"모델 설명력(R²): {model.rsquared:.2%}")
+        
+        # [통합됨] 글로벌 뉴스
+        st.write("")
+        st.subheader("📰 글로벌 경제 리스크 뉴스")
+        news_items = get_market_news(NEWS_API_KEY)
+        for news in news_items:
+            st.markdown(f"- [{news['title']}]({news['link']})")
 
     st.divider()
+    
+    # 4행: 주도 업종 분석 (3번째 기능 위치)
+    st.subheader("🔄 주도 업종 수익률 모멘텀 (최근 5일)")
+    sector_rets = df[['Samsung', 'Hynix', 'Hyundai', 'LG_Energy']].pct_change(5).iloc[-1] * 100
+    sector_df = pd.DataFrame(sector_returns).rename(columns={sector_returns.name: '수익률(%)'}) # 에러 방지 위해 DataFrame 변환
+    st.bar_chart(sector_rets)
 
-    # 하단 그래프 영역 (기존 유지)
+    st.divider()
     fig, axes = plt.subplots(2, 4, figsize=(24, 10))
     plt.subplots_adjust(hspace=0.4)
     config = [
@@ -280,9 +318,7 @@ try:
     for i, (col, title, th_label, warn_text) in enumerate(config):
         ax = axes[i // 4, i % 4]
         plot_data = df[col].tail(100)
-        ma = df[col].rolling(window=250).mean().iloc[-1]
-        std = df[col].rolling(window=250).std().iloc[-1]
-        
+        ma, std = df[col].rolling(window=250).mean().iloc[-1], df[col].rolling(window=250).std().iloc[-1]
         if col == 'Exchange': threshold = ma + (1.5 * std)
         elif col in ['VIX', 'Yield_Spread']: threshold = float(th_label)
         elif col in ['US10Y']: threshold = ma + std
@@ -290,24 +326,15 @@ try:
         
         ax.plot(plot_data, color='#34495e', lw=2.5)
         ax.axhline(y=threshold, color='#e74c3c', ls='--', lw=2)
-        
         ax.xaxis.set_major_formatter(plt.FuncFormatter(custom_date_formatter))
         ax.xaxis.set_major_locator(mdates.MonthLocator())
-        
-        ax.set_title(title, fontproperties=fprop, fontsize=16, fontweight='bold', pad=10)
-        ax.text(plot_data.index[0], threshold, f"근거: {th_label}", 
-                fontproperties=fprop, color='#e74c3c', va='bottom', fontsize=10, backgroundcolor='#ffffff')
-
-        # [복원] 전문 진단 설명 (위험선 대비 거리 및 판단 내용)
-        safe_th = threshold if threshold != 0 else 1
-        dist = abs(plot_data.iloc[-1] - threshold) / abs(safe_th)
+        ax.set_title(title, fontproperties=fprop, fontsize=16, fontweight='bold')
+        ax.text(plot_data.index[0], threshold, f"근거: {th_label}", fontproperties=fprop, color='#e74c3c', va='bottom', fontsize=10, backgroundcolor='#ffffff')
+        dist = abs(plot_data.iloc[-1] - threshold) / (abs(threshold) if threshold != 0 else 1)
         ax.set_xlabel(f"위험선 대비 거리: {dist:.1%} | {warn_text}", fontproperties=fprop, fontsize=11, color='#c0392b')
-        
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontproperties(fprop)
+        for label in (ax.get_xticklabels() + ax.get_yticklabels()): label.set_fontproperties(fprop)
 
-    plt.tight_layout()
     st.pyplot(fig)
 
 except Exception as e:
-    st.error(f"메인 로직 에러: {e}")
+    st.error(f"⚠️ 시스템 오류: {e}")
