@@ -165,6 +165,7 @@ try:
     r2_c1, r2_c2, r2_c3 = st.columns(3)
     with r2_c1:
         st.plotly_chart(create_chart(yield_curve, "장단기 금리차", 0.0, 'below', "0 이하 역전 시 위험"), use_container_width=True)
+        st.info("**장단기 금리차**: 10년물과 2년물 금리 역전은 통상 경기 침체의 강력한 전조 신호로 해석됩니다.")
     with r2_c2:
         ks_recent, ma_recent = ks_s.last('30D'), ma20.last('30D')
         fig_ks = go.Figure()
@@ -173,8 +174,10 @@ try:
         fig_ks.add_annotation(x=ks_recent.index[-1], y=ma_recent.iloc[-1], text="평균선 아래 추락 시 위험", showarrow=True, font=dict(color="red"))
         fig_ks.update_layout(title="KOSPI 최근 1개월 집중 분석", height=300)
         st.plotly_chart(fig_ks, use_container_width=True)
+        st.info("**기술적 분석**: 주가가 20일 이동평균선을 하회할 경우 단기 추세 하락 전환 가능성이 높습니다.")
     with r2_c3:
         st.plotly_chart(create_chart(vx_s, "VIX 공포 지수", 30, 'above', "30 돌파 시 패닉"), use_container_width=True)
+        st.info("**VIX 지수**: 시장 변동성을 나타내며, 지수 급등은 투자 심리 악화와 투매 가능성을 시사합니다.")
 
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
