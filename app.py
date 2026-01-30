@@ -221,9 +221,9 @@ try:
         fig.add_hline(y=threshold, line_width=2, line_color="red")
         fig.add_annotation(x=series.index[len(series)//2], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
         
-        # 코로나19 폭락 기점 표시 (모든 그래프 동일 시점)
+        # S&P 500 폭락 기점 표시 (모든 그래프 동일 시점)
         fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
-        fig.add_annotation(x=COVID_EVENT_DATE, y=series.max(), text="코로나19 폭락 기점", showarrow=True, arrowhead=1, font=dict(color="blue"), bgcolor="white", yshift=20)
+        fig.add_annotation(x=COVID_EVENT_DATE, y=series.max(), text="S&P 500 폭락 기점(COVID)", showarrow=True, arrowhead=1, font=dict(color="blue"), bgcolor="white", yshift=20)
         
         fig.update_layout(title=title, height=300, margin=dict(l=10, r=10, t=40, b=10))
         return fig
@@ -251,7 +251,6 @@ try:
         fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ma20.reindex(ks_recent.index).values, name="20일선", line=dict(dash='dot')))
         fig_ks.add_annotation(x=ks_recent.index[-1], y=ma20.iloc[-1], text="평균선 하회 시 위험", showarrow=True, font=dict(color="red"))
         
-        # KOSPI 1개월 차트에는 전체 시계열 상의 코로나 기점이 보이지 않으므로 텍스트만 유지하거나 조건부 추가
         fig_ks.update_layout(title="KOSPI 최근 1개월 집중 분석", height=300)
         st.plotly_chart(fig_ks, use_container_width=True)
         st.info("**기술적 분석**: 주가가 20일 이동평균선을 하회할 경우 단기 추세 하락 전환 가능성이 높습니다.")
