@@ -205,10 +205,10 @@ try:
     st.markdown("---")
     r3_c1, r3_c2, r3_c3 = st.columns(3)
     with r3_c1:
-        # 최근 1년 평균 대비 -20% 하락 시를 위험 구간으로 설정
-        fr_threshold = round(float(fr_s.last('365D').mean() * 0.8), 2)
-        st.plotly_chart(create_chart(fr_s, "글로벌 물동량 지표 (BDRY)", fr_threshold, 'below', "물동량 급감 시 위험"), use_container_width=True)
-        st.info("**물동량**: 건화물선 운임 지수(BDI) 관련 ETF로, 지수 하락은 글로벌 교역량 감소와 경기 둔화를 의미합니다.")
+        # 최근 1년 평균 대비 -15% 하락 시를 추세적 붕괴(위험) 구간으로 제안하여 설정
+        fr_threshold = round(float(fr_s.last('365D').mean() * 0.85), 2)
+        st.plotly_chart(create_chart(fr_s, "글로벌 물동량 지표 (BDRY)", fr_threshold, 'below', f"지지선({fr_threshold}) 붕괴 시 위험"), use_container_width=True)
+        st.info(f"**물동량 분석**: 건화물선 운임은 경기 선행 지표입니다. 현재 기준선({fr_threshold}) 하향 돌파 시 글로벌 경기 수축 신호로 간주합니다.")
 
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
