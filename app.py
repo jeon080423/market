@@ -53,32 +53,41 @@ def load_data():
     copper = yf.download("HG=F", start=start_date, end=end_date) 
     return kospi, sp500, nikkei, exchange_rate, us_10y, us_2y, vix, copper
 
-# 6. 리포트 및 뉴스 함수
+# 6. 리포트 및 뉴스 함수 (네이버 증권 기반으로 변경)
 def get_analyst_reports():
-    # '현재 시점 기준 최신 10개'를 가져오기 위해 기본 리스트 페이지 호출
-    url = "http://consensus.hankyung.com/apps.analysis/analysis.list?skinType=business"
+    # 네이버 증권 종목분석 리서치 페이지
+    url = "https://finance.naver.com/research/company_list.naver"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
     }
     try:
         res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
+        # 네이버 금융은 EUC-KR을 사용하므로 인코딩 설정
+        res.encoding = 'euc-kr'
         soup = BeautifulSoup(res.text, 'html.parser')
         reports = []
         
-        # 테이블의 행(tr)을 찾아서 데이터 추출
-        table_rows = soup.select("tr")
-        for row in table_rows:
-            if len(reports) >= 10: break  # 최신 10개만 수집
+        # 데이터가 포함된 테이블 행 선택
+        rows = soup.select("table.type_1 tr")
+        
+        for row in rows:
+            if len(reports) >= 10: break
             
-            titles = row.select(".text_l a")
-            if titles:
-                d = row.select("td")
-                if len(d) >= 5:
-                    title_text = titles[0].get_text().strip()
-                    stock_name = d[1].get_text().strip()
-                    source = f"{d[4].get_text().strip()}({d[3].get_text().strip()})"
-                    reports.append({"제목": title_text, "종목": stock_name, "출처": source})
+            # 종목명과 제목 추출
+            title_tag = row.select_one("td.alpha a")
+            if title_tag:
+                cells = row.select("td")
+                # 0:종목명, 1:제목, 2:증권사
+                stock_name = cells[0].get_text().strip()
+                title_text = cells[1].get_text().strip()
+                source = cells[2].get_text().strip()
+                
+                reports.append({
+                    "제목": title_text,
+                    "종목": stock_name,
+                    "출처": source
+                })
         return reports
     except Exception as e:
         return []
