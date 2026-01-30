@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 import os
 
-# [자동 업데이트] 15분 주기로 변경 (5분 -> 15분)
+# [자동 업데이트] 15분 주기
 st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
 
 # [로컬 데이터 보존 설정]
@@ -54,7 +54,7 @@ fprop = get_korean_font()
 st.set_page_config(page_title="KOSPI 정밀 진단 v2.8", layout="wide")
 
 # [데이터 수집] 개별 수집으로 안정성 확보 및 에러 핸들링 강화
-@st.cache_data(ttl=900) # 캐시 유지 시간도 15분으로 상향
+@st.cache_data(ttl=900)
 def load_expert_data():
     tickers = {
         '^KS11': 'KOSPI', 'USDKRW=X': 'Exchange', '^SOX': 'SOX', '^GSPC': 'SP500', 
@@ -65,15 +65,11 @@ def load_expert_data():
 
     for ticker, name in tickers.items():
         try:
-            # 과거 데이터 다운로드
             raw = yf.download(ticker, start=start_date, interval='1d', progress=False)
             if not raw.empty:
-                # 실시간 데이터(1분봉) 시도
                 rt = yf.download(ticker, period='1d', interval='1m', progress=False)
                 val = rt['Close'].iloc[-1] if not rt.empty else raw['Close'].iloc[-1]
-                
                 series = raw['Close'].copy()
-                # 마지막 인덱스가 오늘 날짜인지 확인 후 업데이트
                 series.iloc[-1] = val
                 combined_df[name] = series
         except Exception as e:
@@ -95,7 +91,7 @@ def get_analysis(df):
     X = df_smooth[features_list]
     X_scaled = (X - X.mean()) / X.std()
     X_scaled['SOX_SP500'] = X_scaled['SOX_lag1'] * X_scaled['SP500']
-    X_final = sm.add_constant(X_final_input := X_scaled)
+    X_final = sm.add_constant(X_scaled)
     model = sm.OLS(y, X_final).fit()
     abs_coeffs = np.abs(model.params.drop(['const', 'SOX_SP500']))
     contribution = (abs_coeffs / abs_coeffs.sum()) * 100
@@ -109,11 +105,12 @@ try:
     df = load_expert_data()
     model, contribution_pct = get_analysis(df)
     
+    # 상단 요약 가이드 섹션 (3컬럼 구조 복원)
     c1, c2, c3 = st.columns([1.1, 1.1, 1.3])
     
     with c1:
+        # 단기 예측 로직
         current_data = df.tail(3).mean()
-        # 데이터 정규화 로직 (에러 방지를 위해 명시적 처리)
         mu, std = df[contribution_pct.index].mean(), df[contribution_pct.index].std()
         current_scaled = (current_data[contribution_pct.index] - mu) / std
         current_scaled['SOX_SP500'] = current_scaled['SOX_lag1'] * current_scaled['SP500']
@@ -122,6 +119,7 @@ try:
         prev_val_level = df['KOSPI'].iloc[-2]
         pred_val = (pred_val_level - prev_val_level) / prev_val_level
         
+        # 히스토리 저장
         today_str = datetime.now().strftime('%Y-%m-%d')
         save_prediction_history(today_str, pred_val, df['KOSPI'].iloc[-1])
         
@@ -130,25 +128,48 @@ try:
             <div style="padding: 20px; border-radius: 15px; border-left: 10px solid {color}; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px;">
                 <h3 style="margin: 0; color: #555;">📈 KOSPI 기대 수익률: <span style="color:{color}">{pred_val:+.2%}</span></h3>
                 <p style="color: #444; font-size: 13px; margin-top: 10px; line-height: 1.5;">
-                    <b>[진단 상태]</b><br>
-                    갱신 주기: 15분 (서버 부하 감소 적용)<br>
-                    실시간 종가: <b>{df['KOSPI'].iloc[-1]:,.2f}</b>
+                    <b>[단기 수치 해석]</b><br>
+                    8대 지표의 실시간 변화를 다중 회귀 모델에 대입하여 산출한 <b>'KOSPI 기대 수익률'</b>입니다.<br>
+                    - <b>(+) 상승 압력 / (-) 하락 압력</b><br>
+                    - 절대값이 클수록 글로벌 시장의 에너지가 코스피에 강하게 작용 중임을 의미합니다.
                 </p>
             </div>
         """, unsafe_allow_html=True)
 
-    with c2:
+        # [이동] 예측 히스토리를 KOSPI 기대 수익률 밑으로 배치
+        st.write("") # 간격
         history_df = load_prediction_history()
         if not history_df.empty:
             st.markdown(f"""
-                <div style="padding: 20px; border-radius: 15px; border-left: 10px solid #3498db; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px; overflow-y: auto;">
-                    <h3 style="margin: 0; color: #555;">📊 예측 히스토리</h3>
+                <div style="padding: 15px; border-radius: 10px; border: 1px solid #eee; background-color: #f9f9f9; max-height: 250px; overflow-y: auto;">
+                    <h5 style="margin: 0 0 10px 0;">📊 예측 히스토리</h5>
                     {history_df.tail(10).to_html(index=False, classes='table table-striped')}
                 </div>
             """, unsafe_allow_html=True)
-        else:
-            st.info("누적된 예측 데이터가 없습니다.")
 
+    with c2:
+        # [복원] 중기 예측 로직 (최근 20거래일 추세)
+        mid_term_df = df.tail(20).mean()
+        mid_scaled = (mid_term_df[contribution_pct.index] - mu) / std
+        mid_scaled['SOX_SP500'] = mid_scaled['SOX_lag1'] * mid_scaled['SP500']
+        
+        mid_pred_level = model.predict([1] + mid_scaled.tolist())[0]
+        mid_start_level = df['KOSPI'].tail(20).iloc[0]
+        mid_pred_val = (mid_pred_level - mid_start_level) / mid_start_level
+        mid_color = "#e74c3c" if mid_pred_val < 0 else "#2ecc71"
+        
+        st.markdown(f"""
+            <div style="padding: 20px; border-radius: 15px; border-left: 10px solid {mid_color}; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 260px;">
+                <h3 style="margin: 0; color: #555;">📅 중기 투자 전망: <span style="color:{mid_color}">{mid_pred_val:+.2%}</span></h3>
+                <p style="color: #444; font-size: 13px; margin-top: 10px; line-height: 1.5;">
+                    <b>[중기 예측 설명]</b><br>
+                    최근 <b>20거래일(약 1개월)</b>간의 글로벌 지표 누적 변화를 바탕으로 산출한 추세적 방향성입니다.<br>
+                    - 단기 변동성(Noise)을 제거하고 거시적인 <b>에너지 흐름</b>을 파악하기 위한 지표입니다.<br>
+                    - 기대수익률과 방향이 일치할 경우 추세 강화로 해석합니다.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
     with c3:
         st.subheader("📊 지표별 KOSPI 영향력 비중")
         def highlight_max(s):
@@ -160,6 +181,7 @@ try:
 
     st.divider()
 
+    # 하단 그래프 영역 (기존 유지)
     fig, axes = plt.subplots(2, 4, figsize=(24, 10))
     plt.subplots_adjust(hspace=0.4)
     config = [
