@@ -44,12 +44,13 @@ def load_data():
     vix = yf.download("^VIX", start=start_date, end=end_date)
     copper = yf.download("HG=F", start=start_date, end=end_date)
     freight = yf.download("BDRY", start=start_date, end=end_date)
-    wti = yf.download("CL=F", start=start_date, end=end_date) # WTI 추가
-    return kospi, sp500, nikkei, exchange_rate, us_10y, us_2y, vix, copper, freight, wti
+    wti = yf.download("CL=F", start=start_date, end=end_date)
+    dxy = yf.download("DX-Y.NYB", start=start_date, end=end_date) # 달러 인덱스 추가
+    return kospi, sp500, nikkei, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy
 
 try:
     with st.spinner('시장 데이터 분석 및 가중치 최적화 중...'):
-        kospi, sp500, nikkei, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data = load_data()
+        kospi, sp500, nikkei, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data = load_data()
 
     def get_clean_series(df):
         if df is None or df.empty: return pd.Series()
@@ -66,7 +67,8 @@ try:
     vx_s = get_clean_series(vix_data).reindex(ks_s.index).ffill()
     cp_s = get_clean_series(copper_data).reindex(ks_s.index).ffill()
     fr_s = get_clean_series(freight_data).reindex(ks_s.index).ffill()
-    wt_s = get_clean_series(wti_data).reindex(ks_s.index).ffill() # WTI 시리즈 추가
+    wt_s = get_clean_series(wti_data).reindex(ks_s.index).ffill()
+    dx_s = get_clean_series(dxy_data).reindex(ks_s.index).ffill() # 달러 인덱스 시리즈 추가
     
     yield_curve = b10_s - b2_s
     ma20 = ks_s.rolling(window=20).mean()
@@ -267,15 +269,16 @@ try:
         fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2)
         st.plotly_chart(create_chart(fr_s, "글로벌 물동량 지표 (BDRY)", fr_th, f"{fr_th} 하향 돌파 시 위험"), use_container_width=True)
         st.info(f"**물동량**: 지지선({fr_th}) 하향 돌파 시 글로벌 경기 수축 신호로 간주합니다.")
-    # --- 추가된 코드 섹션 ---
     with r3_c2:
         wt_th = round(float(wt_s.last('365D').mean() * 1.2), 2)
         st.plotly_chart(create_chart(wt_s, "에너지 가격 (WTI 원유)", wt_th, f"{wt_th} 돌파 시 비용 압력"), use_container_width=True)
         st.info(f"**유가**: 유가 급등은 생산 비용 상승과 인플레이션 압박으로 이어져 시장에 부담을 줍니다.")
+    # --- 추가된 코드 섹션 (달러 인덱스) ---
     with r3_c3:
-        # 비어있는 세 번째 컬럼은 향후 확장용으로 남겨두거나 정보를 배치할 수 있습니다.
-        st.write("") 
-    # -----------------------
+        dx_th = round(float(dx_s.last('365D').mean() * 1.03), 2)
+        st.plotly_chart(create_chart(dx_s, "달러 인덱스 (DXY)", dx_th, f"{dx_th} 돌파 시 유동성 위축"), use_container_width=True)
+        st.info(f"**달러 가치**: 달러 인덱스 상승은 글로벌 유동성 축소 및 위험자산 회피 신호로 작용합니다.")
+    # -----------------------------------
 
     # 10. S&P 500 vs 글로벌 물동량 지표 표준화 분석 (새로 추가)
     st.markdown("---")
