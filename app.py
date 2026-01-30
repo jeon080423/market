@@ -162,8 +162,9 @@ try:
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(title="KOSPI", overlaying="y", side="right"), height=400, legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_bt, use_container_width=True)
     with cb2:
-        st.metric("상관계수 (Corr)", f"{correlation:.2f}")
+        # 상관계수와 설명력 위치 변경
         st.metric("설명력 (R²)", f"{(correlation**2)*100:.1f}%")
+        st.metric("상관계수 (Corr)", f"{correlation:.2f}")
         st.write("""
         **수치 해석 가이드:**
         - **-1.0 ~ -0.7**: 하락장 포착 능력 우수
@@ -198,7 +199,6 @@ try:
     def create_chart(series, title, threshold, desc_text):
         fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title))
         fig.add_hline(y=threshold, line_width=2, line_color="red")
-        # 빨간 선 위 텍스트(Annotation) 추가
         fig.add_annotation(x=series.index[len(series)//2], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
         fig.update_layout(title=title, height=300, margin=dict(l=10, r=10, t=40, b=10))
         return fig
