@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "marisk",
+  "private_key_id": "bb12816972e55614c95caa1454d20182ff055838",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEugIBADANBgkqhkiG9w0BAQEFAASCBKQwggSgAgEAAoIBAQDPhW7V/Wqa47DH\nknxgTXwRvp53ojf5gMAa29jKCyph5wba50WlYCoLyRzGEKduIOMkzoWCjtkeqtBs\nNwrlKtR5ihOeCIZSS9Mlr9Bv7HjJnHpkvuFUmoK4cN/Zsjh0V+FqrVyrdYnePTOO\nSPEw8b6sT2aok/8OWJIebg8Qg2by8JtOUBw3oIHJnFzAivbgfhPFG58w0Qo6FCuC\nn6fYFhvRHOnpGGRu9mPqlqD0T8ANmb9IE8tDKynNwG6I7PhoHS0UL9ihG6vmoQM5\nE3R2ZDZE49CtoiKDeKfi6YMi7Lt28L9VlIh1p8WZDhZ+TaF00FyvU5x7Yx7Izs2g\nEe1TELwnAgMBAAECgf82t3gB9E+nh2GVPYqN2eBczWX7JUqc/tWoP09p9oe2SLQG\nA/TZJgHwGZb8omeDIijCC7IoOoIFFATgg6Lbye88HKwPfy/rgxKpXTIYUMGIZzne\nVnYTWKoe96QOQm+gPYuyFQPaMaOodXqiiZkOzq73v/fRezRFFBVy8JIISJ1ccJp6\ncp7A4AbrGHOLXl237L97xE1kqkXKbqdT0nvzyunASbBPW/+336m1D26tOn1dBIaf\narQBhXg/EK21wxT8Nby1tpzmF77a0teJst/l25gzlsl97shCD7oevLdI5dn974F2\nu3Cwc+NB/+3MoF77SDvu7k+aGxP4mpIMdkX0zqkCgYEA/AGmI4Ko5jg6inlCMAtf\nMwGbW8d5W+cIryZ6np8IGhdhPc3hpQqB8iOZIuv+J5iPSgUqimUZ516MWXVmgP67\nfM/VA5wmM6OiL7782ustX8CosQz7U4qpHzQqVyj/6UzOJNmdDISkLHtvpU/B37LL\nCvMh/44bxYILFzVY/hhAxikCgYEA0s9QeORkh330VJecjZ0GWnl9SH5TQmcgjlaM\nJoXAxODLEiKd31XEih9FBarKU9eeyg/ttNWheGlh4NUsO7BVd668NzOWG4rK4Ua7\n6NJkYLihkRkuTUzXLPjWjJqtue5C2XGVPalcbplOFuv3MyBBLsjXj4cxzo4iXpvn\nHvJymc8CgYBzpl4UVdYlMRDMk7FoUw+xXL9rczOilXhKySHkwZ76OliKAH3ZO+U+\ntk+E00Cj80Nu+Mf5E0S8BYvrUhFkiYKJWOes7HArqqC3wLJR1TPRiZzhA9AjGrNa\nepojvdETxAemqaeFIyokr9Eg0GVsv6SmtcWYfiMIlRF56SWaFo9DYQKBgECX929j\nhA4kIOZ+oiCeOaElUqcQ1hAlq0sR59Wx7BQnUPHYm4kgLZ2o4SxQXbh8/BGr+ckM\nIHLVz4DlsK0FZdrLNq6vZtI/n9SRKOi49rrQN+lOzuounkwQXyUsDAlJoUAhVnpT\nV5gn706EtPT8cByWu74lzbQdxxg4KwRHg6fvAoGAVZhnYLMibxUgGhMojkYGmmeh\nWwJfSjnoAth0xFfUWRpXHJmd4VOxB/eeZW9j5xnVTPciLkKXaiQp/zAZrbRAkm7W\nF07L6vsxCm3gpQBEOePqPZo8f9WSGPorC9XZFkObvbbhCfPna0ZjMBq5aKb0KF1U\nUPJgo90+Q4PZKdDJSrg=\n-----END PRIVATE KEY-----\n",
+  "client_email": "kospi-tracker@marisk.iam.gserviceaccount.com",
+  "client_id": "114578545630409714357",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/kospi-tracker%40marisk.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
