@@ -180,7 +180,6 @@ try:
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
     
-    # 백테스팅 설명 추가
     st.info("""
     **백테스팅(Backtesting)이란?** 과거 데이터를 사용하여 모델이나 투자 전략의 유효성을 검증하는 과정입니다. 
     여기서는 지난 1년간의 데이터를 바탕으로 매일의 '시장 위험 지수'를 재산출하여, 
@@ -192,7 +191,6 @@ try:
         dates = ks_s.index[-lookback:]
         
         def get_hist_score(series, current_idx, inverse=False):
-            # 에러 수정: loc[:current_idx]를 사용하여 특정 날짜까지의 데이터만 슬라이싱
             sub = series.loc[:current_idx].iloc[-252:]
             if len(sub) < 10: return 50.0
             min_v, max_v = sub.min(), sub.max()
@@ -209,7 +207,6 @@ try:
             s_bn = get_hist_score(b10_s, d)
             s_cp = get_hist_score(cp_s, d, True)
             m_score = (s_fx + s_bn + s_cp) / 3
-            # 기술 점수 계산 시 ma20 사용 (ks_s와 ma20의 인덱스는 동일함)
             t_score = max(0, min(100, 100 - (ks_s.loc[d] / ma20.loc[d] - 0.9) * 500))
             f_score = get_hist_score(vx_s, d)
             
@@ -218,18 +215,34 @@ try:
 
         hist_df = pd.DataFrame({'Date': dates, 'RiskIndex': hist_risks, 'KOSPI': ks_s.loc[dates].values})
         
-        fig_bt = go.Figure()
-        fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['RiskIndex'], name="위험 지수", line=dict(color='red', width=2)))
-        fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot')))
+        # 상관계수 계산
+        correlation = hist_df['RiskIndex'].corr(hist_df['KOSPI'])
         
-        fig_bt.update_layout(
-            title="위험 지수 vs KOSPI 동조화 분석",
-            yaxis=dict(title="위험 지수 (0-100)", range=[0, 100]),
-            yaxis2=dict(title="KOSPI 지수", overlaying="y", side="right"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=400
-        )
-        st.plotly_chart(fig_bt, use_container_width=True)
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            fig_bt = go.Figure()
+            fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['RiskIndex'], name="위험 지수", line=dict(color='red', width=2)))
+            fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot')))
+            
+            fig_bt.update_layout(
+                title="위험 지수 vs KOSPI 동조화 분석",
+                yaxis=dict(title="위험 지수 (0-100)", range=[0, 100]),
+                yaxis2=dict(title="KOSPI 지수", overlaying="y", side="right"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                height=400
+            )
+            st.plotly_chart(fig_bt, use_container_width=True)
+        
+        with c2:
+            st.metric(label="📊 모델 상관계수 (Corr)", value=f"{correlation:.2f}")
+            st.write("""
+            **수치 해석:**
+            - **-1.0 ~ -0.7**: 강한 역상관 (위험 신호가 하락을 매우 잘 반영함)
+            - **-0.7 ~ -0.3**: 뚜렷한 역상관 (유의미한 하락 전조 신호)
+            - **-0.3 ~ 0.0**: 약한 역상관 (참고용 지표)
+            - **0.0 이상**: 모델 왜곡 가능성 (지표 재조정 권장)
+            """)
+
         st.caption("※ 위험 지수가 급격히 상승할 때 KOSPI의 하락 압력이 강해지는 경향을 확인할 수 있습니다.")
 
     # 9. 뉴스 및 보고서 가로 배치
