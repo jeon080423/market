@@ -1,6 +1,7 @@
 streamlit
 pandas
 numpy
-FinanceDataReader
+yfinance
+pandas-datareader
 statsmodels
 matplotlib
