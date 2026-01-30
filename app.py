@@ -187,34 +187,34 @@ try:
 
         # [신규 추가] 실시간 매매 전략 신호 가이드 및 판단 이유
         st.write("")
-        # 전략 신호 판단 로직
+        # 전략 신호 판단 로직 (괄호 내용 삭제)
         if pred_val < -0.005 and mid_pred_val < 0:
-            signal, s_color = "🔴 즉시 매도 (강한 하락)", "#ff4b4b"
+            signal, s_color = "🔴 즉시 매도", "#ff4b4b"
             reason = "단기 기대수익률이 -0.5%를 하회하며 급락 신호가 발생했고, 중기 추세 에너지 역시 음수(-)로 전환되어 하락 압력이 극에 달한 상태입니다. 리스크 관리를 위해 즉각적인 비중 축소가 권고됩니다."
         elif pred_val < 0:
-            signal, s_color = "🟠 매도 준비 (에너지 약화)", "#ffa500"
+            signal, s_color = "🟠 매도 준비", "#ffa500"
             reason = "중기 추세는 유지되고 있으나 단기 기대수익률이 음수(-)로 꺾였습니다. 글로벌 지표의 에너지가 약화되고 있으므로 수익 실현을 준비하거나 분할 매도를 검토해야 하는 시점입니다."
         elif pred_val > 0.005 and mid_pred_val > 0:
-            signal, s_color = "🔵 매수 유효 (강한 탄력)", "#1f77b4"
+            signal, s_color = "🔵 매수 유효", "#1f77b4"
             reason = "단기 기대수익률이 +0.5%를 상회하는 강한 반등 신호를 보이고 있으며, 중기 추세 또한 양수(+)로 우상향 에너지가 결합되었습니다. 추세적 상승 가능성이 높은 구간으로 판단됩니다."
         else:
-            signal, s_color = "⚪ 보유 및 관망 (중립)", "#888"
+            signal, s_color = "⚪ 보유 및 관망", "#888"
             reason = "단기 변동성과 중기 추세가 혼조세를 보이거나 뚜렷한 방향성을 나타내지 않고 있습니다. 지표가 위험선에 근접할 때까지 추가적인 시장 관망이 필요한 중립 단계입니다."
 
-        # 신호와 이유를 가로로 배치하기 위해 내부 컬럼 사용
-        sc1, sc2 = st.columns([1, 1.2])
+        # 신호와 이유의 폭을 넓히기 위해 컬럼 조정 (폭 확대)
+        sc1, sc2 = st.columns([1.1, 1.4])
         with sc1:
             st.markdown(f"""
                 <div style="padding: 15px; border-radius: 10px; background-color: {s_color}; color: white; text-align: center; height: 140px; display: flex; flex-direction: column; justify-content: center;">
-                    <h5 style="margin: 0; font-size: 14px;">⚡ 전략 신호</h5>
-                    <h2 style="margin: 5px 0 0 0; font-weight: bold; font-size: 20px;">{signal}</h2>
+                    <h5 style="margin: 0; font-size: 15px;">⚡ 전략 신호</h5>
+                    <h2 style="margin: 5px 0 0 0; font-weight: bold; font-size: 24px;">{signal}</h2>
                 </div>
             """, unsafe_allow_html=True)
         with sc2:
             st.markdown(f"""
                 <div style="padding: 12px; border-radius: 10px; border: 1px solid #ddd; background-color: #fff; height: 140px; overflow-y: auto;">
-                    <h6 style="margin: 0 0 5px 0; color: #333;">🧐 판단 이유</h6>
-                    <p style="margin: 0; font-size: 11.5px; line-height: 1.4; color: #555;">{reason}</p>
+                    <h6 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">🧐 판단 이유</h6>
+                    <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #555;">{reason}</p>
                 </div>
             """, unsafe_allow_html=True)
         
