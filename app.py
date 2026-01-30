@@ -155,8 +155,10 @@ try:
         st.plotly_chart(create_chart(sp_s, "미국 S&P 500 (영향력 60%)", sp_s.last('365D').mean()*0.9, 'below', "평균 대비 -10% 하락 시"), use_container_width=True)
         st.info("**미국 지수**: KOSPI와 가장 강한 정(+)의 상관성을 보입니다.")
     with r1_c2:
-        st.plotly_chart(create_chart(fx_s, "원/달러 환율 추이", 1350, 'above', "1,350원 돌파 시 위험"), use_container_width=True)
-        st.info("**환율**: 1,400원 이상 지속 시 외국인 자본 유출 위험이 매우 큽니다.")
+        # 최근 1년 평균의 +2%를 유동적 임계값으로 설정
+        fx_threshold = round(float(fx_s.last('365D').mean() * 1.02), 1)
+        st.plotly_chart(create_chart(fx_s, "원/달러 환율 추이", fx_threshold, 'above', f"{fx_threshold}원 돌파 시 위험"), use_container_width=True)
+        st.info(f"**환율**: 최근 1년 평균 대비 +2%({fx_threshold}원) 상회 시 외국인 자본 유출 압력이 심화됩니다.")
     with r1_c3:
         st.plotly_chart(create_chart(cp_s, "실물 경기 지표 (Copper)", cp_s.last('365D').mean()*0.9, 'below', "수요 위축 시 위험"), use_container_width=True)
         st.info("**실물 경기**: 원자재 가격 하락은 글로벌 수요 둔화의 선행 신호입니다.")
