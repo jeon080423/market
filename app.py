@@ -113,6 +113,7 @@ def get_analysis(df):
     abs_coeffs = np.abs(model.params.drop(['const', 'SOX_SP500']))
     contribution = (abs_coeffs / abs_coeffs.sum()) * 100
     
+    # 행렬 연산을 위해 계수 딕셔너리 및 정규화 파라미터 반환
     return model, contribution, X_mean, X_std
 
 def custom_date_formatter(x, pos):
@@ -161,7 +162,8 @@ try:
     h1, h2 = st.columns([3, 1])
     with h1:
         mood = "상승 우세" if pred_val > 0 else "하락 압력"
-        st.info(f"🤖 **AI 마켓 브리핑:** 현재 시장의 주동력은 **{contribution_pct.idxmax()}**이며, 분석 신뢰도는 **{reliability}**({r2:.1%})입니다. 단기적으로 **{mood}** 구간입니다.")
+        # 신뢰도 문구 명확화
+        st.info(f"🤖 **AI 마켓 브리핑:** 현재 시장의 주동력은 **{contribution_pct.idxmax()}**이며, **모델 예측 신뢰도**는 **{reliability}**({r2:.1%})입니다. 단기적으로 **{mood}** 구간입니다.")
     with h2:
         cash = 10 if pred_val > 0.005 else 40 if pred_val > 0 else 70 if pred_val > -0.005 else 90
         st.metric("권장 현금 비중", f"{cash}%", f"{'방어적' if cash >= 70 else '공격적'} 전략")
@@ -201,7 +203,7 @@ try:
                     <h2 style="margin: 5px 0 0 0; font-weight: bold; font-size: 24px;">{signal}</h2>
                 </div>
                 <div style="flex: 1.4; padding: 12px; border-radius: 10px; border: 1px solid #ddd; background-color: #fff; overflow-y: auto;">
-                    <h6 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">🧐 판단 이유</h6>
+                    <h6 style="margin: 0 0 5px 0; color: #333;">🧐 판단 이유</h6>
                     <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #555;">{reason}</p>
                 </div>
             </div>
