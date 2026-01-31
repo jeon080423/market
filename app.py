@@ -176,9 +176,11 @@ def get_market_news():
         return news_items
     except: return []
 
-# 4.6 게시판 데이터 로드/저장 로직
+# 4.6 게시판 데이터 로드/저장 로직 (수정: 캐싱 및 세션 동기화 강화)
+@st.cache_data(ttl=10) # 짧은 주기로 캐싱하여 불필요한 HTTP 요청 방지 및 데이터 일관성 유지
 def load_board_data():
     try:
+        # cache_bust를 통해 매번 최신 데이터를 시트에서 가져오도록 유도
         res = requests.get(f"{GSHEET_CSV_URL}&cache_bust={datetime.now().timestamp()}", timeout=10)
         res.encoding = 'utf-8' # 한글 깨짐 방지
         if res.status_code == 200:
@@ -198,7 +200,11 @@ def save_to_gsheet(date, author, content, password, action="append"):
             "action": action
         }
         res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=15)
-        return res.status_code == 200
+        if res.status_code == 200:
+            # 성공 시 캐시를 무효화하여 다음 로드 때 최신 데이터를 읽어오게 함
+            st.cache_data.clear()
+            return True
+        return False
     except Exception as e:
         st.error(f"연동 에러: {e}")
         return False
@@ -380,6 +386,7 @@ try:
             </style>
             """, unsafe_allow_html=True)
 
+        # 데이터 로드
         st.session_state.board_data = load_board_data()
         
         ITEMS_PER_PAGE = 20
