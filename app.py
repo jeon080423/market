@@ -33,7 +33,7 @@ ADMIN_PW = "3033"
 SHEET_ID = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 # ⚠️ 반드시 1번 단계에서 새로 배포한 웹 앱 URL을 아래에 입력하세요.
-GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbw43o-TgvsEFetlCnp_Yu-L-7aIM4INkYB9hb3Hzvr5kJS2263v3bP0RRmwXSNG9iuv/exec" 
+GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx9Py_q8W7ZR1MgS3av3LgAAgKxZgkFSoAB4oo7IlhvZFcK30R8ZUfumuH2_ouQt2wX/exec" 
 
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
@@ -140,6 +140,7 @@ def save_to_gsheet(date, author, content, password, action="append"):
             "action": action
         }
         res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=10)
+        # Apps Script 응답 텍스트가 Success, Deleted, Updated 등인지 확인
         return res.status_code in [200, 302]
     except Exception as e:
         st.error(f"상세 에러: {e}")
@@ -315,6 +316,7 @@ try:
                 paged_data = reversed_data[start_idx:end_idx]
                 
                 for i, post in enumerate(paged_data):
+                    # 세션 초기화를 위한 키 설정
                     actual_idx = len(st.session_state.board_data) - 1 - (start_idx + i)
                     bc1, bc2 = st.columns([12, 1.5]) 
                     bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
@@ -326,11 +328,15 @@ try:
                             c1, c2 = st.columns(2)
                             if c1.button("수정", key=f"ub_{actual_idx}"):
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), new_c, check_pw, action="update"):
-                                    st.success("수정됨"); st.rerun()
+                                    st.success("수정됨")
+                                    st.session_state.board_data = load_board_data() # 데이터 즉시 재로드
+                                    st.rerun()
                                 else: st.error("실패")
                             if c2.button("삭제", key=f"db_{actual_idx}"):
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), "", check_pw, action="delete"):
-                                    st.success("삭제됨"); st.rerun()
+                                    st.success("삭제됨")
+                                    st.session_state.board_data = load_board_data() # 데이터 즉시 재로드
+                                    st.rerun()
                                 else: st.error("실패")
                         elif check_pw:
                             st.error("비번 불일치")
@@ -359,7 +365,9 @@ try:
                 else:
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                     if save_to_gsheet(now_str, u_name if u_name else "익명", u_content, u_pw, action="append"):
-                        st.success("등록됨"); st.rerun()
+                        st.success("등록됨")
+                        st.session_state.board_data = load_board_data()
+                        st.rerun()
                     else: st.error("실패")
 
     # 7. 백테스팅
