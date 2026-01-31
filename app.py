@@ -91,7 +91,7 @@ def get_kst_now():
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
 st.markdown(f"""
-이 대시보드는 **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하는데 최적화 되어 있습니다.  **검증되지 않은 모델** 입니다. **참고용** 으로만 사용하세요.
+이 대시보드는 **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하는데 최적화 되어 있습니다.  **검증되지 않은 모델** 이기때문에 **참고만** 하세요.
 (마지막 업데이트 KST: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
 """)
 st.markdown("---")
@@ -277,6 +277,19 @@ try:
     w_global = st.sidebar.slider("글로벌 시장 위험 (미국 지수)", 0.0, 1.0, key="slider_g", step=0.01)
     w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, key="slider_f", step=0.01)
     w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
+
+    # --- 기술적 산출 방법 설명으로 변경 ---
+    with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
+        st.caption("""
+        본 모델은 **시차 상관분석**과 **선형 회귀(OLS)** 를 결합하여 최적 가중치를 도출합니다.
+        
+        1. **시차 최적화 (Lag Optimization)**:
+           각 지표와 KOSPI 간의 상관계수가 최대가 되는 지연 일수(0~5일)를 자동으로 탐색합니다.
+        2. **기여도 산출 (ML Regression)**:
+           `np.linalg.lstsq`를 사용하여 각 팩터가 KOSPI 변동에 미치는 영향력(Coefficient)을 산출합니다.
+        3. **가중치 정규화**:
+           `|계수| x 표준편차`를 통해 변동성 기여도를 계산하고, 이를 확률적으로 정규화하여 기본값으로 제시합니다.
+        """)
 
     st.sidebar.markdown("---")
     
@@ -480,9 +493,9 @@ try:
         fig.add_hline(y=threshold, line_width=2, line_color="red")
         fig.add_annotation(x=series.index[len(series)//2], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
         
-        # Blue Line & Annotation (NEW)
+        # Blue Line & Annotation
         fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
-        fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="COVID 주가 폭락 기점", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
+        fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="코로나19", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
         
         return fig
 
@@ -559,4 +572,3 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
-
