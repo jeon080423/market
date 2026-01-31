@@ -253,13 +253,13 @@ try:
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
-        st.subheader("📰 글로벌 마켓 리스크 뉴스")
+        st.subheader("📰 글로벌 마켓 뉴스")
         news_list = get_market_news()
         if news_list:
             for a in news_list: st.markdown(f"- [{a['title']}]({a['url']})")
         else: st.info("현재 뉴스를 불러올 수 없습니다.")
     with cr:
-        st.subheader("📝 최신 애널 보고서")
+        st.subheader("📝 최신 보고서")
         reports = get_analyst_reports()
         if reports:
             st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
@@ -397,6 +397,7 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
 
 
 
