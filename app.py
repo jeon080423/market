@@ -33,8 +33,8 @@ ADMIN_PW = "3033"
 # 구글 시트 설정
 SHEET_ID = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-# ⚠️ 반드시 배포한 웹 앱 URL을 입력하세요.
-GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbw43o-TgvsEFetlCnp_Yu-L-7aIM4INkYB9hb3Hzvr5kJS2263v3bP0RRmwXSNG9iuv/exec" 
+# ⚠️ 반드시 새로 배포한 웹 앱 URL을 아래에 입력하세요.
+GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx9Py_q8W7ZR1MgS3av3LgAAgKxZgkFSoAB4oo7IlhvZFcK30R8ZUfumuH2_ouQt2wX/exec" 
 
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
@@ -123,10 +123,9 @@ def get_market_news():
         return news_items
     except: return []
 
-# 4.6 게시판 데이터 로드/저장 로직 (개선됨)
+# 4.6 게시판 데이터 로드/저장 로직
 def load_board_data():
     try:
-        # 캐시 무효화 및 한글 인코딩 강제 설정
         res = requests.get(f"{GSHEET_CSV_URL}&cache_bust={datetime.now().timestamp()}", timeout=10)
         res.encoding = 'utf-8' # 한글 깨짐 방지
         if res.status_code == 200:
@@ -139,18 +138,14 @@ def load_board_data():
 def save_to_gsheet(date, author, content, password, action="append"):
     try:
         payload = {
-            "date": str(date).strip(),
-            "author": str(author).strip(),
-            "content": str(content).strip(),
-            "password": str(password).strip(),
+            "date": str(date),
+            "author": str(author),
+            "content": str(content),
+            "password": str(password),
             "action": action
         }
-        # JSON 형식으로 명확하게 전달
         res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=15)
-        # Apps Script에서 리턴한 텍스트에 성공 키워드가 있는지 확인
-        if res.status_code == 200:
-            return True
-        return False
+        return res.status_code == 200
     except Exception as e:
         st.error(f"연동 에러: {e}")
         return False
@@ -294,7 +289,6 @@ try:
     with cr:
         st.subheader("💬 한 줄 의견(익명)")
         
-        # 스타일 보강
         st.markdown("""
             <style>
             .stMarkdown p { margin-top: -2px !important; margin-bottom: -2px !important; line-height: 1.2 !important; padding: 0px !important; }
@@ -324,29 +318,25 @@ try:
                 paged_data = reversed_data[start_idx : start_idx + ITEMS_PER_PAGE]
                 
                 for i, post in enumerate(paged_data):
-                    # 고유 아이디 생성
                     unique_id = f"post_{start_idx + i}"
                     bc1, bc2 = st.columns([12, 1.5]) 
                     bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
                     
                     with bc2.popover("편집", help="수정/삭제"):
                         chk_pw = st.text_input("비밀번호", type="password", key=f"chk_{unique_id}")
-                        # 시트에서 불러온 비밀번호와 입력한 비밀번호를 문자열로 엄격히 비교
                         stored_pw = str(post.get('Password', '')).strip()
                         
                         if chk_pw and chk_pw.strip() == stored_pw:
                             new_val = st.text_input("수정 내용", value=post.get('Content',''), key=f"edit_{unique_id}")
                             btn1, btn2 = st.columns(2)
-                            if btn1.button("수정 완료", key=f"up_{unique_id}"):
+                            if btn1.button("수정", key=f"up_{unique_id}"):
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), new_val, stored_pw, action="update"):
                                     st.success("수정 성공")
                                     st.rerun()
-                                else: st.error("수정 실패")
-                            if btn2.button("즉시 삭제", key=f"del_{unique_id}"):
-                                if save_to_gsheet(post.get('date',''), post.get('Author',''), "", stored_pw, action="delete"):
+                            if btn2.button("삭제", key=f"del_{unique_id}"):
+                                if save_to_gsheet(post.get('date',''), post.get('Author',''), post.get('Content',''), stored_pw, action="delete"):
                                     st.success("삭제 성공")
                                     st.rerun()
-                                else: st.error("삭제 실패")
                         elif chk_pw:
                             st.error("불일치")
         
@@ -372,11 +362,11 @@ try:
                 elif not u_pw: st.error("비번 필수")
                 elif not u_content: st.error("내용 입력")
                 else:
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # 초단위까지 포함하여 유니크함 증대
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     if save_to_gsheet(now_str, u_name, u_content, u_pw, action="append"):
                         st.success("등록 성공")
                         st.rerun()
-                    else: st.error("등록 실패")
+                    else: st.error("실패")
 
     # 7. 백테스팅
     st.markdown("---")
@@ -498,4 +488,3 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
-
