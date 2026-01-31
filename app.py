@@ -34,7 +34,7 @@ ADMIN_PW = "3033"
 SHEET_ID = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 # ⚠️ 반드시 새로 배포한 웹 앱 URL을 아래에 입력하세요.
-GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx9Py_q8W7ZR1MgS3av3LgAAgKxZgkFSoAB4oo7IlhvZFcK30R8ZUfumuH2_ouQt2wX/exec" 
+GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyli4kg7O_pxUOLAOFRCCiyswB5TXrA0RUMvjlTirSxLi4yz3tXH1YoGtNUyjztpDsb/exec" 
 
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
@@ -488,3 +488,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
