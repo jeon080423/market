@@ -241,12 +241,20 @@ try:
     c_gd, c_gg = st.columns([1, 1.5])
     with c_gd:
         st.subheader("💡 지수를 더 똑똑하게 보는 법")
-        st.markdown("| 점수 | 의미 | 권장 대응 |\n| :--- | :--- | :--- |\n| **0-40** | Safe | 적극적 수익 추구 |\n| **40-60** | Watch | 현금 비중 고민 |\n| **60-80** | Danger | 방어적 운용 |\n| **80-100** | Panic | 리스크 관리 최우선 |")
+        st.markdown(f"""
+        현재 시장 위험 지수는 **{total_risk_index:.1f}pt**입니다. 지수 구간별 상세 대응 전략은 다음과 같습니다.
+
+        | 점수 | 상태 | 현재 상황 및 시장 심리 | 권장 대응 (Action Plan) |
+        | :--- | :--- | :--- | :--- |
+        | **0-40** | **Safe** | 매크로 및 심리 지표 안정. 외국인 매수세 유입 가능성 높음. | **적극적 수익 추구.** 주식 비중을 확대하고 주도주 위주의 공격적 포트폴리오 운용. |
+        | **40-60** | **Watch** | 지표 혼조세. 추세 전환의 변곡점 가능성. 변동성 확대 시작. | **현금 비중 조절 시작.** 추가 매수는 지양하고, 수익이 난 종목은 일부 차익 실현 고려. |
+        | **60-80** | **Danger** | 주요 지표 악화(환율 급등, 금리 역전 등). 투매 심리 확산 중. | **방어적 운용 및 리스크 관리.** 주식 비중을 50% 이하로 축소. 변동성이 낮은 배당주나 가치주 위주 재편. |
+        | **80-100** | **Panic** | 시장 붕괴 위험 고조. 극도의 공포(VIX 급등) 및 기술적 지지선 붕괴. | **최우선 리스크 관리.** 가급적 현금 비중 최대화. 신용/미수 사용 전면 금지 및 손절매 기준 엄격 적용. |
+        
+        *※ 본 지수는 과거 데이터를 기반으로 한 통계적 수치이며, 예상치 못한 블랙스완 발생 시 즉각 대응이 어려울 수 있습니다.*
+        """)
     with c_gg:
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number", 
-            value=total_risk_index, 
-            title={'text': "종합 시장 위험 지수"},
+        fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=total_risk_index, title={'text': "종합 시장 위험 지수"},
             gauge={
                 'axis': {'range': [0, 100]}, 
                 'bar': {'color': "black"},
@@ -255,8 +263,7 @@ try:
                     {'range': [40, 60], 'color': "yellow"}, 
                     {'range': [60, 80], 'color': "orange"}, 
                     {'range': [80, 100], 'color': "red"}
-                ]
-            }))
+                ]}))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
     # 뉴스 및 리포트
