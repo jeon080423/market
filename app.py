@@ -128,27 +128,28 @@ def load_board_data():
         # 캐시 방지를 위해 랜덤 쿼리 추가 및 데이터 타입 지정
         resp = requests.get(f"{GSHEET_CSV_URL}&cache_bust={datetime.now().timestamp()}")
         from io import StringIO
-        df = pd.read_csv(StringIO(resp.text), dtype=str) # 모든 데이터를 문자열로 처리하여 비교 정확도 향상
+        # 모든 데이터를 문자열(str)로 읽어들여 형식 불일치 방지
+        df = pd.read_csv(StringIO(resp.text), dtype=str) 
         return df.to_dict('records')
     except:
         return []
 
 def save_to_gsheet(date, author, content, password, action="append"):
     try:
+        # 날짜 형식 통일 및 데이터 문자열화
         payload = {
-            "date": str(date),
-            "author": str(author),
-            "content": str(content),
-            "password": str(password),
+            "date": str(date).strip(),
+            "author": str(author).strip(),
+            "content": str(content).strip(),
+            "password": str(password).strip(),
             "action": action
         }
-        # post 시 headers 명시
         headers = {'Content-Type': 'application/json'}
         res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), headers=headers, timeout=15)
-        # 성공 시 응답 본문에 'Success', 'Deleted', 'Updated'가 포함되는지 확인
-        return res.status_code in [200, 302]
+        # Apps Script가 정상적으로 응답했는지 확인 (200 OK)
+        return res.status_code == 200
     except Exception as e:
-        st.error(f"상세 에러: {e}")
+        st.error(f"전송 에러: {e}")
         return False
 
 try:
@@ -320,28 +321,33 @@ try:
                 paged_data = reversed_data[start_idx:end_idx]
                 
                 for i, post in enumerate(paged_data):
-                    # 전체 데이터에서의 고유 인덱스 계산 (역순 기준)
                     actual_key = f"post_{start_idx + i}"
                     bc1, bc2 = st.columns([12, 1.5]) 
+                    
+                    # 작성자와 내용 표시 (폰트 확대 1.1rem)
                     bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
                     
                     with bc2.popover("편집", help="수정/삭제"):
                         check_pw = st.text_input("비번 확인", type="password", key=f"check_{actual_key}")
-                        # 시트에서 온 비밀번호와 입력한 비밀번호를 문자열로 비교
                         stored_pw = str(post.get('Password', '')).strip()
+                        
+                        # 비밀번호가 일치할 때만 수정/삭제 버튼 노출
                         if check_pw and check_pw.strip() == stored_pw:
                             new_c = st.text_input("내용 수정", value=post.get('Content',''), key=f"edit_{actual_key}")
                             c1, c2 = st.columns(2)
                             if c1.button("수정", key=f"ub_{actual_key}"):
-                                # 정확한 날짜 매칭을 위해 원본 date 사용
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), new_c, stored_pw, action="update"):
                                     st.success("수정됨")
                                     st.rerun()
+                                else:
+                                    st.error("수정 실패")
                             if c2.button("삭제", key=f"db_{actual_key}"):
-                                # 삭제 시 content는 무의미하나 action="delete"로 분기
+                                # action을 명시적으로 'delete'로 전달
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), "", stored_pw, action="delete"):
                                     st.success("삭제됨")
                                     st.rerun()
+                                else:
+                                    st.error("삭제 실패")
                         elif check_pw:
                             st.error("비번 불일치")
         
