@@ -29,7 +29,7 @@ ADMIN_ID = "jeon080423"
 ADMIN_PW = "3033"
 # 구글 시트 URL (여기에 본인의 구글 시트 편집용 CSV 내보내기 링크 또는 Apps Script URL을 넣으세요)
 # 예시 형식: https://docs.google.com/spreadsheets/d/시트ID/gviz/tq?tqx=out:csv
-GSHEET_URL = "" 
+GSHEET_URL = "https://docs.google.com/spreadsheets/d/1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU/edit?gid=0#gid=0" 
 
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
@@ -421,3 +421,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
