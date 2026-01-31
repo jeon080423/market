@@ -71,14 +71,7 @@ with st.expander("📖 대시보드 사용 가이드"):
     st.markdown("#### **③ Z-Score 표준화 (Standardization)**")
     st.latex(r"Z = \frac{x - \mu}{\sigma}")
 
-    st.divider()
-    st.subheader("💡 [제안] 데이터 크롤링 성능 개선 방법")
-    st.write("""
-    현재의 크롤링 방식(BeautifulSoup) 외에 더 안정적인 데이터 수집을 위한 **두 가지 대안**을 추천합니다.
-    1. **Playwright/Selenium 활용**: 네이버 증권 등 동적 자바스크립트로 로딩되는 리포트 페이지의 경우, 단순 리퀘스트보다 브라우저 엔진을 사용하는 방식이 누락 없는 데이터 수집에 유리합니다.
-    2. **전문 금융 API (EOD Historical Data 등)**: 뉴스 크롤링은 속도 제한(Rate Limit)이 잦으므로, 유료 금융 API를 연동하면 실시간 전 세계 마켓 리스크 관련 기사를 정형화된 JSON 데이터로 안전하게 받아올 수 있습니다.
-    """)
-
+   
 # 4. 데이터 수집 함수
 @st.cache_data(ttl=600)
 def load_data():
@@ -398,3 +391,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
