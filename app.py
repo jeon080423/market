@@ -87,7 +87,7 @@ st.markdown("""
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
 st.markdown(f"""
 이 대시보드는 **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하는데 최적화 되어 있습니다.  **검증되지 않은 모델** 입니다. **참고용** 으로만 사용하세요.
-(마지막 업데이트: {datetime.now().strftime('%d일 %H시 %M분')})
+(마지막 업데이트: {datetime.now().strftime('%m월 %d일 %H시 %M분')})
 """)
 st.markdown("---")
 
@@ -551,4 +551,5 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
 
