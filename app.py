@@ -32,8 +32,8 @@ ADMIN_PW = "3033"
 # 구글 시트 설정
 SHEET_ID = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-# 상단 가이드에 따라 생성한 Apps Script 웹 앱 URL을 여기에 입력하세요.
-GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxuYuDmHYaYniYGuCklq7-_nUq4axPwkNnzYI1UGiSPGaZ-7yix65P4J0cGiAPyaj3j/exec" 
+# ⚠️ 반드시 1번 단계에서 새로 배포한 웹 앱 URL을 아래에 입력하세요.
+GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx9Py_q8W7ZR1MgS3av3LgAAgKxZgkFSoAB4oo7IlhvZFcK30R8ZUfumuH2_ouQt2wX/exec" 
 
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
@@ -59,7 +59,7 @@ with st.expander("📖 대시보드 사용 가이드"):
     st.markdown("#### **① 선행성 분석 범위 (Lag Optimization)**")
     st.write("""
     * **단기 선행성 (1~5일)**: 현재 모델의 `find_best_lag` 함수는 각 지표와 KOSPI 간의 상관계수가 가장 높게 나타나는 지연 시간을 0일에서 5일 사이에서 찾습니다. 이는 매크로 지표의 변화가 국내 증시에 즉각적 혹은 수일 내에 반영되는 단기적 '전조 신호'를 포착하는 데 최적화되어 있습니다.
-    * **중장기 선행성 (1~3개월)**: '장단기 금리차'와 같은 특정 지표는 수개월 이상의 시차를 두고 실물 경기에 영향을 주지만, 본 대시보드는 주식 시장의 단기 하락 위험 모니터링에 초층을 맞추고 있어 모델 내부적으로는 최근의 변동 기여도를 우선시합니다.
+    * **중장기 선행성 (1~3개월)**: '장단기 금리차'와 같은 특정 지표는 수개월 이상의 시차를 두고 실물 경기에 영향을 주지만, 본 대시보드는 주식 시장의 단기 하락 위험 모니터링에 초점을 맞추고 있어 모델 내부적으로는 최근의 변동 기여도를 우선시합니다.
     """)
     
     st.markdown("#### **② 지표별 특성에 따른 선행 효과**")
@@ -125,9 +125,7 @@ def get_market_news():
 # 4.6 게시판 데이터 로드/저장 로직
 def load_board_data():
     try:
-        # 캐싱 방지를 위한 파라미터 추가
         df = pd.read_csv(f"{GSHEET_CSV_URL}&cache_bust={datetime.now().timestamp()}")
-        # 컬럼명 대소문자 통일 (date, Author, Content, Password)
         return df.to_dict('records')
     except:
         return []
@@ -140,9 +138,12 @@ def save_to_gsheet(date, author, content, password):
             "content": content,
             "password": password
         }
-        res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload))
-        return res.status_code == 200
-    except:
+        # 웹 앱으로 데이터 전송 (Redirect 허용을 위해 allow_redirects=True 설정)
+        res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=10)
+        # Apps Script는 성공 시 200 혹은 302 리다이렉트를 반환할 수 있음
+        return res.status_code in [200, 302]
+    except Exception as e:
+        st.error(f"상세 에러: {e}")
         return False
 
 try:
