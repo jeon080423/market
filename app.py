@@ -502,7 +502,7 @@ try:
         
         # Blue Line & Annotation
         fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
-        fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="코로나19", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
+        fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="COVID 지수 폭락 기점", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
         
         return fig
 
@@ -579,3 +579,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
