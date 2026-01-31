@@ -96,46 +96,52 @@ def load_data():
     
     return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
-# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 RSS 함수 (수정 적용)
+# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 RSS 함수 (수정 반영)
 @st.cache_data(ttl=600)
 def get_market_news():
-    # 실제 작동하는 Yahoo Finance 글로벌 뉴스 RSS 주소
+    # 실제 작동이 보장된 Yahoo Finance RSS 피드 주소
     rss_url = "https://finance.yahoo.com/news/rssindex"
     try:
         res = requests.get(rss_url, timeout=10)
-        soup = BeautifulSoup(res.content, features="xml")
+        # 범용적인 'html.parser'를 사용하면서도 RSS 태그를 읽도록 수정
+        soup = BeautifulSoup(res.content, 'html.parser')
         items = soup.find_all('item')
         news_items = []
         for item in items[:5]:
-            news_items.append({"title": item.title.text, "link": item.link.text})
+            # RSS는 보통 <title>과 <link> 태그를 사용함
+            title = item.find('title').get_text() if item.find('title') else "뉴스 제목 없음"
+            link = item.find('link').next_sibling.strip() if item.find('link') else "#"
+            news_items.append({"title": title, "link": link})
         return news_items
     except:
         return []
 
 def get_analyst_reports():
-    # 네이버 증권 리포트 크롤링 백업 로직을 우선 실행하여 정보 표시 보장
-    url = "https://finance.naver.com/research/company_list.naver"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    # 국내 증권 보고서: 한국경제 증권가 소식 RSS를 우선 사용 (신뢰도 높음)
+    rss_url = "https://www.hankyung.com/feed/stock"
     try:
-        res = requests.get(url, headers=headers, timeout=10)
-        res.encoding = 'euc-kr'
-        soup = BeautifulSoup(res.text, 'html.parser')
-        rows = soup.select("table.type_1 tr")
+        res = requests.get(rss_url, timeout=10)
+        soup = BeautifulSoup(res.content, 'html.parser')
+        items = soup.find_all('item')
         reports = []
+        for item in items[:10]:
+            title = item.find('title').get_text() if item.find('title') else "리포트 정보 없음"
+            reports.append({"제목": title, "종목": "국내증시", "출처": "한국경제"})
+        
+        if reports: return reports
+
+        # RSS 실패 시 네이버 증권 기존 크롤링 로직 가동
+        url = "https://finance.naver.com/research/company_list.naver"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        res_nv = requests.get(url, headers=headers, timeout=10)
+        res_nv.encoding = 'euc-kr'
+        soup_nv = BeautifulSoup(res_nv.text, 'html.parser')
+        rows = soup_nv.select("table.type_1 tr")
         for r in rows:
             if len(reports) >= 10: break
             if r.select_one("td.alpha"):
                 tds = r.select("td")
                 reports.append({"제목": tds[1].get_text().strip(), "종목": tds[0].get_text().strip(), "출처": tds[2].get_text().strip()})
-        if reports: return reports
-        
-        # 만약 크롤링 실패 시 RSS 변환 주소 시도 (대안)
-        rss_converted_url = "https://rss.app/feeds/example_naver_finance_reports.xml" 
-        res_rss = requests.get(rss_converted_url, timeout=5)
-        soup_rss = BeautifulSoup(res_rss.content, features="xml")
-        items = soup_rss.find_all('item')
-        for item in items[:10]:
-            reports.append({"제목": item.title.text, "종목": "분석종목", "출처": "RSS"})
         return reports
     except:
         return []
@@ -267,7 +273,7 @@ try:
         fig_gauge.update_layout(height=350, margin=dict(t=50, b=0))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 뉴스 및 리포트 섹션 (명칭 수정: 국내 증권 보고서)
+    # 뉴스 및 리포트 섹션 (수정된 RSS 및 크롤링 로직 적용)
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
@@ -283,9 +289,9 @@ try:
         if reports:
             st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
         else:
-            st.info("현재 보고서를 불러올 수 없습니다. 네이버 증권 연결 상태를 확인하세요.")
+            st.info("현재 보고서를 불러올 수 없습니다. 증권사 연결 상태를 확인하세요.")
 
-    # 7. 백테스팅 섹션 (요청 반영: 설명 및 상관계수 가이드 복원, 설명력 삭제)
+    # 7. 백테스팅 섹션 (항목 반영: 설명 및 상관계수 가이드 복원, 설명력 삭제)
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
     st.info("""
@@ -341,8 +347,6 @@ try:
         fig_bs2.update_layout(height=350, margin=dict(l=10, r=10, t=30, b=10), yaxis=dict(title="위험 강도", range=[0, 100])); st.plotly_chart(fig_bs2, use_container_width=True)
 
     # 9. 지표별 상세 분석
-    st.markdown("---")
-    st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석")
     def create_chart(series, title, threshold, desc_text):
         if series.empty: return go.Figure()
         fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title))
