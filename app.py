@@ -261,37 +261,63 @@ try:
     with cr:
         st.subheader("💬 한 줄 의견(익명)")
         
-        # 게시글 간 상하 여백 최소화 스타일 추가
+        # 게시글 간 상하 여백 및 텍스트 줄 간격 최소화 스타일 보강
         st.markdown("""
             <style>
-            .stMarkdown p { margin-bottom: 2px !important; }
-            .element-container { margin-bottom: 2px !important; }
+            .stMarkdown p { margin-bottom: 0px !important; line-height: 1.2 !important; }
+            .element-container { margin-bottom: 1px !important; }
+            div[data-testid="stVerticalBlock"] > div { padding-top: 0px !important; padding-bottom: 0px !important; }
             </style>
             """, unsafe_allow_html=True)
 
+        # 페이지네이션 설정
+        ITEMS_PER_PAGE = 20
+        total_posts = len(st.session_state.board_data)
+        total_pages = max(1, (total_posts - 1) // ITEMS_PER_PAGE + 1)
+        
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 1
+            
         # 게시글 목록 표시 (위로 올림)
-        board_container = st.container(height=300)
+        board_container = st.container(height=350)
         with board_container:
             if not st.session_state.board_data:
                 st.write("등록된 의견이 없습니다.")
-            for idx, post in enumerate(st.session_state.board_data):
-                bc1, bc2 = st.columns([6, 1])
-                bc1.markdown(f"**{post['Author']}**: {post['Content']} <small style='color:gray;'>({post['Date']})</small>", unsafe_allow_html=True)
+            else:
+                start_idx = (st.session_state.current_page - 1) * ITEMS_PER_PAGE
+                end_idx = start_idx + ITEMS_PER_PAGE
+                paged_data = st.session_state.board_data[start_idx:end_idx]
                 
-                with bc2.popover("⚙️", help="삭제"):
-                    if is_admin:
-                        st.info("관리자 권한")
-                        if st.button("삭제", key=f"del_admin_{idx}"):
-                            st.session_state.board_data.pop(idx)
-                            st.rerun()
-                    else:
-                        input_pw = st.text_input("비밀번호", type="password", key=f"pw_{idx}")
-                        if st.button("삭제", key=f"del_{idx}"):
-                            if input_pw == post['Password']:
-                                st.session_state.board_data.pop(idx)
+                for i, post in enumerate(paged_data):
+                    actual_idx = start_idx + i
+                    bc1, bc2 = st.columns([6, 1])
+                    bc1.markdown(f"**{post['Author']}**: {post['Content']} <small style='color:gray;'>({post['Date']})</small>", unsafe_allow_html=True)
+                    
+                    with bc2.popover("⚙️", help="삭제"):
+                        if is_admin:
+                            st.info("관리자 권한")
+                            if st.button("삭제", key=f"del_admin_{actual_idx}"):
+                                st.session_state.board_data.pop(actual_idx)
                                 st.rerun()
-                            else:
-                                st.error("불일치")
+                        else:
+                            input_pw = st.text_input("비밀번호", type="password", key=f"pw_{actual_idx}")
+                            if st.button("삭제", key=f"del_{actual_idx}"):
+                                if input_pw == post['Password']:
+                                    st.session_state.board_data.pop(actual_idx)
+                                    st.rerun()
+                                else:
+                                    st.error("불일치")
+        
+        # 페이지 조절 단추
+        if total_pages > 1:
+            pc1, pc2, pc3 = st.columns([1, 2, 1])
+            if pc1.button("이전", disabled=st.session_state.current_page == 1):
+                st.session_state.current_page -= 1
+                st.rerun()
+            pc2.write(f"<center>{st.session_state.current_page} / {total_pages}</center>", unsafe_allow_html=True)
+            if pc3.button("다음", disabled=st.session_state.current_page == total_pages):
+                st.session_state.current_page += 1
+                st.rerun()
 
         # 글쓰기 폼 (작성 폼과 등록 단추까지 모두 한 줄 배치)
         st.markdown("---")
@@ -318,6 +344,8 @@ try:
                         "Password": u_pw
                     }
                     st.session_state.board_data.insert(0, new_post)
+                    # 새 글 작성 시 첫 페이지로 이동
+                    st.session_state.current_page = 1
                     st.rerun()
 
     # 7. 백테스팅
