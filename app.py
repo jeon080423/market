@@ -125,6 +125,7 @@ def get_market_news():
 # 4.6 게시판 데이터 로드/저장 로직
 def load_board_data():
     try:
+        # 캐시 무효화를 위해 타임스탬프 파라미터 추가
         df = pd.read_csv(f"{GSHEET_CSV_URL}&cache_bust={datetime.now().timestamp()}")
         return df.to_dict('records')
     except:
@@ -133,15 +134,17 @@ def load_board_data():
 def save_to_gsheet(date, author, content, password, action="append"):
     try:
         payload = {
-            "date": date,
-            "author": author,
-            "content": content,
+            "date": str(date),
+            "author": str(author),
+            "content": str(content),
             "password": str(password),
             "action": action
         }
-        res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=10)
-        # Apps Script 응답 텍스트가 Success, Deleted, Updated 등인지 확인
-        return res.status_code in [200, 302]
+        res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=15)
+        # 성공 응답 확인 및 세션 상태 갱신을 위해 True 반환
+        if res.status_code in [200, 302]:
+            return True
+        return False
     except Exception as e:
         st.error(f"상세 에러: {e}")
         return False
@@ -298,6 +301,7 @@ try:
             </style>
             """, unsafe_allow_html=True)
 
+        # 게시판 데이터 로드 (매번 최신 데이터를 시트에서 가져옴)
         st.session_state.board_data = load_board_data()
         
         ITEMS_PER_PAGE = 20
@@ -310,13 +314,14 @@ try:
             if not st.session_state.board_data:
                 st.write("의견이 없습니다.")
             else:
+                # 데이터를 역순으로 정렬(최신순)
                 reversed_data = st.session_state.board_data[::-1]
                 start_idx = (st.session_state.current_page - 1) * ITEMS_PER_PAGE
                 end_idx = start_idx + ITEMS_PER_PAGE
                 paged_data = reversed_data[start_idx:end_idx]
                 
                 for i, post in enumerate(paged_data):
-                    # 세션 초기화를 위한 키 설정
+                    # 고유 키 생성을 위한 인덱스
                     actual_idx = len(st.session_state.board_data) - 1 - (start_idx + i)
                     bc1, bc2 = st.columns([12, 1.5]) 
                     bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
@@ -329,13 +334,15 @@ try:
                             if c1.button("수정", key=f"ub_{actual_idx}"):
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), new_c, check_pw, action="update"):
                                     st.success("수정됨")
-                                    st.session_state.board_data = load_board_data() # 데이터 즉시 재로드
+                                    # 명시적으로 세션 데이터 업데이트 후 리런
+                                    st.session_state.board_data = load_board_data()
                                     st.rerun()
                                 else: st.error("실패")
                             if c2.button("삭제", key=f"db_{actual_idx}"):
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), "", check_pw, action="delete"):
                                     st.success("삭제됨")
-                                    st.session_state.board_data = load_board_data() # 데이터 즉시 재로드
+                                    # 명시적으로 세션 데이터 업데이트 후 리런
+                                    st.session_state.board_data = load_board_data()
                                     st.rerun()
                                 else: st.error("실패")
                         elif check_pw:
