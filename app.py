@@ -41,22 +41,28 @@ with st.expander("📖 대시보드 사용 가이드"):
     * **시장 심리**: **VIX(공포 지수)** 를 통해 투자자의 불안 심리와 변동성 전조를 파악합니다.
     * **실물 경제**: 경기 선행 지표인 **구리 가격(Copper)** 과 **장단기 금리차**를 포함합니다.
     """)
+    
     st.divider()
+
     st.subheader("2. 선행성 분석 범위 및 효과 (Lag Analysis)")
     st.markdown("#### **① 선행성 분석 범위 (Lag Optimization)**")
     st.write("""
     * **단기 선행성 (1~5일)**: 현재 모델의 `find_best_lag` 함수는 각 지표와 KOSPI 간의 상관계수가 가장 높게 나타나는 지연 시간을 0일에서 5일 사이에서 찾습니다. 이는 매크로 지표의 변화가 국내 증시에 즉각적 혹은 수일 내에 반영되는 단기적 '전조 신호'를 포착하는 데 최적화되어 있습니다.
     * **중장기 선행성 (1~3개월)**: '장단기 금리차'와 같은 특정 지표는 수개월 이상의 시차를 두고 실물 경기에 영향을 주지만, 본 대시보드는 주식 시장의 단기 하락 위험 모니터링에 초점을 맞추고 있어 모델 내부적으로는 최근의 변동 기여도를 우선시합니다.
     """)
+    
     st.markdown("#### **② 지표별 특성에 따른 선행 효과**")
     st.write("""
     * **공포 지수(VIX) 및 환율**: 통상적으로 당일 혹은 1~2일 내외의 매우 짧은 선행성을 보이며 시장의 즉각적인 심리를 반영합니다.
     * **구리 가격 및 물동량(BDRY)**: 실물 경기를 반영하므로 주가지수보다 수일에서 수주 앞서 추세적 변화를 보이는 경향이 있습니다.
     * **장단기 금리차**: 실제 경기 침체는 6개월~1년 이상의 시차를 두고 발생할 수 있으나, 금융 시장은 이를 선반영하여 수주 내에 하락 압력을 받기 시작합니다.
     """)
+    
     st.markdown("#### **③ 요약**")
     st.info("본 대시보드의 위험 지수는 수개월 단위의 거시적 경제 지표보다는, **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하고 대비하는 데 최적화되어 설계되었습니다.")
+
     st.divider()
+    
     st.subheader("3. 수리적 산출 공식")
     st.markdown("#### **① 시차 상관관계 (Time-Lagged Correlation)**")
     st.latex(r"\rho(k) = \frac{Cov(X_{t-k}, Y_t)}{\sigma_{X_{t-k}} \sigma_{Y_t}} \quad (0 \le k \le 5)")
@@ -64,6 +70,14 @@ with st.expander("📖 대시보드 사용 가이드"):
     st.latex(r"Importance_i = |\beta_i| \times \sigma_{X_i}")
     st.markdown("#### **③ Z-Score 표준화 (Standardization)**")
     st.latex(r"Z = \frac{x - \mu}{\sigma}")
+
+    st.divider()
+    st.subheader("💡 [제안] 데이터 크롤링 성능 개선 방법")
+    st.write("""
+    현재의 크롤링 방식(BeautifulSoup) 외에 더 안정적인 데이터 수집을 위한 **두 가지 대안**을 추천합니다.
+    1. **Playwright/Selenium 활용**: 네이버 증권 등 동적 자바스크립트로 로딩되는 리포트 페이지의 경우, 단순 리퀘스트보다 브라우저 엔진을 사용하는 방식이 누락 없는 데이터 수집에 유리합니다.
+    2. **전문 금융 API (EOD Historical Data 등)**: 뉴스 크롤링은 속도 제한(Rate Limit)이 잦으므로, 유료 금융 API를 연동하면 실시간 전 세계 마켓 리스크 관련 기사를 정형화된 JSON 데이터로 안전하게 받아올 수 있습니다.
+    """)
 
 # 4. 데이터 수집 함수
 @st.cache_data(ttl=600)
@@ -90,7 +104,6 @@ def load_data():
     
     return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
-# 4.5 뉴스 및 리포트 함수 (복원)
 @st.cache_data(ttl=600)
 def get_market_news():
     url = f"https://newsapi.org/v2/everything?q=stock+market+risk&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
@@ -144,8 +157,7 @@ try:
         try:
             sub = series.loc[:current_idx].iloc[-252:]
             if len(sub) < 10: return 50.0
-            min_v, max_v = sub.min(), sub.max()
-            curr_v = series.loc[current_idx]
+            min_v, max_v = sub.min(), sub.max(); curr_v = series.loc[current_idx]
             if max_v == min_v: return 50.0
             return ((max_v - curr_v) / (max_v - min_v)) * 100 if inverse else ((curr_v - min_v) / (max_v - min_v)) * 100
         except: return 50.0
@@ -176,7 +188,7 @@ try:
 
     sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
-    # 5. 사이드바 슬라이더
+    # 5. 사이드바
     st.sidebar.header("⚙️ 지표별 가중치 설정")
     if 'slider_m' not in st.session_state: st.session_state.slider_m = float(round(sem_w[0], 2))
     if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
@@ -238,14 +250,14 @@ try:
         fig_gauge.update_layout(height=350, margin=dict(t=50, b=0))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 6.5 뉴스 및 리포트 섹션 (복원)
+    # 뉴스 및 리포트 섹션
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
         st.subheader("📰 글로벌 마켓 리스크 뉴스")
         news_list = get_market_news()
         if news_list:
-            for a in news_list: st.markdown(f"- [{a['title']}]({a['link']})")
+            for a in news_list: st.markdown(f"- [{a['title']}]({a['url']})")
         else: st.info("현재 뉴스를 불러올 수 없습니다.")
     with cr:
         st.subheader("📝 최신 애널 보고서")
@@ -254,9 +266,12 @@ try:
             st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
         else: st.info("현재 보고서를 불러올 수 없습니다. (평일 장중에 업데이트됩니다.)")
 
-    # 7. 백테스팅 섹션
+    # 7. 백테스팅 섹션 (요청 반영: 설명력 삭제, 설명 및 상관계수 가이드 복원)
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
+    st.info("""
+    **백테스팅(Backtesting)**: 과거 데이터를 사용하여 모델의 유효성을 검증하는 과정입니다. 위험 지수가 선행하여 상승했는지 확인하십시오.
+    """)
     dates = ks_s.index[-252:]
     hist_risks = []
     for d in dates:
@@ -265,6 +280,7 @@ try:
         hist_risks.append((m * w_macro + t * w_tech + g * w_global + get_hist_score_val(vx_s, d) * w_fear) / total_w)
     hist_df = pd.DataFrame({'Date': dates, 'Risk': hist_risks, 'KOSPI': ks_s.loc[dates].values})
     correlation = hist_df['Risk'].corr(hist_df['KOSPI'])
+    
     cb1, cb2 = st.columns([3, 1])
     with cb1:
         fig_bt = go.Figure()
@@ -273,9 +289,16 @@ try:
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(title="KOSPI", overlaying="y", side="right"), height=400, legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_bt, use_container_width=True)
     with cb2:
-        st.metric("설명력 (R²)", f"{(correlation**2)*100:.1f}%"); st.metric("상관계수 (Corr)", f"{correlation:.2f}")
+        st.metric("상관계수 (Corr)", f"{correlation:.2f}")
+        st.write("""
+        **수치 해석 가이드:**
+        - **-1.0 ~ -0.7**: 하락장 포착 능력 우수
+        - **-0.7 ~ -0.3**: 유의미한 전조 신호
+        - **-0.3 ~ 0.0**: 약한 역상관 (참조용)
+        - **0.0 이상**: 모델 왜곡 가능성
+        """)
 
-    # 7.5 블랙스완 비교 (복원 및 궤적 수정)
+    # 7.5 블랙스완 비교 시뮬레이션
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     def get_norm_risk_proxy(ticker, start, end):
@@ -357,6 +380,7 @@ try:
     fig_norm.add_trace(go.Scatter(x=sp_norm.index, y=sp_norm.values, name="S&P 500 (Std)", line=dict(color='blue')))
     fig_norm.add_trace(go.Scatter(x=fr_norm.index, y=fr_norm.values, name="BDRY (Std)", line=dict(color='orange')))
     fig_norm.update_layout(title="Z-Score 동조화 추세", height=400); st.plotly_chart(fig_norm, use_container_width=True)
+    st.info("**분석 가이드**: 두 지표의 단위를 통일(Z-Score)하여 변동의 궤적을 겹쳐 보았습니다. 물동량이 주가지수보다 선행하거나 동행하는 구간을 통해 경기 흐름을 예측할 수 있습니다.")
 
     sector_perf = []
     for name, ticker in sector_map.items():
@@ -366,8 +390,9 @@ try:
         except: pass
     if sector_perf:
         df_perf = pd.DataFrame(sector_perf)
-        fig_h = px.bar(df_perf, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률", title="섹터별 대표 종목 등락 현황 (%)")
+        fig_h = px.bar(df_perf, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률", title="금일 섹터별 대표 종목 등락 현황 (%)")
         st.plotly_chart(fig_h, use_container_width=True)
+        st.info("**분석 가이드**: 종합 위험 지수가 상승할 때 방어 섹터(유틸리티, 금융)와 민감 섹터(반도체, IT)의 등락을 비교하여 자금 이동 경로를 파악하십시오.")
 
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
