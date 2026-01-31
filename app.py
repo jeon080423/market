@@ -243,8 +243,20 @@ try:
         st.subheader("💡 지수를 더 똑똑하게 보는 법")
         st.markdown("| 점수 | 의미 | 권장 대응 |\n| :--- | :--- | :--- |\n| **0-40** | Safe | 적극적 수익 추구 |\n| **40-60** | Watch | 현금 비중 고민 |\n| **60-80** | Danger | 방어적 운용 |\n| **80-100** | Panic | 리스크 관리 최우선 |")
     with c_gg:
-        fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=total_risk_index, title={'text': "종합 시장 위험 지수"},
-            gauge={'axis': {'range': [0, 100]}, 'steps': [{'range': [0, 40], 'color': "green"}, {'range': [40, 60], 'color': "yellow"}, {'range': [60, 80], 'color': "orange"}, {'range': [80, 100], 'color': "red"}]}))
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number", 
+            value=total_risk_index, 
+            title={'text': "종합 시장 위험 지수"},
+            gauge={
+                'axis': {'range': [0, 100]}, 
+                'bar': {'color': "black"},
+                'steps': [
+                    {'range': [0, 40], 'color': "green"}, 
+                    {'range': [40, 60], 'color': "yellow"}, 
+                    {'range': [60, 80], 'color': "orange"}, 
+                    {'range': [80, 100], 'color': "red"}
+                ]
+            }))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
     # 뉴스 및 리포트
@@ -378,6 +390,3 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
-
-
-
