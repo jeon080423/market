@@ -96,45 +96,33 @@ def load_data():
     
     return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
-# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 수집 함수 (안정화 수정 적용)
+# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 RSS 함수 (안정성 강화 수정)
 @st.cache_data(ttl=600)
 def get_market_news():
-    # 실제 작동 가능한 Google News RSS 주소 및 User-Agent 추가
+    # 가장 안정적인 Google News RSS 주소 활용
     rss_url = "https://news.google.com/rss/search?q=stock+market+risk&hl=en-US&gl=US&ceid=US:en"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
         res = requests.get(rss_url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.content, 'html.parser')
         items = soup.find_all('item')
         news_items = []
         for item in items[:5]:
-            title = item.find('title').text if item.find('title') else "뉴스 제목 없음"
-            link = item.find('link').next_sibling.strip() if item.find('link') else "#"
-            news_items.append({"title": title, "link": link})
+            news_items.append({"title": item.title.text, "link": item.link.text})
         return news_items
     except:
         return []
 
 def get_analyst_reports():
-    # 국내 증권 보고서: 한국경제 및 네이버 증권 하이브리드 수집 로직
-    reports = []
-    headers = {"User-Agent": "Mozilla/5.0"}
+    # 네이버 증권 리포트: User-Agent 및 인코딩 보완으로 차단 우회
+    url = "https://finance.naver.com/research/company_list.naver"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"}
     try:
-        # 1. 한국경제 증권 뉴스 RSS 수집 (안정적)
-        hk_rss = "https://www.hankyung.com/feed/stock"
-        res_hk = requests.get(hk_rss, headers=headers, timeout=10)
-        soup_hk = BeautifulSoup(res_hk.content, 'html.parser')
-        items_hk = soup_hk.find_all('item')
-        for item in items_hk[:5]:
-            title = item.find('title').text
-            reports.append({"제목": title, "종목": "국내증시", "출처": "한국경제"})
-        
-        # 2. 네이버 증권 리포트 크롤링 백업 (데이터 보장)
-        url = "https://finance.naver.com/research/company_list.naver"
-        res_nv = requests.get(url, headers=headers, timeout=10)
-        res_nv.encoding = 'euc-kr'
-        soup_nv = BeautifulSoup(res_nv.text, 'html.parser')
-        rows = soup_nv.select("table.type_1 tr")
+        res = requests.get(url, headers=headers, timeout=10)
+        res.encoding = 'euc-kr'
+        soup = BeautifulSoup(res.text, 'html.parser')
+        rows = soup.select("table.type_1 tr")
+        reports = []
         for r in rows:
             if len(reports) >= 10: break
             if r.select_one("td.alpha"):
@@ -193,12 +181,18 @@ try:
             g_risk = s_sp; m_score = (s_fx + s_b10 + s_cp) / 3
             t_score = max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500))
             data_rows.append([m_score, g_risk, s_vx, t_score, _ks_s.loc[d]])
+        
+        # 가중치 0.0 현상 방지를 위한 통계적 정제 로직
         df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI'])
-        X = (df_reg.iloc[:, :4] - df_reg.iloc[:, :4].mean()) / df_reg.iloc[:, :4].std()
-        Y = (df_reg['KOSPI'] - df_reg['KOSPI'].mean()) / df_reg['KOSPI'].std()
+        df_reg = df_reg.replace([np.inf, -np.inf], np.nan).fillna(method='ffill').fillna(0) # 결측치 및 무한대 제거
+        
+        X = (df_reg.iloc[:, :4] - df_reg.iloc[:, :4].mean()) / (df_reg.iloc[:, :4].std() + 1e-6)
+        Y = (df_reg['KOSPI'] - df_reg['KOSPI'].mean()) / (df_reg['KOSPI'].std() + 1e-6)
+        
         coeffs = np.linalg.lstsq(X, Y, rcond=None)[0]
         abs_coeffs = np.abs(coeffs); vol_weights = X.std().values
-        adjusted_importance = abs_coeffs * vol_weights
+        adjusted_importance = abs_coeffs * vol_weights + 1e-6 # 최소 가중치 보장
+        
         return adjusted_importance / np.sum(adjusted_importance)
 
     sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
