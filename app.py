@@ -36,13 +36,51 @@ GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?form
 # ⚠️ 반드시 새로 배포한 웹 앱 URL을 아래에 입력하세요.
 GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyli4kg7O_pxUOLAOFRCCiyswB5TXrA0RUMvjlTirSxLi4yz3tXH1YoGtNUyjztpDsb/exec" 
 
+# CSS 주입: 제목 폰트 유동성 및 가이드북 간격 조정
+st.markdown("""
+    <style>
+    /* 메인 제목 유동적 폰트 크기 설정 */
+    h1 {
+        font-size: clamp(24px, 4vw, 48px) !important;
+    }
+    
+    /* 지수 가이드북 섹션의 간격 및 폰트 조정 */
+    .guide-header {
+        font-size: clamp(18px, 2.5vw, 28px) !important;
+        font-weight: 600;
+        margin-bottom: 10px !important;
+        padding-top: 10px !important;
+    }
+    
+    /* 가이드북 내 테이블 스타일 */
+    div[data-testid="stMarkdownContainer"] table {
+        width: 100% !important;
+        table-layout: auto !important;
+        margin-bottom: 10px !important;
+    }
+    div[data-testid="stMarkdownContainer"] table th,
+    div[data-testid="stMarkdownContainer"] table td {
+        font-size: clamp(12px, 1.1vw, 16px) !important; /* 표 텍스트 유동성 */
+        word-wrap: break-word !important;
+        padding: 8px 4px !important;
+    }
+    
+    /* 수평선(hr) 여백 조정 - 버튼과의 거리감 균형 */
+    hr {
+        margin-top: 1rem !important;
+        margin-bottom: 1rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
 st.markdown(f"""
 이 대시보드는 **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하는데 최적화 되어 있습니다.  **검증되지 않은 모델** 입니다. **참고용** 으로만 사용하세요.
-(마지막 업데이트: {datetime.now().strftime('%H:%M:%S')})
+(마지막 업데이트: {datetime.now().strftime('%d일 %H시 %M분')})
 """)
 st.markdown("---")
+
 # --- [안내서 섹션] ---
 with st.expander("📖 지수 가이드북"):
     st.subheader("1. 지수 산출 핵심 지표 (Core Indicators)")
@@ -252,29 +290,14 @@ try:
 
     # 6. 메인 게이지
     st.markdown("---")
-    # 레이아웃 변경: 게이지(1) : 가이드(1.6) -> 게이지가 왼쪽, 가이드가 오른쪽
+    # 레이아웃: 게이지 왼쪽, 가이드 오른쪽
     c_gauge, c_guide = st.columns([1, 1.6])
 
-    with c_guide: # 가이드 (오른쪽으로 이동)
-        st.subheader("💡 지수를 더 똑똑하게 보는 법")
-        
-        # 표 열 폭 및 텍스트 유동성을 위한 CSS 수정
-        # vw(viewport width) 단위를 사용하여 브라우저 크기에 따라 글자 크기 조정
-        st.markdown("""
-            <style>
-            div[data-testid="stMarkdownContainer"] table {
-                width: 100% !important;
-                table-layout: auto !important;
-            }
-            div[data-testid="stMarkdownContainer"] table th,
-            div[data-testid="stMarkdownContainer"] table td {
-                font-size: clamp(12px, 1.2vw, 18px) !important; /* 유동적 폰트 사이즈 */
-                word-wrap: break-word !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+    with c_guide: # 가이드 (오른쪽)
+        # HTML 마크다운으로 제목 구현 (유동적 폰트 적용)
+        st.markdown('<p class="guide-header">💡 지수를 더 똑똑하게 보는 법</p>', unsafe_allow_html=True)
             
-        # '현재 상황 및 시장 심리' 열 삭제 및 표 내용 수정
+        # 표 내용 및 스타일
         st.markdown(f"""
         지수 구간별 상세 대응 전략은 다음과 같습니다.
 
@@ -288,14 +311,12 @@ try:
         *※ 본 지수는 과거 데이터를 기반으로 한 통계적 수치이며, 예상치 못한 블랙스완 발생 시 즉각 대응이 어려울 수 있습니다.*
         """)
         
-    with c_gauge: # 게이지 (왼쪽으로 이동)
-        # 게이지 레이아웃 최적화 (숫자 중앙 정렬 및 텍스트 유동성 확보)
-        # number font size 고정값(80) 삭제 -> 자동 스케일링 유도
+    with c_gauge: # 게이지 (왼쪽)
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number", 
             value=total_risk_index, 
             title={'text': "주식 시장 위험 지수", 'font': {'size': 20}},
-            number={'suffix': ""}, # 텍스트 크기 자동 조절을 위해 고정 size 삭제
+            number={'suffix': ""}, 
             gauge={
                 'axis': {'range': [0, 100]}, 
                 'bar': {'color': "black"},
@@ -306,7 +327,6 @@ try:
                     {'range': [80, 100], 'color': "red"}
                 ]}))
         
-        # 여백(margin)을 auto로 설정하여 중앙 배치 유도 및 반응형 처리
         fig_gauge.update_layout(
             margin=dict(l=40, r=40, t=80, b=40),
             height=350,
@@ -331,7 +351,6 @@ try:
             button[data-testid="baseButton-secondary"] { 
                 padding: 0px !important; height: 18px !important; min-height: 18px !important; line-height: 1 !important; border: none !important; background: transparent !important; color: #555 !important; font-size: 12px !important;
             }
-            hr { margin-top: 5px !important; margin-bottom: 5px !important; }
             </style>
             """, unsafe_allow_html=True)
 
@@ -342,7 +361,6 @@ try:
         total_pages = max(1, (total_posts - 1) // ITEMS_PER_PAGE + 1)
         if 'current_page' not in st.session_state: st.session_state.current_page = 1
             
-        # 게시판 박스 높이를 글로벌 경제 뉴스 높이와 유사하게 조정 (320 -> 200)
         board_container = st.container(height=200) 
         with board_container:
             if not st.session_state.board_data:
@@ -522,4 +540,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+st.caption(f"Last updated: {datetime.now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
