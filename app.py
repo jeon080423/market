@@ -24,6 +24,13 @@ NEWS_API_KEY = "13cfedc9823541c488732fb27b02fa25"
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
 
+# 관리자 설정
+ADMIN_ID = "jeon080423"
+ADMIN_PW = "3033"
+# 구글 시트 URL (여기에 본인의 구글 시트 편집용 CSV 내보내기 링크 또는 Apps Script URL을 넣으세요)
+# 예시 형식: https://docs.google.com/spreadsheets/d/시트ID/gviz/tq?tqx=out:csv
+GSHEET_URL = "" 
+
 # 3. 제목 및 설명
 st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
 st.markdown(f"""
@@ -96,7 +103,7 @@ def load_data():
     
     return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
-# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 수집 함수
+# 4.5 글로벌 경제 뉴스 수집 함수
 @st.cache_data(ttl=600)
 def get_market_news():
     rss_url = "https://news.google.com/rss/search?q=stock+market+risk&hl=en-US&gl=US&ceid=US:en"
@@ -111,28 +118,9 @@ def get_market_news():
         return news_items
     except: return []
 
-def get_analyst_reports():
-    reports = []
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        hk_rss = "https://www.hankyung.com/feed/stock"
-        res_hk = requests.get(hk_rss, headers=headers, timeout=10)
-        soup_hk = BeautifulSoup(res_hk.content, 'html.parser')
-        items_hk = soup_hk.find_all('item')
-        for item in items_hk[:5]:
-            reports.append({"제목": item.title.text, "종목": "국내증시", "출처": "한국경제"})
-        
-        url = "https://finance.naver.com/research/company_list.naver"
-        res_nv = requests.get(url, headers=headers, timeout=10)
-        res_nv.encoding = 'euc-kr'; soup_nv = BeautifulSoup(res_nv.text, 'html.parser')
-        rows = soup_nv.select("table.type_1 tr")
-        for r in rows:
-            if len(reports) >= 10: break
-            if r.select_one("td.alpha"):
-                tds = r.select("td")
-                reports.append({"제목": tds[1].get_text().strip(), "종목": tds[0].get_text().strip(), "출처": tds[2].get_text().strip()})
-        return reports
-    except: return []
+# 익명 게시판 관련 함수 (Session State 활용 예시)
+if 'board_data' not in st.session_state:
+    st.session_state.board_data = []
 
 try:
     with st.spinner('시차 상관관계 및 ML 가중치 분석 중...'):
@@ -192,7 +180,7 @@ try:
 
     sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
-    # 5. 사이드바 - [복원] 가중치 산출 방법 상세 설명
+    # 5. 사이드바 - 가중치 설정
     st.sidebar.header("⚙️ 지표별 가중치 설정")
     if 'slider_m' not in st.session_state: st.session_state.slider_m = float(round(sem_w[0], 2))
     if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
@@ -210,14 +198,12 @@ try:
     w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 가중치 산출: 시차 최적화 분석")
-    st.sidebar.write("""
-    본 대시보드의 초기 가중치는 **'시차 상관관계(Lagged Correlation)'** 및 **'특성 기여도(Feature Importance)'** 알고리즘을 통해 산출되었습니다.
     
-    1. **시차 최적화**: 각 매크로 지표가 KOSPI에 영향을 주기까지의 과거 지연 시간(Lag)을 계산하여 가장 설명력이 높은 시점의 데이터를 추출합니다.
-    2. **기여도 분석**: 머신러닝의 변수 중요도 산출 방식을 통해 KOSPI 수익률 변동에 대한 각 지표의 통계적 영향력을 계산합니다.
-    3. **동적 가중치**: 최근 1년간의 데이터 흐름을 기반으로, 현재 시장 하락을 가장 잘 예측하는 지표에 더 높은 가중치가 자동으로 할당됩니다.
-    """)
+    # 관리자 로그인 섹션
+    st.sidebar.subheader("🔒 관리자 모드")
+    admin_id_input = st.sidebar.text_input("아이디", key="admin_id")
+    admin_pw_input = st.sidebar.text_input("비밀번호", type="password", key="admin_pw")
+    is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
     
     st.sidebar.markdown("---")
     st.sidebar.subheader("자발적 후원으로 운영됩니다.")
@@ -266,16 +252,54 @@ try:
                 ]}))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 뉴스 및 리포트
+    # 뉴스 및 익명 게시판
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
         st.subheader("📰 글로벌 경제 뉴스 (RSS)")
         for a in get_market_news(): st.markdown(f"- [{a['title']}]({a['link']})")
     with cr:
-        st.subheader("📝 국내 증권 보고서 (RSS)")
-        reports = get_analyst_reports()
-        if reports: st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
+        st.subheader("💬 한 줄 의견 게시판 (익명)")
+        
+        # 글쓰기 폼
+        with st.form("board_form", clear_on_submit=True):
+            col_id, col_pw = st.columns(2)
+            u_name = col_id.text_input("작성자(익명)", value="익명")
+            u_pw = col_pw.text_input("비밀번호", type="password", help="수정/삭제 시 필요")
+            u_content = st.text_input("한 줄 의견 (최대 50자)", max_chars=50)
+            submit = st.form_submit_button("등록")
+            
+            if submit and u_content:
+                new_post = {
+                    "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "Author": u_name,
+                    "Content": u_content,
+                    "Password": u_pw
+                }
+                st.session_state.board_data.insert(0, new_post)
+                # 구글 시트 저장 로직 (필요 시 GSHEET_URL을 통한 POST 요청 구현)
+                st.success("의견이 등록되었습니다.")
+
+        # 게시글 목록 표시 및 관리
+        for idx, post in enumerate(st.session_state.board_data):
+            c1, c2 = st.columns([4, 1])
+            c1.markdown(f"**{post['Author']}**: {post['Content']} <small style='color:gray;'>({post['Date']})</small>", unsafe_allow_html=True)
+            
+            with c2.popover("⚙️"):
+                if is_admin:
+                    st.info("관리자 권한: 즉시 삭제 가능")
+                    if st.button("삭제", key=f"del_admin_{idx}"):
+                        st.session_state.board_data.pop(idx)
+                        st.rerun()
+                else:
+                    input_pw = st.text_input("비밀번호 입력", type="password", key=f"pw_{idx}")
+                    if st.button("삭제", key=f"del_{idx}"):
+                        if input_pw == post['Password']:
+                            st.session_state.board_data.pop(idx)
+                            st.success("삭제되었습니다.")
+                            st.rerun()
+                        else:
+                            st.error("비밀번호 불일치")
 
     # 7. 백테스팅
     st.markdown("---")
@@ -298,7 +322,7 @@ try:
         st.metric("상관계수 (Corr)", f"{correlation:.2f}")
         st.write("- -1.0~-0.7: 우수\n- -0.7~-0.3: 유의미\n- 0.0이상: 모델 왜곡")
 
-    # 7.5 블랙스완 - [복원] 빨간 선 범례 명칭 수정
+    # 7.5 블랙스완
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     def get_norm_risk_proxy(t, s, e):
@@ -315,7 +339,7 @@ try:
         fig_bs2 = go.Figure(); fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3)))
         fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년 위기 궤적", line=dict(color='blue', dash='dot'))); st.plotly_chart(fig_bs2, use_container_width=True)
 
-    # 9. 지표별 상세 분석 - [누락 방지] Subheader 복원
+    # 9. 지표별 상세 분석
     st.markdown("---")
     st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석")
     def create_chart(series, title, threshold, desc_text):
