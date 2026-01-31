@@ -96,7 +96,7 @@ def load_data():
     
     return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
-# 4.5 뉴스 및 보고서 수집 함수
+# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 수집 함수
 @st.cache_data(ttl=600)
 def get_market_news():
     rss_url = "https://news.google.com/rss/search?q=stock+market+risk&hl=en-US&gl=US&ceid=US:en"
@@ -192,7 +192,7 @@ try:
 
     sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
-    # 5. 사이드바
+    # 5. 사이드바 - [복원] 가중치 산출 방법 상세 설명
     st.sidebar.header("⚙️ 지표별 가중치 설정")
     if 'slider_m' not in st.session_state: st.session_state.slider_m = float(round(sem_w[0], 2))
     if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
@@ -211,7 +211,14 @@ try:
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 가중치 산출: 시차 최적화 분석")
-    st.sidebar.write("1. 시차 최적화: 매크로 지표의 영향 지연 시간을 계산합니다.\n2. 기여도 분석: 머신러닝 변수 중요도로 통계적 영향력을 계산합니다.")
+    st.sidebar.write("""
+    본 대시보드의 초기 가중치는 **'시차 상관관계(Lagged Correlation)'** 및 **'특성 기여도(Feature Importance)'** 알고리즘을 통해 산출되었습니다.
+    
+    1. **시차 최적화**: 각 매크로 지표가 KOSPI에 영향을 주기까지의 과거 지연 시간(Lag)을 계산하여 가장 설명력이 높은 시점의 데이터를 추출합니다.
+    2. **기여도 분석**: 머신러닝의 변수 중요도 산출 방식을 통해 KOSPI 수익률 변동에 대한 각 지표의 통계적 영향력을 계산합니다.
+    3. **동적 가중치**: 최근 1년간의 데이터 흐름을 기반으로, 현재 시장 하락을 가장 잘 예측하는 지표에 더 높은 가중치가 자동으로 할당됩니다.
+    """)
+    
     st.sidebar.markdown("---")
     st.sidebar.subheader("본 서비스는 자발적 후원으로 운영됩니다.")
     st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅ현)")
@@ -272,7 +279,7 @@ try:
         st.metric("상관계수 (Corr)", f"{correlation:.2f}")
         st.write("- -1.0~-0.7: 우수\n- -0.7~-0.3: 유의미\n- 0.0이상: 모델 왜곡")
 
-    # 7.5 블랙스완
+    # 7.5 블랙스완 - [복원] 빨간 선 범례 명칭 수정
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     def get_norm_risk_proxy(t, s, e):
@@ -282,14 +289,14 @@ try:
     col_bs1, col_bs2 = st.columns(2)
     with col_bs1:
         st.info("**2008 금융위기 vs 현재**"); bs_2008 = get_norm_risk_proxy("^KS11", "2008-01-01", "2009-01-01")
-        fig_bs1 = go.Figure(); fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재", line=dict(color='red', width=3)))
-        fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년", line=dict(color='black', dash='dot'))); st.plotly_chart(fig_bs1, use_container_width=True)
+        fig_bs1 = go.Figure(); fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3)))
+        fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='black', dash='dot'))); st.plotly_chart(fig_bs1, use_container_width=True)
     with col_bs2:
         st.info("**2020 코로나 폭락 vs 현재**"); bs_2020 = get_norm_risk_proxy("^KS11", "2020-01-01", "2020-06-01")
-        fig_bs2 = go.Figure(); fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재", line=dict(color='red', width=3)))
-        fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년", line=dict(color='blue', dash='dot'))); st.plotly_chart(fig_bs2, use_container_width=True)
+        fig_bs2 = go.Figure(); fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3)))
+        fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년 위기 궤적", line=dict(color='blue', dash='dot'))); st.plotly_chart(fig_bs2, use_container_width=True)
 
-    # 9. 지표별 상세 분석
+    # 9. 지표별 상세 분석 - [누락 방지] Subheader 복원
     st.markdown("---")
     st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석")
     def create_chart(series, title, threshold, desc_text):
@@ -347,6 +354,7 @@ try:
         st.plotly_chart(create_chart(dx_s, "DXY", dx_th, "유동성 위축 위험"), use_container_width=True)
         st.info("**달러 가치**: 달러 상승은 유동성 축소 및 위험자산 회피")
 
+    # 10. 표준화 비교 및 섹터 히트맵
     st.markdown("---")
     st.subheader("📊 지수간 동조화 및 섹터 분석")
     sp_norm = (sp_s - sp_s.mean()) / sp_s.std(); fr_norm = (fr_s - fr_s.mean()) / fr_s.std()
