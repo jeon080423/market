@@ -7,6 +7,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
+import feedparser # 안정적인 RSS 파싱을 위해 추가
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -96,47 +97,40 @@ def load_data():
     
     return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
 
-# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 RSS 함수 (수정 반영)
+# 4.5 글로벌 경제 뉴스 및 국내 증권 보고서 RSS 함수 (수정 적용)
 @st.cache_data(ttl=600)
 def get_market_news():
-    # 실제 작동이 보장된 Yahoo Finance RSS 피드 주소
-    rss_url = "https://finance.yahoo.com/news/rssindex"
+    # 검증된 글로벌 경제 뉴스 RSS (Google News Financial 및 Yahoo)
+    rss_urls = [
+        "https://news.google.com/rss/search?q=stock+market+risk&hl=en-US&gl=US&ceid=US:en",
+        "https://finance.yahoo.com/news/rssindex"
+    ]
+    news_items = []
     try:
-        res = requests.get(rss_url, timeout=10)
-        # 범용적인 'html.parser'를 사용하면서도 RSS 태그를 읽도록 수정
-        soup = BeautifulSoup(res.content, 'html.parser')
-        items = soup.find_all('item')
-        news_items = []
-        for item in items[:5]:
-            # RSS는 보통 <title>과 <link> 태그를 사용함
-            title = item.find('title').get_text() if item.find('title') else "뉴스 제목 없음"
-            link = item.find('link').next_sibling.strip() if item.find('link') else "#"
-            news_items.append({"title": title, "link": link})
-        return news_items
+        for url in rss_urls:
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:3]:
+                news_items.append({"title": entry.title, "link": entry.link})
+        return news_items[:5]
     except:
         return []
 
 def get_analyst_reports():
-    # 국내 증권 보고서: 한국경제 증권가 소식 RSS를 우선 사용 (신뢰도 높음)
-    rss_url = "https://www.hankyung.com/feed/stock"
+    # 국내 증권 보고서: 한국경제 및 네이버 증권 하이브리드 수집
+    reports = []
     try:
-        res = requests.get(rss_url, timeout=10)
-        soup = BeautifulSoup(res.content, 'html.parser')
-        items = soup.find_all('item')
-        reports = []
-        for item in items[:10]:
-            title = item.find('title').get_text() if item.find('title') else "리포트 정보 없음"
-            reports.append({"제목": title, "종목": "국내증시", "출처": "한국경제"})
+        # 1. 한국경제 증권 RSS 시도
+        hk_feed = feedparser.parse("https://www.hankyung.com/feed/stock")
+        for entry in hk_feed.entries[:5]:
+            reports.append({"제목": entry.title, "종목": "국내증시", "출처": "한국경제"})
         
-        if reports: return reports
-
-        # RSS 실패 시 네이버 증권 기존 크롤링 로직 가동
+        # 2. 네이버 증권 크롤링 백업 (데이터 확보 보장)
         url = "https://finance.naver.com/research/company_list.naver"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        res_nv = requests.get(url, headers=headers, timeout=10)
-        res_nv.encoding = 'euc-kr'
-        soup_nv = BeautifulSoup(res_nv.text, 'html.parser')
-        rows = soup_nv.select("table.type_1 tr")
+        res = requests.get(url, headers=headers, timeout=10)
+        res.encoding = 'euc-kr'
+        soup = BeautifulSoup(res.text, 'html.parser')
+        rows = soup.select("table.type_1 tr")
         for r in rows:
             if len(reports) >= 10: break
             if r.select_one("td.alpha"):
@@ -230,7 +224,7 @@ try:
     본 대시보드의 초기 가중치는 **'시차 상관관계(Lagged Correlation)'** 및 **'특성 기여도(Feature Importance)'** 알고리즘을 통해 산출되었습니다.
     1. **시차 최적화**: 각 매크로 지표가 KOSPI에 영향을 주기까지의 과거 지연 시간(Lag)을 계산합니다.
     2. **기여도 분석**: 머신러닝의 변수 중요도 산출 방식을 통해 통계적 영향력을 계산합니다.
-    3. **동적 가중치**: 최근 1년간의 데이터 흐름을 기반으로, 현재 시장 하락을 가장 잘 예측하는 지표에 더 높은 가중치가 자동으로 할당됩니다.
+    3. **동적 가중치**: 현재 시장 하락을 가장 잘 예측하는 지표에 더 높은 가중치가 자동으로 할당됩니다.
     """)
     
     st.sidebar.markdown("---")
@@ -273,7 +267,7 @@ try:
         fig_gauge.update_layout(height=350, margin=dict(t=50, b=0))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    # 뉴스 및 리포트 섹션 (수정된 RSS 및 크롤링 로직 적용)
+    # 뉴스 및 리포트 섹션
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
@@ -291,7 +285,7 @@ try:
         else:
             st.info("현재 보고서를 불러올 수 없습니다. 증권사 연결 상태를 확인하세요.")
 
-    # 7. 백테스팅 섹션 (항목 반영: 설명 및 상관계수 가이드 복원, 설명력 삭제)
+    # 7. 백테스팅 섹션 (요청 반영: 설명 및 상관계수 가이드 복원, 설명력 삭제)
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
     st.info("""
@@ -323,9 +317,9 @@ try:
         - **0.0 이상**: 모델 왜곡 가능성
         """)
 
-    # 7.5 블랙스완 비교 시나리오
+    # 7.5 블랙스완 비교 시나리오 (아이콘 대체 적용)
     st.markdown("---")
-    st.subheader("Swan 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
+    st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     def get_norm_risk_proxy(ticker, start, end):
         data = yf.download(ticker, start=start, end=end)['Close']
         if isinstance(data, pd.DataFrame): data = data.iloc[:, 0]
@@ -421,4 +415,3 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
-
