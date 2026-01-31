@@ -138,9 +138,7 @@ def save_to_gsheet(date, author, content, password):
             "content": content,
             "password": password
         }
-        # 웹 앱으로 데이터 전송 (Redirect 허용을 위해 allow_redirects=True 설정)
         res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=10)
-        # Apps Script는 성공 시 200 혹은 302 리다이렉트를 반환할 수 있음
         return res.status_code in [200, 302]
     except Exception as e:
         st.error(f"상세 에러: {e}")
@@ -285,12 +283,14 @@ try:
     with cr:
         st.subheader("💬 한 줄 의견(익명)")
         
-        # 게시글 간 상하 여백 및 텍스트 줄 간격 최소화 스타일 보강
+        # 게시글 간 상하 여백, 줄 간격 및 팝업 버튼 높이 최소화 스타일
         st.markdown("""
             <style>
-            .stMarkdown p { margin-bottom: 0px !important; line-height: 1.1 !important; }
+            .stMarkdown p { margin-top: 0px !important; margin-bottom: 0px !important; line-height: 1.1 !important; padding-top: 0px !important; padding-bottom: 0px !important; }
             .element-container { margin-bottom: 0px !important; padding-bottom: 0px !important; }
             div[data-testid="stVerticalBlock"] > div { padding-top: 0px !important; padding-bottom: 0px !important; }
+            /* 팝업 버튼 높이 및 패딩 조정 */
+            button[data-testid="baseButton-secondary"] { padding-top: 0px !important; padding-bottom: 0px !important; height: 1.2rem !important; min-height: 1.2rem !important; line-height: 1 !important; }
             </style>
             """, unsafe_allow_html=True)
 
@@ -306,20 +306,20 @@ try:
             st.session_state.current_page = 1
             
         # 게시글 목록 표시 (최신순 정렬 후 표시)
-        board_container = st.container(height=350)
+        board_container = st.container(height=300) # 높이 소폭 조정
         with board_container:
             if not st.session_state.board_data:
                 st.write("등록된 의견이 없습니다.")
             else:
-                # 데이터를 최신순으로 반전(구글 시트는 아래로 쌓이므로)
                 reversed_data = st.session_state.board_data[::-1]
                 start_idx = (st.session_state.current_page - 1) * ITEMS_PER_PAGE
                 end_idx = start_idx + ITEMS_PER_PAGE
                 paged_data = reversed_data[start_idx:end_idx]
                 
                 for i, post in enumerate(paged_data):
-                    bc1, bc2 = st.columns([6, 1])
-                    bc1.markdown(f"<p style='margin:0; padding:0;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
+                    # 텍스트와 버튼 비율을 극단적으로 조정하여 높이 감소
+                    bc1, bc2 = st.columns([12, 1]) 
+                    bc1.markdown(f"<p style='font-size:0.9rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.7rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
                     
                     with bc2.popover("⚙️", help="삭제"):
                         st.warning("시트에서 직접 행을 삭제해 주세요.")
@@ -353,7 +353,6 @@ try:
                 elif not u_content:
                     st.error("내용 입력")
                 else:
-                    # 구글 시트로 전송
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                     if save_to_gsheet(now_str, u_name if u_name else "익명", u_content, u_pw):
                         st.success("의견이 등록되었습니다.")
