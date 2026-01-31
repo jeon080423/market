@@ -212,7 +212,7 @@ try:
     st.sidebar.markdown("---")
     st.sidebar.subheader("본 서비스는 자발적 후원으로 운영됩니다.")
     st.sidebar.write("""
-    **계좌**: 카카오뱅크 3333-23-8667708 (**현)
+    카카오뱅크 3333-23-8667708 (ㅈㅅ현)
     """)
     
     total_w = w_macro + w_tech + w_global + w_fear
@@ -397,5 +397,6 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
 
 
