@@ -296,7 +296,7 @@ try:
     with c_guide: # 가이드 (오른쪽)
         # HTML 마크다운으로 제목 구현 (유동적 폰트 적용)
         st.markdown('<p class="guide-header">💡 지수를 더 똑똑하게 보는 법</p>', unsafe_allow_html=True)
-        st.markdown("""
+        
             
         # 표 내용 및 스타일
         st.markdown(f"""
@@ -541,5 +541,6 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
 
 
