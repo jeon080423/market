@@ -259,7 +259,7 @@ try:
         st.subheader("📰 글로벌 경제 뉴스 (RSS)")
         for a in get_market_news(): st.markdown(f"- [{a['title']}]({a['link']})")
     with cr:
-        st.subheader("💬 한 줄 의견 게시판 (익명)")
+        st.subheader("💬 한 줄 의견(익명)")
         
         # 게시글 목록 표시 (위로 올림)
         board_container = st.container(height=300)
@@ -435,3 +435,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
