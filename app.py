@@ -44,7 +44,7 @@ st.markdown(f"""
 """)
 st.markdown("---")
 # --- [안내서 섹션] ---
-with st.expander("📖 대시보드 사용 가이드"):
+with st.expander("📖 지수 가이드북"):
     st.subheader("1. 지수 산출 핵심 지표 (Core Indicators)")
     st.write("""
     본 모델의 지표들은 KOSPI와의 **통계적 상관관계** 및 **하락 선행성**을 기준으로 선정되었습니다.
@@ -519,6 +519,7 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
 
 
 
