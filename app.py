@@ -42,7 +42,7 @@ st.markdown(f"""
 이 대시보드는 **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하는데 최적화 되어 있습니다.  **검증되지 않은 모델** 입니다. **참고용** 으로만 사용하세요.
 (마지막 업데이트: {datetime.now().strftime('%H:%M:%S')})
 """)
-
+st.markdown("---")
 # --- [안내서 섹션] ---
 with st.expander("📖 대시보드 사용 가이드"):
     st.subheader("1. 지수 산출 핵심 지표 (Core Indicators)")
@@ -519,3 +519,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
