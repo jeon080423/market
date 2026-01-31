@@ -137,12 +137,12 @@ def save_to_gsheet(date, author, content, password, action="append"):
             "author": author,
             "content": content,
             "password": password,
-            "action": action # Apps Script에서 분기 처리를 위해 추가
+            "action": action
         }
         res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=10)
         return res.status_code in [200, 302]
     except Exception as e:
-        st.error(f"에러: {e}")
+        st.error(f"상세 에러: {e}")
         return False
 
 try:
@@ -284,23 +284,24 @@ try:
     with cr:
         st.subheader("💬 한 줄 의견(익명)")
         
-        # 간격 최소화를 위한 CSS (팝업 버튼 높이와 여백 극소화)
+        # 게시글 높이 최소화 및 폰트 크기 2단계 확대(1.1rem) 스타일
         st.markdown("""
             <style>
-            .stMarkdown p { margin: 0px !important; line-height: 1.0 !important; padding: 0px !important; }
-            .element-container { margin: 0px !important; padding: 0px !important; }
+            .stMarkdown p { margin-top: -2px !important; margin-bottom: -2px !important; line-height: 1.2 !important; padding: 0px !important; }
+            .element-container { margin-bottom: -1px !important; padding: 0px !important; }
             div[data-testid="stVerticalBlock"] > div { padding: 0px !important; margin: 0px !important; }
-            /* 팝업 버튼 스타일 */
+            /* 편집 버튼 스타일 */
             button[data-testid="baseButton-secondary"] { 
                 padding: 0px !important; 
-                height: 14px !important; 
-                min-height: 14px !important; 
+                height: 18px !important; 
+                min-height: 18px !important; 
                 line-height: 1 !important; 
                 border: none !important; 
                 background: transparent !important;
                 color: #555 !important;
-                font-size: 10px !important;
+                font-size: 12px !important;
             }
+            hr { margin-top: 5px !important; margin-bottom: 5px !important; }
             </style>
             """, unsafe_allow_html=True)
 
@@ -311,7 +312,7 @@ try:
         total_pages = max(1, (total_posts - 1) // ITEMS_PER_PAGE + 1)
         if 'current_page' not in st.session_state: st.session_state.current_page = 1
             
-        board_container = st.container(height=260) 
+        board_container = st.container(height=320) 
         with board_container:
             if not st.session_state.board_data:
                 st.write("의견이 없습니다.")
@@ -322,28 +323,28 @@ try:
                 paged_data = reversed_data[start_idx:end_idx]
                 
                 for i, post in enumerate(paged_data):
+                    actual_idx = len(st.session_state.board_data) - 1 - (start_idx + i)
                     bc1, bc2 = st.columns([12, 1.5]) 
-                    bc1.markdown(f"<p style='font-size:0.85rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.7rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
+                    # 폰트 크기를 1.1rem으로 확대
+                    bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
                     
                     with bc2.popover("편집", help="수정/삭제"):
-                        check_pw = st.text_input("비번", type="password", key=f"check_{i}")
+                        check_pw = st.text_input("비번 확인", type="password", key=f"check_{actual_idx}")
                         if str(check_pw) == str(post.get('Password','')):
-                            new_c = st.text_input("수정내용", value=post.get('Content',''), key=f"edit_{i}")
+                            new_c = st.text_input("내용 수정", value=post.get('Content',''), key=f"edit_{actual_idx}")
                             c1, c2 = st.columns(2)
-                            if c1.button("수정", key=f"ub_{i}"):
-                                # 수정 로직: 시트에서 해당 행을 찾아 업데이트 (Apps Script 연동 필요)
+                            if c1.button("수정", key=f"ub_{actual_idx}"):
                                 st.warning("시트에서 직접 수정해 주세요.")
-                            if c2.button("삭제", key=f"db_{i}"):
-                                # 삭제 로직: 시트에서 해당 행 삭제 (Apps Script 연동 필요)
+                            if c2.button("삭제", key=f"db_{actual_idx}"):
                                 st.warning("시트에서 직접 삭제해 주세요.")
                         elif check_pw:
-                            st.error("불일치")
+                            st.error("비번 불일치")
         
         if total_pages > 1:
             pc1, pc2, pc3 = st.columns([1, 2, 1])
             if pc1.button("◀", disabled=st.session_state.current_page == 1):
                 st.session_state.current_page -= 1; st.rerun()
-            pc2.markdown(f"<p style='text-align:center; font-size:12px;'>{st.session_state.current_page}/{total_pages}</p>", unsafe_allow_html=True)
+            pc2.markdown(f"<p style='text-align:center; font-size:14px;'>{st.session_state.current_page}/{total_pages}</p>", unsafe_allow_html=True)
             if pc3.button("▶", disabled=st.session_state.current_page == total_pages):
                 st.session_state.current_page += 1; st.rerun()
 
@@ -364,7 +365,8 @@ try:
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                     if save_to_gsheet(now_str, u_name if u_name else "익명", u_content, u_pw):
                         st.success("등록됨"); st.rerun()
-                    else: st.error("실패")
+                    else:
+                        st.error("실패")
 
     # 7. 백테스팅
     st.markdown("---")
