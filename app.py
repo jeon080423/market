@@ -173,7 +173,7 @@ with st.expander("📖 지수 가이드북"):
     def get_math_formulas():
         st.markdown("#### **① 시차 상관관계 (Time-Lagged Correlation)**")
         st.latex(r"\rho(k) = \frac{Cov(X_{t-k}, Y_t)}{\sigma_{X_{t-k}} \sigma_{Y_t}} \quad (0 \le k \le 5)")
-        st.markdown("#### **② 머신러닝 기반 중요도 (Feature Importance)**")
+        st.markdown("#### **② 통계적 변동 기여도 분석 (Feature Importance)**")
         st.latex(r"Importance_i = |\beta_i| \times \sigma_{X_i}")
         st.markdown("#### **③ Z-Score 표준화 (Standardization)**")
         st.latex(r"Z = \frac{x - \mu}{\sigma}")
@@ -264,7 +264,7 @@ def save_to_gsheet(date, author, content, password, action="append"):
         return False
 
 try:
-    with st.spinner('시차 상관관계 및 ML 가중치 분석 중...'):
+    with st.spinner('시차 상관관계 및 가중치 분석 중...'):
         kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map = load_data()
 
     def get_clean_series(df):
@@ -330,7 +330,7 @@ try:
     if 'slider_f' not in st.session_state: st.session_state.slider_f = float(round(sem_w[2], 2))
     if 'slider_t' not in st.session_state: st.session_state.slider_t = float(round(sem_w[3], 2))
 
-    if st.sidebar.button("🔄 최적화 모델 가중치로 복귀"):
+    if st.sidebar.button("🔄 권장 최적 가중치로 복귀"):
         st.session_state.slider_m = float(round(sem_w[0], 2)); st.session_state.slider_g = float(round(sem_w[1], 2))
         st.session_state.slider_f = float(round(sem_w[2], 2)); st.session_state.slider_t = float(round(sem_w[3], 2))
         st.rerun()
@@ -342,14 +342,14 @@ try:
 
     with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
         st.caption("""
-        본 모델은 **시차 상관분석**과 **선형 회귀(OLS)** 를 결합하여 최적 가중치를 도출합니다.
+        본 모델은 **시차 상관분석**과 **선형 회귀(OLS)** 통계 기법을 결합하여 가중치를 제안합니다.
         
         1. **시차 최적화 (Lag Optimization)**:
             각 지표와 KOSPI 간의 상관계수가 최대가 되는 지연 일수(0~5일)를 자동으로 탐색합니다.
-        2. **기여도 산출 (ML Regression)**:
-            `np.linalg.lstsq`를 사용하여 각 팩터가 KOSPI 변동에 미치는 영향력(Coefficient)을 산출합니다.
+        2. **기여도 역산 (OLS Regression)**:
+            `np.linalg.lstsq`를 사용하여 과거 데이터상 각 팩터가 KOSPI 변동에 미친 통계적 영향력을 산출합니다.
         3. **가중치 정규화**:
-            `|계수| x 표준편차`를 통해 변동성 기여도를 계산하고, 이를 확률적으로 정규화하여 기본값으로 제시합니다.
+            산출된 계수값을 바탕으로 변동성 기여도를 계산하고, 이를 확률적으로 정규화하여 권장 가중치로 제시합니다.
         """)
 
     st.sidebar.markdown("---")
@@ -685,8 +685,3 @@ except Exception as e:
 
 # 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
-
-
-
-
-
