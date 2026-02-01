@@ -323,7 +323,6 @@ try:
     total_risk_index = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear) / total_w
 
     # 6. 메인 게이지
-    st.markdown("---")
     # 레이아웃: 게이지 왼쪽, 가이드 오른쪽
     c_gauge, c_guide = st.columns([1, 1.6])
 
@@ -333,17 +332,12 @@ try:
             
         # 표 형식에서 일반 텍스트로 변경 (5칸 들여쓰기 적용)
         st.markdown(f"""
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **0-40 (Safe)** : 적극적 수익 추구. 주식 비중을 확대하고, 주도주 위주의 공격적 포트폴리오 운용.  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **40-60 (Watch)** : 현금 비중 조절 시작. 추가 매수는 지양하고, 수익이 난 종목은 일부 차익 실현 고려.  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **60-80 (Danger)** : 방어적 운용 및 리스크 관리. 주식 비중을 50% 이하로 축소.  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **80-100 (panic)** : 최우선 리스크 관리. 가급적 현금 비중 최소화, 신용/미수 사용 전면 금지 및 손절매 기준 엄격 적용.  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-
-        *※ 본 지수는 과거 데이터를 기반으로 한 통계적 수치이며, 예상치 못한 블랙스완 발생 시 즉각 대응이 어려울 수 있습니다.*
+        
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **0-40 (Safe)** : 적극적 수익 추구. 주식 비중을 확대하고, 주도주 위주의 공격적 포트폴리오 운용.  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **40-60 (Watch)** : 현금 비중 조절 시작. 추가 매수는 지양하고, 수익이 난 종목은 일부 차익 실현 고려.  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **60-80 (Danger)** : 방어적 운용 및 리스크 관리. 주식 비중을 50% 이하로 축소.  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **80-100 (panic)** : 최우선 리스크 관리. 가급적 현금 비중 최소화, 신용/미수 사용 전면 금지 및 손절매 기준 엄격 적용.  
+        
         """)
         
     with c_gauge: # 게이지 (왼쪽)
@@ -582,4 +576,5 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
+
 
