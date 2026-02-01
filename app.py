@@ -571,3 +571,4 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
+
