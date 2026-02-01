@@ -347,6 +347,7 @@ try:
     st.sidebar.markdown("---")
     st.sidebar.subheader("자발적 후원으로 운영됩니다.")
     st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
+    st.sidebar.write("후원금은 유료 서버, AI api, 유료 정보 크롤링, 메가커피 아아 등 데이터의 정밀도를 높이는데 사용하겠습니다.")
     
     total_w = w_macro + w_tech + w_global + w_fear
     if total_w == 0: st.error("가중치 합이 0일 수 없습니다."); st.stop()
@@ -568,10 +569,28 @@ try:
         st.info("**금리차**: 금리 역전은 경기 침체 강력 전조  \n**빨간선 기준**: 금리차가 0(수평)이 되는 역전 한계 지점")
     with r2_c2:
         st.subheader("KOSPI 기술적 분석")
-        ks_recent = ks_s.last('30D'); fig_ks = go.Figure(); fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ks_recent.values, name="현재가"))
-        fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ma20.reindex(ks_recent.index).values, name="20일선", line=dict(dash='dot')))
-        fig_ks.add_annotation(x=ks_recent.index[-1], y=ma20.iloc[-1], text="20일 평균선 하회 시 위험", showarrow=True, font=dict(color="red"))
-        st.plotly_chart(fig_ks, use_container_width=True); st.info("**기술적 분석**: 20일선 하회 시 단기 추세 하락")
+        ks_recent = ks_s.last('30D')
+        fig_ks = go.Figure()
+        # 현재가 그래프: 선 굵기 및 마커 추가로 가독성 향상
+        fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ks_recent.values, name="현재가", line=dict(color='royalblue', width=3), mode='lines+markers'))
+        # 20일 이동평균선: 색상을 오렌지로 변경하여 대비 강조
+        fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ma20.reindex(ks_recent.index).values, name="20일선", line=dict(color='orange', width=2, dash='dot')))
+        # 화살표 및 주석: 위치를 데이터 끝부분에 정확히 맞추고 ay(화살표 길이) 조정
+        fig_ks.add_annotation(
+            x=ks_recent.index[-1], 
+            y=ma20.iloc[-1], 
+            text="20일 평균선 하회 시 위험", 
+            showarrow=True, 
+            arrowhead=2, 
+            ax=0, 
+            ay=-40, 
+            font=dict(color="red", size=12),
+            bgcolor="white",
+            bordercolor="red"
+        )
+        fig_ks.update_layout(margin=dict(l=0, r=0, t=30, b=0), height=350)
+        st.plotly_chart(fig_ks, use_container_width=True)
+        st.info("**기술적 분석**: 20일선 하회 시 단기 추세 하락")
     with r2_c3:
         st.subheader("VIX 공포 지수")
         st.plotly_chart(create_chart(vx_s, "VIX", 30, "30 돌파 시 패닉"), use_container_width=True)
