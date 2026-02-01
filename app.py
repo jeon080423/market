@@ -9,8 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from io import StringIO
-# google-generativeai 대신 groq 라이브러리 사용
-from groq import Groq
+import google.generativeai as genai
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -25,33 +24,24 @@ except ImportError:
 # 2. Secrets에서 API Key 불러오기
 try:
     NEWS_API_KEY = st.secrets["news_api"]["api_key"]
-    # gemini 대신 groq 키를 불러오도록 수정
-    GROQ_API_KEY = st.secrets["groq"]["api_key"]
+    GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
 except KeyError:
     st.error("Secrets 설정(API Key)이 누락되었습니다. 설정을 확인해 주세요.")
     st.stop()
 
-# Groq 설정 및 모델 초기화
+# Gemini 설정 및 모델 초기화
 try:
-    client = Groq(api_key=GROQ_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-2.0-flash')
 except Exception as e:
-    st.error(f"Groq 설정 중 오류 발생: {e}")
+    st.error(f"Gemini 설정 중 오류 발생: {e}")
 
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
     try:
-        # Groq API 호출 방식으로 변경 (Llama 3.3 70B 모델 사용)
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            model="llama-3.3-70b-versatile",
-        )
-        return chat_completion.choices[0].message.content
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
         return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
 
@@ -167,21 +157,20 @@ with st.expander("📖 지수 가이드북"):
     st.markdown("#### **③ Z-Score 표준화 (Standardization)**")
     st.latex(r"Z = \frac{x - \mu}{\sigma}")
 
-# 4. 데이터 수집 함수
-@st.cache_data(ttl=600)
+# 4. 데이터 수집 함수 (최적화: 일괄 다운로드)
+@st.cache_data(ttl=900) # 15분으로 연장
 def load_data():
     end_date = datetime.now()
     start_date = "2019-01-01"
-    kospi = yf.download("^KS11", start=start_date, end=end_date)
-    sp500 = yf.download("^GSPC", start=start_date, end=end_date)
-    exchange_rate = yf.download("KRW=X", start=start_date, end=end_date)
-    us_10y = yf.download("^TNX", start=start_date, end=end_date)
-    us_2y = yf.download("^IRX", start=start_date, end=end_date)
-    vix = yf.download("^VIX", start=start_date, end=end_date)
-    copper = yf.download("HG=F", start=start_date, end=end_date)
-    freight = yf.download("BDRY", start=start_date, end=end_date)
-    wti = yf.download("CL=F", start=start_date, end=end_date)
-    dxy = yf.download("DX-Y.NYB", start=start_date, end=end_date)
+    
+    # 여러 티커를 한 번에 다운로드하여 API 호출 횟수 절약
+    tickers = {
+        "kospi": "^KS11", "sp500": "^GSPC", "fx": "KRW=X", 
+        "us10y": "^TNX", "us2y": "^IRX", "vix": "^VIX", 
+        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB"
+    }
+    
+    data = yf.download(list(tickers.values()), start=start_date, end=end_date)['Close']
     
     sector_tickers = {
         "반도체": "005930.KS", "자동차": "005380.KS", "2차전지": "051910.KS",
@@ -190,10 +179,16 @@ def load_data():
     }
     sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
     
-    return kospi, sp500, exchange_rate, us_10y, us_2y, vix, copper, freight, wti, dxy, sector_raw, sector_tickers
+    # 딕셔너리 형태로 반환하기 위해 분리 (기존 리턴 구조 유지)
+    return (
+        data[[tickers["kospi"]]], data[[tickers["sp500"]]], data[[tickers["fx"]]], 
+        data[[tickers["us10y"]]], data[[tickers["us2y"]]], data[[tickers["vix"]]], 
+        data[[tickers["copper"]]], data[[tickers["freight"]]], data[[tickers["wti"]]], 
+        data[[tickers["dxy"]]], sector_raw, sector_tickers
+    )
 
-# 4.5 글로벌 경제 뉴스 수집 함수 (NewsAPI 사용)
-@st.cache_data(ttl=600)
+# 4.5 글로벌 경제 뉴스 수집 함수 (최적화: 캐시 연장)
+@st.cache_data(ttl=1800) # 30분으로 연장
 def get_market_news():
     api_url = "https://newsapi.org/v2/everything"
     params = {
@@ -251,10 +246,11 @@ try:
         kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map = load_data()
 
     def get_clean_series(df):
-        if df is None or df.empty: return pd.Series()
-        df = df[~df.index.duplicated(keep='first')]
-        if isinstance(df.columns, pd.MultiIndex): return df['Close'].iloc[:, 0]
-        return df['Close']
+        if df is None or df.empty: return pd.Series(dtype='float64')
+        # 중복 제거 및 단일 열 추출 최적화
+        if isinstance(df, pd.DataFrame):
+            df = df.iloc[:, 0]
+        return df[~df.index.duplicated(keep='first')]
 
     ks_s = get_clean_series(kospi)
     sp_s = get_clean_series(sp500).reindex(ks_s.index).ffill()
@@ -391,8 +387,7 @@ try:
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
-        # 제목 텍스트 유지 (Groq로 동작하지만 사용자 요청에 따라 명칭만 유지하거나 변경 가능)
-        st.subheader("📰 글로벌 경제 뉴스 (Groq AI 요약)")
+        st.subheader("📰 글로벌 경제 뉴스 (Gemini AI 요약)")
         news_data = get_market_news()
         all_titles = ""
         for a in news_data:
@@ -522,7 +517,7 @@ try:
     - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
     """
     
-    with st.expander("🤖 Groq AI의 현재 시장 지표 종합 진단", expanded=True):
+    with st.expander("🤖 Gemini AI의 현재 시장 지표 종합 진단", expanded=True):
         with st.spinner("지표 데이터를 분석 중..."):
             ai_desc_prompt = f"""
             다음 주식 시장 지표 데이터를 보고, 현재 한국 증시(KOSPI)에 미칠 영향과 시장의 전반적인 분위기를 투자자 관점에서 쉽고 전문적으로 설명해줘.
@@ -532,6 +527,7 @@ try:
             st.write(get_ai_analysis(ai_desc_prompt))
 
     def create_chart(series, title, threshold, desc_text):
+        # 최적화: 인덱스 전체 사용 대신 필요한 부분만 처리
         fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title))
         fig.add_hline(y=threshold, line_width=2, line_color="red")
         fig.add_annotation(x=series.index[len(series)//2], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
@@ -615,4 +611,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
+st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
