@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from io import StringIO
+import google.generativeai as genai
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -20,8 +21,21 @@ try:
 except ImportError:
     pass
 
-# 2. 고정 NewsAPI Key 설정
+# 2. 고정 NewsAPI Key 및 Gemini API Key 설정
 NEWS_API_KEY = "13cfedc9823541c488732fb27b02fa25"
+GEMINI_API_KEY = "AIzaSyBZT8GHuD9E9TuhbsZxlRPXxoQfAXNCnV8"
+
+# Gemini 설정
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+# AI 분석 함수 정의
+def get_ai_analysis(prompt):
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"AI 분석을 가져오는 중 오류가 발생했습니다: {e}"
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -365,7 +379,7 @@ try:
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
-        st.subheader("📰 글로벌 경제 뉴스 (NewsAPI)")
+        st.subheader("📰 글로벌 경제 뉴스 (Gemini AI 요약)")
         news_data = get_market_news()
         all_titles = ""
         for a in news_data:
@@ -374,21 +388,13 @@ try:
         
         if news_data:
             st.markdown("<br>", unsafe_allow_html=True)
-            summary_box = st.container()
-            with summary_box:
-                lower_titles = all_titles.lower()
-                summary_text = "🔎 **뉴스 키워드 분석 요약:** "
-                findings = []
-                if any(k in lower_titles for k in ["fed", "interest", "rate"]): findings.append("미 연준의 금리 정책 및 통화 긴축에 대한 우려")
-                if any(k in lower_titles for k in ["inflation", "cpi", "prices"]): findings.append("물가 상승 압력과 그에 따른 시장 변동성")
-                if any(k in lower_titles for k in ["recession", "slowdown", "growth"]): findings.append("경기 침체 및 성장 둔화 가능성 제기")
-                if any(k in lower_titles for k in ["risk", "crash", "bear", "fall"]): findings.append("금융 시장의 하락 위험 및 예기치 못한 변동성 경고")
-                if any(k in lower_titles for k in ["tech", "ai", "nvidia", "earnings"]): findings.append("기술주 및 AI 산업의 실적과 향후 전망")
-                
-                if findings:
-                    summary_text += "최근 뉴스는 주로 " + ", ".join(findings) + " 등을 다루고 있습니다. 이는 글로벌 자금 흐름과 위험 자산 선호도에 직접적인 영향을 줄 수 있는 요소들입니다."
-                else:
-                    summary_text += "현재 시장은 특정 대형 이슈보다는 개별 지표 발표를 기다리며 관망세를 보이고 있는 것으로 분석됩니다."
+            with st.spinner("AI가 뉴스를 분석 중입니다..."):
+                prompt = f"""
+                다음은 최근 경제 뉴스 제목들입니다: {all_titles}
+                이 뉴스들을 종합하여 현재 시장의 주요 리스크와 투자자들이 주의해야 할 점을 한국어 두 문장으로 요약해줘.
+                형식: "🔎 **AI 뉴스 통합 분석:** [내용]"
+                """
+                summary_text = get_ai_analysis(prompt)
                 st.info(summary_text)
 
     with cr:
@@ -409,7 +415,7 @@ try:
                 for i, post in enumerate(paged_data):
                     unique_id = f"post_{start_idx + i}"
                     bc1, bc2 = st.columns([12, 1.5]) 
-                    bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
+                    bc1.markdown(f<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
                     with bc2.popover("편집", help="수정/삭제"):
                         chk_pw = st.text_input("비밀번호", type="password", key=f"chk_{unique_id}")
                         stored_pw = str(post.get('Password', '')).strip()
@@ -491,9 +497,27 @@ try:
         if avg_current_risk > 50: st.error(f"🚨 주의: 현재 위험 지수가 2020년 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
         else: st.info(f"💡 현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
 
-    # 9. 지표별 상세 분석
+    # 9. 지표별 상세 분석 및 AI 설명
     st.markdown("---")
-    st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석")
+    st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석 (AI 해설 포함)")
+    
+    # 지표 데이터를 AI 프롬프트용으로 생성
+    latest_data_summary = f"""
+    - S&P 500 현재가: {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s.last('365D').mean())-1)*100:+.1f}%)
+    - 원/달러 환율: {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
+    - 구리 가격: {cp_s.iloc[-1]:.2f} (최근 추세: {'상승' if cp_s.iloc[-1] > cp_s.iloc[-5] else '하락'})
+    - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
+    """
+    
+    with st.expander("🤖 Gemini AI의 현재 시장 지표 종합 진단", expanded=True):
+        with st.spinner("지표 데이터를 분석 중..."):
+            ai_desc_prompt = f"""
+            다음 주식 시장 지표 데이터를 보고, 현재 한국 증시(KOSPI)에 미칠 영향과 시장의 전반적인 분위기를 투자자 관점에서 쉽고 전문적으로 설명해줘.
+            데이터: {latest_data_summary}
+            답변은 한국어로 3~4문장 정도로 작성해줘.
+            """
+            st.write(get_ai_analysis(ai_desc_prompt))
+
     def create_chart(series, title, threshold, desc_text):
         fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title))
         fig.add_hline(y=threshold, line_width=2, line_color="red")
@@ -578,4 +602,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 ML 분석 엔진 가동 중")
+st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
