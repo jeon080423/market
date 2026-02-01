@@ -48,7 +48,7 @@ def get_ai_analysis(prompt):
                     "content": prompt,
                 }
             ],
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-20b",
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
@@ -688,4 +688,5 @@ except Exception as e:
 
 # 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
+
 
