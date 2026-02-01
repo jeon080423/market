@@ -9,7 +9,8 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from io import StringIO
-import google.generativeai as genai
+# google-generativeai 대신 groq 라이브러리 사용
+from groq import Groq
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -24,24 +25,33 @@ except ImportError:
 # 2. Secrets에서 API Key 불러오기
 try:
     NEWS_API_KEY = st.secrets["news_api"]["api_key"]
-    GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
+    # gemini 대신 groq 키를 불러오도록 수정
+    GROQ_API_KEY = st.secrets["groq"]["api_key"]
 except KeyError:
     st.error("Secrets 설정(API Key)이 누락되었습니다. 설정을 확인해 주세요.")
     st.stop()
 
-# Gemini 설정 및 모델 초기화
+# Groq 설정 및 모델 초기화
 try:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    client = Groq(api_key=GROQ_API_KEY)
 except Exception as e:
-    st.error(f"Gemini 설정 중 오류 발생: {e}")
+    st.error(f"Groq 설정 중 오류 발생: {e}")
 
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        # Groq API 호출 방식으로 변경 (Llama 3.3 70B 모델 사용)
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+        )
+        return chat_completion.choices[0].message.content
     except Exception as e:
         return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
 
@@ -381,7 +391,8 @@ try:
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
-        st.subheader("📰 글로벌 경제 뉴스 (Gemini AI 요약)")
+        # 제목 텍스트 유지 (Groq로 동작하지만 사용자 요청에 따라 명칭만 유지하거나 변경 가능)
+        st.subheader("📰 글로벌 경제 뉴스 (Groq AI 요약)")
         news_data = get_market_news()
         all_titles = ""
         for a in news_data:
@@ -511,7 +522,7 @@ try:
     - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
     """
     
-    with st.expander("🤖 Gemini AI의 현재 시장 지표 종합 진단", expanded=True):
+    with st.expander("🤖 Groq AI의 현재 시장 지표 종합 진단", expanded=True):
         with st.spinner("지표 데이터를 분석 중..."):
             ai_desc_prompt = f"""
             다음 주식 시장 지표 데이터를 보고, 현재 한국 증시(KOSPI)에 미칠 영향과 시장의 전반적인 분위기를 투자자 관점에서 쉽고 전문적으로 설명해줘.
@@ -604,4 +615,4 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
+st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
