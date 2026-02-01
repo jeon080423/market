@@ -112,6 +112,16 @@ st.markdown("""
         margin-top: 1rem !important;
         margin-bottom: 1rem !important;
     }
+
+    /* AI 분석 결과 박스 커스텀 */
+    .ai-analysis-box {
+        background-color: #f0f7ff;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #007bff;
+        line-height: 2.0;
+        font-size: 1.05rem;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -347,7 +357,6 @@ try:
     st.sidebar.markdown("---")
     st.sidebar.subheader("자발적 후원으로 운영됩니다.")
     st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
-    st.sidebar.write("후원금은 유료 서버, AI api, 유료 정보 크롤링, 메가커피 아아 등 데이터의 정밀도를 높이는데 사용하겠습니다.")
     
     total_w = w_macro + w_tech + w_global + w_fear
     if total_w == 0: st.error("가중치 합이 0일 수 없습니다."); st.stop()
@@ -409,13 +418,21 @@ try:
         if news_data:
             st.markdown("<br>", unsafe_allow_html=True)
             with st.spinner("AI가 뉴스를 분석 중입니다..."):
+                # 프롬프트 수정: 중복 문구 생성 방지
                 prompt = f"""
                 다음은 최근 경제 뉴스 제목들입니다: {all_titles}
                 이 뉴스들을 종합하여 현재 시장의 주요 리스크와 투자자들이 주의해야 할 점을 한국어 두 문장으로 요약해줘.
-                형식: "🔎 **AI 뉴스 통합 분석:** [내용]"
+                각 문장은 줄바꿈으로 구분해줘. 답변에 'AI 뉴스 통합 분석'이라는 말은 넣지 마.
                 """
                 summary_text = get_ai_analysis(prompt)
-                st.info(summary_text)
+                
+                # 시인성을 위해 마크다운 박스 적용 및 반복 문구 제거
+                st.markdown(f"""
+                <div class="ai-analysis-box">
+                    <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
+                    {summary_text.replace('🔎 AI 뉴스 통합 분석:', '').strip()}
+                </div>
+                """, unsafe_allow_html=True)
 
     with cr:
         st.subheader("💬 한 줄 의견(익명)")
