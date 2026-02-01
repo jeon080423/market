@@ -112,14 +112,15 @@ st.markdown("""
         margin-bottom: 1rem !important;
     }
 
-    /* AI 분석 결과 박스 커스텀 */
+    /* AI 분석 결과 박스 커스텀 (높이 및 줄간격 최적화) */
     .ai-analysis-box {
         background-color: #f0f7ff;
-        padding: 20px;
+        padding: 15px 20px;
         border-radius: 10px;
         border-left: 5px solid #007bff;
-        line-height: 2.0;
-        font-size: 1.05rem;
+        line-height: 1.65;
+        font-size: 1.0rem;
+        margin-bottom: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -421,20 +422,22 @@ try:
         if news_data:
             st.markdown("<br>", unsafe_allow_html=True)
             with st.spinner("AI가 뉴스를 분석 중입니다..."):
-                # 프롬프트 수정: 표준 한국어 및 문법 엄수 지시 추가
+                # 프롬프트 수정: 강조 기호 제거 및 한자 차단 지시 강화
                 prompt = f"""
                 다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
                 
                 이 뉴스들을 종합하여 현재 금융 시장의 핵심 리스크와 투자자가 유의해야 할 점을 분석해줘.
                 지침:
                 1. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
-                2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해 (예: '시장' 대신 'mercado' 사용 금지).
+                2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해.
                 3. 분석 내용을 두 개의 핵심 문장으로 요약하고, 각 문장은 줄바꿈으로 구분해.
-                4. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
+                4. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
+                5. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+                6. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
                 """
                 summary_text = get_ai_analysis(prompt)
                 
-                # 시인성을 위해 마크다운 박스 적용 및 반복 문구 제거
+                # 시인성을 위해 마크다운 박스 적용 및 박스 높이 조절
                 st.markdown(f"""
                 <div class="ai-analysis-box">
                     <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
@@ -564,20 +567,22 @@ try:
             위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
             
             지침:
-            1. 반드시 완벽한 한국어 문장을 사용하고, 외국어(mercado, диверсификация 등)를 섞지 마.
-            2. 고유 명사를 제외한 외래어와 외국어는 한글로 번역해서 제시해.
-            3. 특히 한자, 일본어, 이슬람어, 러시아어 문자 사용 금지. 
+            1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
+            2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+            3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
             
-            4. 가독성을 위해 다음 형식을 엄격히 지켜줘.
-               **[주요 지표 요약]**: 각 지표의 상태를 불렛 포인트로 설명.
-               **[시장 진단 및 전망]**: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
+            4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
+               [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
+               [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
                
             5. 쉽고 전문적인 톤을 유지해.
             """
             analysis_output = get_ai_analysis(ai_desc_prompt)
+            # 결과물에서 마크다운 강조 기호 다시 한번 제거 및 줄간격 조절
+            clean_output = analysis_output.replace('**', '').replace('##', '').strip()
             st.markdown(f"""
-            <div class="ai-analysis-box" style="background-color: #ffffff; border: 1px solid #e0e0e0; border-left: 8px solid #007bff;">
-                {analysis_output}
+            <div class="ai-analysis-box" style="background-color: #ffffff; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 10px 20px;">
+                {clean_output}
             </div>
             """, unsafe_allow_html=True)
 
