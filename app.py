@@ -55,11 +55,16 @@ st.markdown("""
     .guide-header {
         font-size: clamp(18px, 2.5vw, 28px) !important;
         font-weight: 600;
-        /* 제목과 표 사이 간격 (한 줄 띄움 효과) */
-        margin-bottom: 30px !important; 
-        /* 그래프 하단 정렬을 위해 전체 텍스트 블록을 아래로 이동 */
+        /* 제목과 텍스트 사이 빈 줄 두 줄 효과를 위한 여백 */
+        margin-bottom: 45px !important; 
         margin-top: 60px !important;    
         padding-top: 10px !important;
+    }
+
+    /* 설명글 유동적 폰트 및 줄간격 설정 */
+    .guide-text {
+        font-size: clamp(14px, 1.2vw, 20px) !important;
+        line-height: 1.8 !important;
     }
     
     /* 가이드북 내 테이블 스타일 */
@@ -330,14 +335,18 @@ try:
         # HTML 마크다운으로 제목 구현 (유동적 폰트 적용 + 상단 여백 추가로 위치 조정)
         st.markdown('<p class="guide-header">💡 지수를 더 똑똑하게 보는 법</p>', unsafe_allow_html=True)
             
-        # 표 형식에서 일반 텍스트로 변경 (5칸 들여쓰기 적용)
+        # 표 형식에서 일반 텍스트로 변경 및 줄바꿈/시인성 강화
         st.markdown(f"""
+        <div class="guide-text">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **0-40 (Safe)** : 적극적 수익 추구. 주식 비중을 확대하고, 주도주 위주의 공격적 포트폴리오 운용.  
+        <br>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **40-60 (Watch)** : 현금 비중 조절 시작. 추가 매수는 지양하고, 수익이 난 종목은 일부 차익 실현 고려.  
+        <br>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **60-80 (Danger)** : 방어적 운용 및 리스크 관리. 주식 비중을 50% 이하로 축소.  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **80-100 (panic)** : 최우선 리스크 관리. 가급적 현금 비중 최소화, 신용/미수 사용 전면 금지 및 손절매 기준 엄격 적용.  
-        
-        """)
+        <br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;○ **80-100 (panic)** : 최우선 리스크 관리. 가급적 현금 비중 최소화, 신용/미수 사용 전면 금지 및 손절매 기준 엄격 적용.
+        </div>
+        """, unsafe_allow_html=True)
         
     with c_gauge: # 게이지 (왼쪽)
         fig_gauge = go.Figure(go.Indicator(
@@ -575,8 +584,3 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | 시차 최적화 및 ML 기여도 분석 엔진 가동 중")
-
-
-
-
-
