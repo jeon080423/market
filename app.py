@@ -376,7 +376,34 @@ try:
     cn, cr = st.columns(2)
     with cn:
         st.subheader("📰 글로벌 경제 뉴스 (RSS)")
-        for a in get_market_news(): st.markdown(f"- [{a['title']}]({a['link']})")
+        news_data = get_market_news()
+        all_titles = ""
+        for a in news_data:
+            st.markdown(f"- [{a['title']}]({a['link']})")
+            all_titles += a['title'] + ". "
+        
+        # 뉴스 요약 설명 로직 추가
+        if news_data:
+            st.markdown("<br>", unsafe_allow_html=True)
+            summary_box = st.container()
+            with summary_box:
+                # 간단한 키워드 기반 한글 요약 생성
+                lower_titles = all_titles.lower()
+                summary_text = "🔎 **뉴스 키워드 분석 요약:** "
+                findings = []
+                if "fed" in lower_titles or "interest" in lower_titles: findings.append("미 연준의 금리 정책 및 통화 긴축에 대한 우려")
+                if "inflation" in lower_titles or "cpi" in lower_titles: findings.append("물가 상승(인플레이션) 압력과 그에 따른 시장 변동성")
+                if "recession" in lower_titles or "slowdown" in lower_titles: findings.append("경기 침체 및 성장 둔화 가능성 제기")
+                if "risk" in lower_titles or "crash" in lower_titles: findings.append("금융 시장의 하락 위험 및 예기치 못한 변동성 경고")
+                if "tech" in lower_titles or "ai" in lower_titles: findings.append("기술주 및 AI 산업의 실적과 향후 전망")
+                
+                if findings:
+                    summary_text += "최근 뉴스는 주로 " + ", ".join(findings) + " 등을 다루고 있습니다. 이는 글로벌 자금 흐름과 위험 자산 선호도에 직접적인 영향을 줄 수 있는 요소들입니다."
+                else:
+                    summary_text += "현재 시장은 특정 대형 이슈보다는 개별 기업 실적이나 지표 발표를 기다리며 관망세를 보이고 있는 것으로 분석됩니다."
+                
+                st.info(summary_text)
+
     with cr:
         st.subheader("💬 한 줄 의견(익명)")
         
@@ -482,7 +509,7 @@ try:
 
     # 7.5 블랙스완
     st.markdown("---")
-    st.subheader(" Swan) 과거 사례 비교 시뮬레이션")
+    st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     def get_norm_risk_proxy(t, s, e):
         d = yf.download(t, start=s, end=e)['Close']
         if isinstance(d, pd.DataFrame): d = d.iloc[:, 0]
