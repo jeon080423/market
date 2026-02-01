@@ -54,7 +54,6 @@ except KeyError:
 # 구글 시트 설정
 SHEET_ID = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-# ⚠️ 반드시 새로 배포한 웹 앱 URL을 아래에 입력하세요.
 GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyli4kg7O_pxUOLAOFRCCiyswB5TXrA0RUMvjlTirSxLi4yz3tXH1YoGtNUyjztpDsb/exec" 
 
 # CSS 주입: 제목 폰트 유동성 및 가이드북 간격/정렬 조정
@@ -69,7 +68,6 @@ st.markdown("""
     .guide-header {
         font-size: clamp(18px, 2.5vw, 28px) !important;
         font-weight: 600;
-        /* 제목과 텍스트 사이 빈 줄 두 줄 효과를 위한 여백 */
         margin-bottom: 45px !important; 
         margin-top: 60px !important;    
         padding-top: 10px !important;
@@ -89,9 +87,8 @@ st.markdown("""
     }
     div[data-testid="stMarkdownContainer"] table th,
     div[data-testid="stMarkdownContainer"] table td {
-        font-size: clamp(12px, 1.1vw, 16px) !important; /* 표 텍스트 유동성 */
+        font-size: clamp(12px, 1.1vw, 16px) !important; 
         word-wrap: break-word !important;
-        /* 셀 높이를 늘려 표의 전체 높이를 그래프와 맞춤 */
         padding: 12px 4px !important; 
     }
     
@@ -402,8 +399,7 @@ try:
         st.markdown("""<style>.stMarkdown p { margin-top: -2px !important; margin-bottom: -2px !important; line-height: 1.2 !important; padding: 0px !important; } .element-container { margin-bottom: -1px !important; padding: 0px !important; } div[data-testid="stVerticalBlock"] > div { padding: 0px !important; margin: 0px !important; } button[data-testid="baseButton-secondary"] { padding: 0px !important; height: 18px !important; min-height: 18px !important; line-height: 1 !important; border: none !important; background: transparent !important; color: #555 !important; font-size: 12px !important; }</style>""", unsafe_allow_html=True)
         st.session_state.board_data = load_board_data()
         ITEMS_PER_PAGE = 20
-        total_posts = len(st.session_state.board_data)
-        total_pages = max(1, (total_posts - 1) // ITEMS_PER_PAGE + 1)
+        total_pages = max(1, (len(st.session_state.board_data) - 1) // ITEMS_PER_PAGE + 1)
         if 'current_page' not in st.session_state: st.session_state.current_page = 1
         board_container = st.container(height=200) 
         with board_container:
@@ -425,7 +421,7 @@ try:
                             if btn1.button("수정 완료", key=f"up_{unique_id}"):
                                 if save_to_gsheet(post.get('date',''), post.get('Author',''), new_val, stored_pw, action="update"): st.success("수정 성공"); st.rerun()
                             if btn2.button("삭제", key=f"del_{unique_id}"):
-                                if save_to_gsheet(post.get('date',''), post.get('Author',''), new_val, stored_pw, action="delete"): st.success("삭제 성공"); st.rerun()
+                                if save_to_gsheet(post.get('date',''), post.get('Author',''), post.get('Content',''), stored_pw, action="delete"): st.success("삭제 성공"); st.rerun()
                         elif chk_pw: st.error("불일치")
         if total_pages > 1:
             pc1, pc2, pc3 = st.columns([1, 2, 1])
@@ -435,9 +431,9 @@ try:
         st.markdown("---")
         with st.form("board_form", clear_on_submit=True):
             f_col1, f_col2, f_col3, f_col4 = st.columns([1, 1, 3.5, 0.8])
-            u_name = f_col1.text_input("성함", value="익명", label_visibility="collapsed", placeholder="성함")
-            u_pw = f_col2.text_input("비번", type="password", label_visibility="collapsed", placeholder="비번")
-            u_content = f_col3.text_input("내용", max_chars=50, label_visibility="collapsed", placeholder="한 줄 의견 (50자)")
+            u_name = f_col1.text_input("성함", value="익명", placeholder="성함")
+            u_pw = f_col2.text_input("비번", type="password", placeholder="비번")
+            u_content = f_col3.text_input("내용", max_chars=50, placeholder="한 줄 의견 (50자)")
             submit = f_col4.form_submit_button("등록")
             if submit:
                 bad_words = ["바보", "멍청이", "개새끼", "시발", "씨발", "병신", "미친", "지랄"]
