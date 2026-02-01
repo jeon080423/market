@@ -5,6 +5,5 @@ numpy
 plotly
 requests
 beautifulsoup4
-pip install -U google-generativeai
 google-generativeai
 streamlit-autorefresh
