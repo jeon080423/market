@@ -36,7 +36,8 @@ try:
 except Exception as e:
     st.error(f"Gemini 설정 중 오류 발생: {e}")
 
-# AI 분석 함수 정의
+# AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
+@st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
     try:
         response = model.generate_content(prompt)
@@ -604,4 +605,3 @@ except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
-
