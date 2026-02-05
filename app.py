@@ -572,8 +572,6 @@ try:
             주식 시장 지표 데이터: {latest_data_summary}
             
             위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
-            특히 KOSPI 지수가 전일대비 1%이상 상승하거나 하락했는지 먼저 확인하고 이유를 분석해.
-            KOSPI 상승 또는 하락폭은 그래프 중 'KOSPI 기술적 분석'의 전일대비 당일 지수를 이용해.
             지침:
             1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
             2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
@@ -702,6 +700,7 @@ except Exception as e:
 
 # 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
+
 
 
 
