@@ -93,7 +93,7 @@ st.markdown("""
         line-height: 1.8 !important;
     }
     
-    /* 가이드북 내 테이블 스타일 */
+    /* 가이드북 내 테이블 스타일: 설명 폰트(guide-text)와 동일하게 표시되도록 설정 */
     div[data-testid="stMarkdownContainer"] table {
         width: 100% !important;
         table-layout: auto !important;
@@ -101,9 +101,10 @@ st.markdown("""
     }
     div[data-testid="stMarkdownContainer"] table th,
     div[data-testid="stMarkdownContainer"] table td {
-        font-size: clamp(12px, 1.1vw, 16px) !important; /* 표 텍스트 유동성 */
+        font-size: clamp(14px, 1.2vw, 20px) !important; /* 설명글 폰트 크기와 동일하게 수정 */
         word-wrap: break-word !important;
         padding: 12px 4px !important; 
+        line-height: 1.8 !important; /* 줄간격 통일 */
     }
     
     /* 수평선(hr) 여백 조정 */
@@ -458,24 +459,27 @@ try:
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Risk'], name="위험 지수", line=dict(color='red'), connectgaps=True)) # connectgaps 추가
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot'), connectgaps=True))
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400); st.plotly_chart(fig_bt, use_container_width=True)
+        
+        # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
+        corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
+        with st.spinner("AI가 추세를 분석 중..."):
+            bt_prompt = f"""
+            최근 1년 시장 위험 지수와 KOSPI의 상관계수는 {corr_val:.2f}이며, 현재 위험 지수는 {hist_risks[-1]:.1f}입니다. 
+            상관계수는 위험지수와 KOSPI와의 관계를 설명하는 지표이지 위험을 알려주는 지표는 아니라는 것을 기본적으로 학습해.
+            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 진단해줘 특히 최근 7일 이내의 지수 변동을 종합해서 분석해줘.
+            지침: 한자 금지, 강조기호 금지.
+            """
+            bt_analysis = get_ai_analysis(bt_prompt)
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6;">
+                <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
+            </div>
+            """, unsafe_allow_html=True)
+
     with cb2:
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
         st.metric("상관계수 (Corr)", f"{corr_val:.2f}")
         st.write("- -1.0~-0.7: 우수\n- -0.7~-0.3: 유의미\n- 0.0이상: 모델 왜곡")
-        
-        # 백테스팅 AI 분석 추가
-        with st.spinner("AI가 추세를 분석 중..."):
-            bt_prompt = f"""
-            최근 1년 시장 위험 지수와 KOSPI의 상관계수는 {corr_val:.2f}이며, 현재 위험 지수는 {hist_risks[-1]:.1f}입니다. 
-            상관계수는 위험지수와 KOSPI와의 관계를 설명하는 지표이지 위험을 알려주는 지표는 아니라는 것을 기본적으로 학습ㅎㅐ.
-            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 진단해줘 특히 최근 7일 이내의 지수 변동을 종합해서 분석해줘.
-            """
-            bt_analysis = get_ai_analysis(bt_prompt)
-            st.markdown(f"""
-            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 0.85rem; color: #31333F;">
-                <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
-            </div>
-            """, unsafe_allow_html=True)
 
     # 7.5 블랙스완
     st.markdown("---")
@@ -654,4 +658,3 @@ except Exception as e:
 
 # 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
-
