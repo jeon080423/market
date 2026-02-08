@@ -467,8 +467,8 @@ try:
         with st.spinner("AI가 추세를 분석 중..."):
             bt_prompt = f"""
             최근 1년 시장 위험 지수와 KOSPI의 상관계수는 {corr_val:.2f}이며, 현재 위험 지수는 {hist_risks[-1]:.1f}입니다. 
-            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 진단해줘 특히 최근 7일 이내의 지수 변동과 상관계수를 종합해서 분석해줘.
-            지침: 한자 금지, 강조기호 금지, 3문장 이내.
+            상관계수는 위험지수와 KOSPI와의 관계를 설명하는 지표이지 위험을 알려주는 지표는 아니라는 것을 기본적으로 학습ㅎㅐ.
+            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 진단해줘 특히 최근 7일 이내의 지수 변동을 종합해서 분석해줘.
             """
             bt_analysis = get_ai_analysis(bt_prompt)
             st.markdown(f"""
@@ -654,3 +654,4 @@ except Exception as e:
 
 # 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
+
