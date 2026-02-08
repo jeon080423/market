@@ -112,15 +112,17 @@ st.markdown("""
         margin-bottom: 1rem !important;
     }
 
-    /* AI 분석 결과 박스 커스텀 (높이 및 줄간격 최적화) */
+    /* AI 분석 결과 박스 커스텀 (야간 모드 대응 및 시인성 개선) */
     .ai-analysis-box {
-        background-color: #f0f7ff;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        color: #31333F !important; /* 글자색 강제 고정 */
         padding: 15px 20px;
         border-radius: 10px;
         border-left: 5px solid #007bff;
         line-height: 1.65;
         font-size: 1.0rem;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -424,10 +426,10 @@ try:
             st.markdown(f"- [{a['title']}]({a['link']})")
             all_titles += a['title'] + ". "
         
+    with cr:
+        # "AI 뉴스 통합 분석" 위치를 오른쪽 "한줄 의견" 상단으로 이동
         if news_data:
-            st.markdown("<br>", unsafe_allow_html=True)
             with st.spinner("AI가 뉴스를 분석 중입니다..."):
-                # 프롬프트 수정: 강조 기호 제거 및 한자 차단 지시 강화
                 prompt = f"""
                 다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
                 
@@ -442,7 +444,7 @@ try:
                 """
                 summary_text = get_ai_analysis(prompt)
                 
-                # 시인성을 위해 마크다운 박스 적용 및 박스 높이 조절
+                # 야간 모드 시인성 해결을 위한 스타일 적용
                 st.markdown(f"""
                 <div class="ai-analysis-box">
                     <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
@@ -450,7 +452,6 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
 
-    with cr:
         st.subheader("💬 한 줄 의견(익명)")
         st.markdown("""<style>.stMarkdown p { margin-top: -2px !important; margin-bottom: -2px !important; line-height: 1.2 !important; padding: 0px !important; } .element-container { margin-bottom: -1px !important; padding: 0px !important; } div[data-testid="stVerticalBlock"] > div { padding: 0px !important; margin: 0px !important; } button[data-testid="baseButton-secondary"] { padding: 0px !important; height: 18px !important; min-height: 18px !important; line-height: 1 !important; border: none !important; background: transparent !important; color: #555 !important; font-size: 12px !important; }</style>""", unsafe_allow_html=True)
         st.session_state.board_data = load_board_data()
@@ -520,8 +521,23 @@ try:
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot'), connectgaps=True))
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400); st.plotly_chart(fig_bt, use_container_width=True)
     with cb2:
-        st.metric("상관계수 (Corr)", f"{hist_df['Risk'].corr(hist_df['KOSPI']):.2f}")
+        corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
+        st.metric("상관계수 (Corr)", f"{corr_val:.2f}")
         st.write("- -1.0~-0.7: 우수\n- -0.7~-0.3: 유의미\n- 0.0이상: 모델 왜곡")
+        
+        # 백테스팅 AI 분석 추가
+        with st.spinner("AI가 추세를 분석 중..."):
+            bt_prompt = f"""
+            최근 1년 시장 위험 지수와 KOSPI의 상관계수는 {corr_val:.2f}이며, 현재 위험 지수는 {hist_risks[-1]:.1f}입니다. 
+            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 짧게 진단해줘.
+            지침: 한자 금지, 강조기호 금지, 3문장 이내.
+            """
+            bt_analysis = get_ai_analysis(bt_prompt)
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 0.85rem; color: #31333F;">
+                <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
+            </div>
+            """, unsafe_allow_html=True)
 
     # 7.5 블랙스완
     st.markdown("---")
@@ -582,10 +598,10 @@ try:
             5. 쉽고 전문적인 톤을 유지해.
             """
             analysis_output = get_ai_analysis(ai_desc_prompt)
-            # 결과물에서 마크다운 강조 기호 다시 한번 제거 및 줄간격 조절
+            # 야간 모드 시인성을 위해 배경색 및 글자색 고정 적용
             clean_output = analysis_output.replace('**', '').replace('##', '').strip()
             st.markdown(f"""
-            <div class="ai-analysis-box" style="background-color: #ffffff; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 10px 20px;">
+            <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
                 {clean_output}
             </div>
             """, unsafe_allow_html=True)
@@ -700,11 +716,3 @@ except Exception as e:
 
 # 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
-
-
-
-
-
-
-
-
