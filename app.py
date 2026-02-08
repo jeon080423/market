@@ -236,37 +236,6 @@ def get_market_news():
     except:
         return []
 
-# 4.6 게시판 데이터 로드/저장 로직
-@st.cache_data(ttl=10) 
-def load_board_data():
-    try:
-        res = requests.get(f"{GSHEET_CSV_URL}&cache_bust={datetime.now().timestamp()}", timeout=10)
-        res.encoding = 'utf-8' 
-        if res.status_code == 200:
-            df = pd.read_csv(StringIO(res.text), dtype=str).fillna("")
-            return df.to_dict('records')
-        return []
-    except:
-        return []
-
-def save_to_gsheet(date, author, content, password, action="append"):
-    try:
-        payload = {
-            "date": str(date),
-            "author": str(author),
-            "content": str(content),
-            "password": str(password),
-            "action": action
-        }
-        res = requests.post(GSHEET_WEBAPP_URL, data=json.dumps(payload), timeout=15)
-        if res.status_code == 200:
-            st.cache_data.clear()
-            return True
-        return False
-    except Exception as e:
-        st.error(f"연동 에러: {e}")
-        return False
-
 try:
     with st.spinner('시차 상관관계 및 가중치 분석 중...'):
         kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map = load_data()
@@ -396,6 +365,16 @@ try:
         80-100 (panic): 최우선 리스크 관리. 가급적 현금 비중 최소화, 신용/미수 사용 전면 금지 및 손절매 기준 엄격 적용.
         </div>
         """, unsafe_allow_html=True)
+
+        # 좋아요 기능 추가
+        if 'likes' not in st.session_state:
+            st.session_state.likes = 0
+        
+        l_col1, l_col2 = st.columns([1, 5])
+        if l_col1.button(f"👍 {st.session_state.likes}"):
+            st.session_state.likes += 1
+            st.rerun()
+        l_col2.write("대시보드가 도움이 되었다면 응원해 주세요!")
         
     with c_gauge: 
         fig_gauge = go.Figure(go.Indicator(
@@ -427,7 +406,7 @@ try:
             all_titles += a['title'] + ". "
         
     with cr:
-        # "AI 뉴스 통합 분석" 위치를 오른쪽 "한줄 의견" 상단으로 이동
+        # "AI 뉴스 통합 분석" 위치 유지 (오른쪽 열 상단)
         if news_data:
             with st.spinner("AI가 뉴스를 분석 중입니다..."):
                 prompt = f"""
@@ -451,57 +430,6 @@ try:
                     {summary_text.replace('🔎 AI 뉴스 통합 분석:', '').strip()}
                 </div>
                 """, unsafe_allow_html=True)
-
-        st.subheader("💬 한 줄 의견(익명)")
-        st.markdown("""<style>.stMarkdown p { margin-top: -2px !important; margin-bottom: -2px !important; line-height: 1.2 !important; padding: 0px !important; } .element-container { margin-bottom: -1px !important; padding: 0px !important; } div[data-testid="stVerticalBlock"] > div { padding: 0px !important; margin: 0px !important; } button[data-testid="baseButton-secondary"] { padding: 0px !important; height: 18px !important; min-height: 18px !important; line-height: 1 !important; border: none !important; background: transparent !important; color: #555 !important; font-size: 12px !important; }</style>""", unsafe_allow_html=True)
-        st.session_state.board_data = load_board_data()
-        ITEMS_PER_PAGE = 20
-        total_posts = len(st.session_state.board_data)
-        total_pages = max(1, (total_posts - 1) // ITEMS_PER_PAGE + 1)
-        if 'current_page' not in st.session_state: st.session_state.current_page = 1
-        board_container = st.container(height=200) 
-        with board_container:
-            if not st.session_state.board_data: st.write("의견이 없습니다.")
-            else:
-                reversed_data = st.session_state.board_data[::-1]
-                start_idx = (st.session_state.current_page - 1) * ITEMS_PER_PAGE
-                paged_data = reversed_data[start_idx : start_idx + ITEMS_PER_PAGE]
-                for i, post in enumerate(paged_data):
-                    unique_id = f"post_{start_idx + i}"
-                    bc1, bc2 = st.columns([12, 1.5]) 
-                    bc1.markdown(f"<p style='font-size:1.1rem;'><b>{post.get('Author','익명')}</b>: {post.get('Content','')} <small style='color:gray; font-size:0.8rem;'>({post.get('date','')})</small></p>", unsafe_allow_html=True)
-                    with bc2.popover("편집", help="수정/삭제"):
-                        chk_pw = st.text_input("비밀번호", type="password", key=f"chk_{unique_id}")
-                        stored_pw = str(post.get('Password', '')).strip()
-                        if chk_pw and chk_pw.strip() == stored_pw:
-                            new_val = st.text_input("수정 내용", value=post.get('Content',''), key=f"edit_{unique_id}")
-                            btn1, btn2 = st.columns(2)
-                            if btn1.button("수정 완료", key=f"up_{unique_id}"):
-                                if save_to_gsheet(post.get('date',''), post.get('Author',''), new_val, stored_pw, action="update"): st.success("수정 성공"); st.rerun()
-                            if btn2.button("삭제", key=f"del_{unique_id}"):
-                                if save_to_gsheet(post.get('date',''), post.get('Author',''), new_val, stored_pw, action="delete"): st.success("삭제 성공"); st.rerun()
-                        elif chk_pw: st.error("불일치")
-        if total_pages > 1:
-            pc1, pc2, pc3 = st.columns([1, 2, 1])
-            if pc1.button("◀", disabled=st.session_state.current_page == 1): st.session_state.current_page -= 1; st.rerun()
-            pc2.markdown(f"<p style='text-align:center; font-size:14px;'>{st.session_state.current_page}/{total_pages}</p>", unsafe_allow_html=True)
-            if pc3.button("▶", disabled=st.session_state.current_page == total_pages): st.session_state.current_page += 1; st.rerun()
-        st.markdown("---")
-        with st.form("board_form", clear_on_submit=True):
-            f_col1, f_col2, f_col3, f_col4 = st.columns([1, 1, 3.5, 0.8])
-            u_name = f_col1.text_input("성함", value="익명", label_visibility="collapsed", placeholder="성함")
-            u_pw = f_col2.text_input("비번", type="password", label_visibility="collapsed", placeholder="비번")
-            u_content = f_col3.text_input("내용", max_chars=50, label_visibility="collapsed", placeholder="한 줄 의견 (50자)")
-            submit = f_col4.form_submit_button("등록")
-            if submit:
-                bad_words = ["바보", "멍청이", "개새끼", "시발", "씨발", "병신", "미친", "지랄"]
-                if any(word in u_content for word in bad_words): st.error("금지어")
-                elif not u_pw: st.error("비번 필수")
-                elif not u_content: st.error("내용 입력")
-                else:
-                    now_str = get_kst_now().strftime("%Y-%m-%d %H:%M:%S")
-                    if save_to_gsheet(now_str, u_name, u_content, u_pw, action="append"): st.success("등록 성공"); st.rerun()
-                    else: st.error("실패")
 
     # 7. 백테스팅
     st.markdown("---")
