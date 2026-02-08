@@ -190,7 +190,7 @@ def load_data():
     end_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     start_date = "2019-01-01"
     
-    # 여러 티커를 한 번에 다운로드하여 API 호출 횟수 절약
+    # 여러 티커를 한 번에 다운로드
     tickers = {
         "kospi": "^KS11", "sp500": "^GSPC", "fx": "KRW=X", 
         "us10y": "^TNX", "us2y": "^IRX", "vix": "^VIX", 
@@ -206,7 +206,7 @@ def load_data():
     }
     sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
     
-    # 딕셔너리 형태로 반환하기 위해 분리 (기존 리턴 구조 유지)
+    # [수정] iloc 대신 티커 이름으로 명확하게 컬럼 추출하여 데이터 누락 방지
     return (
         data[[tickers["kospi"]]], data[[tickers["sp500"]]], data[[tickers["fx"]]], 
         data[[tickers["us10y"]]], data[[tickers["us2y"]]], data[[tickers["vix"]]], 
@@ -243,7 +243,7 @@ try:
 
     def get_clean_series(df):
         if df is None or df.empty: return pd.Series(dtype='float64')
-        # 중복 제거 및 단일 열 추출 최적화
+        # [수정] 멀티인덱스 상황에서도 안전하게 데이터를 추출하도록 처리
         if isinstance(df, pd.DataFrame):
             df = df.iloc[:, 0]
         return df[~df.index.duplicated(keep='first')]
@@ -252,7 +252,6 @@ try:
     ks_s = get_clean_series(kospi).ffill()
     sp_s = get_clean_series(sp500).reindex(ks_s.index).ffill()
     fx_s = get_clean_series(fx).reindex(ks_s.index).ffill()
-    # 금리 데이터는 휴장일 차이로 인해 reindex 시 결측치가 많이 생길 수 있어 보강함
     b10_s = get_clean_series(bond10).reindex(ks_s.index).ffill()
     b2_s = get_clean_series(bond2).reindex(ks_s.index).ffill()
     vx_s = get_clean_series(vix_data).reindex(ks_s.index).ffill()
@@ -261,7 +260,7 @@ try:
     wt_s = get_clean_series(wti_data).reindex(ks_s.index).ffill()
     dx_s = get_clean_series(dxy_data).reindex(ks_s.index).ffill()
     
-    # 금리차 계산: 보정된 데이터를 사용하여 계산
+    # 금리차 계산
     yield_curve = b10_s - b2_s
     ma20 = ks_s.rolling(window=20).mean() # 전체 데이터 기반 이동평균 계산
 
@@ -615,8 +614,9 @@ try:
     r3_c1, r3_c2, r3_c3 = st.columns(3)
     with r3_c1:
         st.subheader("글로벌 물동량 지표 (BDRY)")
-        fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2)
-        st.plotly_chart(create_chart(fr_s, "BDRY", fr_th, "물동량 급감 시 위험"), use_container_width=True)
+        if not fr_s.empty:
+            fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2)
+            st.plotly_chart(create_chart(fr_s, "BDRY", fr_th, "물동량 급감 시 위험"), use_container_width=True)
         st.info("**물동량**: 지지선 하향 돌파 시 경기 수축 신호  \n**빨간선 기준**: 최근 1년 평균 대비 -15% 하락 지점")
     with r3_c2:
         st.subheader("에너지 가격 (WTI 원유)")
