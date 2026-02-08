@@ -366,15 +366,25 @@ try:
         </div>
         """, unsafe_allow_html=True)
 
-        # 좋아요 기능 추가
+        # 좋아요 기능 레이아웃 개선
         if 'likes' not in st.session_state:
             st.session_state.likes = 0
         
-        l_col1, l_col2 = st.columns([1, 5])
-        if l_col1.button(f"👍 {st.session_state.likes}"):
-            st.session_state.likes += 1
-            st.rerun()
-        l_col2.write("대시보드가 도움이 되었다면 응원해 주세요!")
+        st.write("") # 간격 조절
+        like_box = st.container()
+        with like_box:
+            # 시인성 있는 박스 형태의 레이아웃
+            l_col1, l_col2 = st.columns([1, 4])
+            with l_col1:
+                if st.button(f"👍 {st.session_state.likes}", use_container_width=True):
+                    st.session_state.likes += 1
+                    st.rerun()
+            with l_col2:
+                st.markdown(f"""
+                <div style="padding-top: 5px;">
+                    <span style="font-size: 0.9rem; color: #666;">대시보드가 유익했다면 좋아요로 응원해주세요!</span>
+                </div>
+                """, unsafe_allow_html=True)
         
     with c_gauge: 
         fig_gauge = go.Figure(go.Indicator(
@@ -398,7 +408,7 @@ try:
     cn, cr = st.columns(2)
     with cn:
         # 제목 텍스트 Groq로 수정
-        st.subheader("📰 글로벌 경제 뉴스 (Groq AI 요약)")
+        st.subheader("📰 글로벌 경제 뉴스")
         news_data = get_market_news()
         all_titles = ""
         for a in news_data:
@@ -457,7 +467,7 @@ try:
         with st.spinner("AI가 추세를 분석 중..."):
             bt_prompt = f"""
             최근 1년 시장 위험 지수와 KOSPI의 상관계수는 {corr_val:.2f}이며, 현재 위험 지수는 {hist_risks[-1]:.1f}입니다. 
-            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 짧게 진단해줘.
+            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 진단해줘 특히 최근 7일 이내의 지수 변동과 상관계수를 종합해서 분석해줘.
             지침: 한자 금지, 강조기호 금지, 3문장 이내.
             """
             bt_analysis = get_ai_analysis(bt_prompt)
@@ -499,7 +509,7 @@ try:
 
     # 9. 지표별 상세 분석 및 AI 설명
     st.markdown("---")
-    st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석 (AI 해설 포함)")
+    st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석 (AI 해설)")
     
     # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
