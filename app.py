@@ -183,14 +183,14 @@ with st.expander("📖 지수 가이드북"):
         st.latex(r"Z = \frac{x - \mu}{\sigma}")
     get_math_formulas()
 
-# 4. 데이터 수집 함수 (최적화: 일괄 다운로드 및 물동량 데이터 보강)
+# 4. 데이터 수집 함수 (최적화: 일괄 다운로드)
 @st.cache_data(ttl=900) # 15분으로 연장
 def load_data():
     # 오늘 데이터를 포함하기 위해 내일 날짜로 end_date 설정
     end_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     start_date = "2019-01-01"
     
-    # 여러 티커를 한 번에 다운로드
+    # 여러 티커를 한 번에 다운로드하여 API 호출 횟수 절약
     tickers = {
         "kospi": "^KS11", "sp500": "^GSPC", "fx": "KRW=X", 
         "us10y": "^TNX", "us2y": "^IRX", "vix": "^VIX", 
@@ -199,11 +199,6 @@ def load_data():
     
     data = yf.download(list(tickers.values()), start=start_date, end=end_date)['Close']
     
-    # BDRY 데이터 누락 시 재시도 로직 (독립적 추출)
-    if tickers["freight"] in data.columns and data[tickers["freight"]].isnull().all():
-        freight_fix = yf.download(tickers["freight"], start=start_date, end=end_date)['Close']
-        data[tickers["freight"]] = freight_fix
-
     sector_tickers = {
         "반도체": "005930.KS", "자동차": "005380.KS", "2차전지": "051910.KS",
         "바이오": "207940.KS", "인터넷": "035420.KS", "금융": "055550.KS",
@@ -253,10 +248,11 @@ try:
             df = df.iloc[:, 0]
         return df[~df.index.duplicated(keep='first')]
 
-    # 데이터 끊김 현상 방지를 위해 ffill() 적용 및 물동량 클렌징 강화
+    # 데이터 끊김 현상 방지를 위해 ffill() 적용
     ks_s = get_clean_series(kospi).ffill()
     sp_s = get_clean_series(sp500).reindex(ks_s.index).ffill()
     fx_s = get_clean_series(fx).reindex(ks_s.index).ffill()
+    # 금리 데이터는 휴장일 차이로 인해 reindex 시 결측치가 많이 생길 수 있어 보강함
     b10_s = get_clean_series(bond10).reindex(ks_s.index).ffill()
     b2_s = get_clean_series(bond2).reindex(ks_s.index).ffill()
     vx_s = get_clean_series(vix_data).reindex(ks_s.index).ffill()
@@ -265,7 +261,7 @@ try:
     wt_s = get_clean_series(wti_data).reindex(ks_s.index).ffill()
     dx_s = get_clean_series(dxy_data).reindex(ks_s.index).ffill()
     
-    # 금리차 계산
+    # 금리차 계산: 보정된 데이터를 사용하여 계산
     yield_curve = b10_s - b2_s
     ma20 = ks_s.rolling(window=20).mean() # 전체 데이터 기반 이동평균 계산
 
@@ -378,6 +374,7 @@ try:
         st.write("") # 간격 조절
         like_box = st.container()
         with like_box:
+            # 시인성 있는 박스 형태의 레이아웃
             l_col1, l_col2 = st.columns([1, 4])
             with l_col1:
                 if st.button(f"👍 {st.session_state.likes}", use_container_width=True):
@@ -411,6 +408,7 @@ try:
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
+        # 제목 텍스트 Groq로 수정
         st.subheader("📰 글로벌 경제 뉴스")
         news_data = get_market_news()
         all_titles = ""
@@ -419,14 +417,24 @@ try:
             all_titles += a['title'] + ". "
         
     with cr:
+        # "AI 뉴스 통합 분석" 위치 유지 (오른쪽 열 상단)
         if news_data:
             with st.spinner("AI가 뉴스를 분석 중입니다..."):
                 prompt = f"""
                 다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
-                뉴스별로 번역하고 리스크 요인을 분석해줘.
-                지침: 한자 금지, 강조기호 금지, 두 문장 요약.
+                
+                이 뉴스별로 번역하고, 뉴스 중 금융 시장의 리스크와 변동성 관련 뉴스가 있다면 투자자가 유의해야 할 점으로 따로 분석해줘.
+                지침:
+                1. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
+                2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해.
+                3. 분석 내용을 두 개의 핵심 문장으로 요약하고, 각 문장은 줄바꿈으로 구분해.
+                4. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
+                5. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+                6. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
                 """
                 summary_text = get_ai_analysis(prompt)
+                
+                # 야간 모드 시인성 해결을 위한 스타일 적용
                 st.markdown(f"""
                 <div class="ai-analysis-box">
                     <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
@@ -441,17 +449,18 @@ try:
     dates = ks_s.index[-252:]
     hist_risks = []
     for d in dates:
+        # 데이터 끊김 현상 보정을 위해 ffill된 데이터 사용
         m = (get_hist_score_val(fx_s, d) + get_hist_score_val(b10_s, d) + get_hist_score_val(cp_s, d, True)) / 3
         hist_risks.append((m * w_macro + max(0, min(100, 100 - (float(ks_s.loc[d]) / float(ma20.iloc[-1]) - 0.9) * 500)) * w_tech + get_hist_score_val(sp_s, d, True) * w_global + get_hist_score_val(vx_s, d) * w_fear) / total_w)
     hist_df = pd.DataFrame({'Date': dates, 'Risk': hist_risks, 'KOSPI': ks_s.loc[dates].values})
     cb1, cb2 = st.columns([3, 1])
     with cb1:
         fig_bt = go.Figure()
-        fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Risk'], name="위험 지수", line=dict(color='red'), connectgaps=True))
+        fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Risk'], name="위험 지수", line=dict(color='red'), connectgaps=True)) # connectgaps 추가
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot'), connectgaps=True))
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400); st.plotly_chart(fig_bt, use_container_width=True)
         
-        # 모델 유효성 진단
+        # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
         with st.spinner("AI가 추세를 분석 중..."):
             bt_prompt = f"""
@@ -468,6 +477,7 @@ try:
             """, unsafe_allow_html=True)
 
     with cb2:
+        corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
         st.metric("상관계수 (Corr)", f"{corr_val:.2f}")
         st.write("- -1.0~-0.7: 우수\n- -0.7~-0.3: 유의미\n- 0.0이상: 모델 왜곡")
 
@@ -475,8 +485,9 @@ try:
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     def get_norm_risk_proxy(t, s, e):
+        # 최신 데이터를 위해 end_date 보정
         bs_end = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d') if e == datetime.now().strftime('%Y-%m-%d') else e
-        d = yf.download(t, start=s, end=bs_end)['Close'].ffill()
+        d = yf.download(t, start=s, end=bs_end)['Close'].ffill() # ffill 추가
         if isinstance(d, pd.DataFrame): d = d.iloc[:, 0]
         return 100 - ((d - d.min()) / (d.max() - d.min()) * 100)
     col_bs1, col_bs2 = st.columns(2)
@@ -488,6 +499,8 @@ try:
         fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
         fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='black', dash='dot'), connectgaps=True))
         st.plotly_chart(fig_bs1, use_container_width=True)
+        if avg_current_risk > 60: st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 위기 초기와 유사합니다.")
+        else: st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
     with col_bs2:
         st.info("**2020 코로나 폭락 vs 현재**")
         bs_2020 = get_norm_risk_proxy("^KS11", "2020-01-01", "2020-06-01")
@@ -495,25 +508,39 @@ try:
         fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
         fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
         st.plotly_chart(fig_bs2, use_container_width=True)
+        if avg_current_risk > 50: st.error(f"🚨 주의: 현재 위험 지수가 2020년 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
+        else: st.info(f"💡 현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
 
     # 9. 지표별 상세 분석 및 AI 설명
     st.markdown("---")
     st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석 (AI 해설)")
     
+    # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
-    - S&P 500 현재가: {sp_s.iloc[-1]:.2f}
-    - 원/달러 환율: {fx_s.iloc[-1]:.1f}원
-    - 구리 가격: {cp_s.iloc[-1]:.2f}
-    - VIX 지수: {vx_s.iloc[-1]:.2f}
+    - S&P 500 현재가: {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s.last('365D').mean())-1)*100:+.1f}%)
+    - 원/달러 환율: {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
+    - 구리 가격: {cp_s.iloc[-1]:.2f} (최근 추세: {'상승' if cp_s.iloc[-1] > cp_s.iloc[-5] else '하락'})
+    - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
     """
     
+    # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
     with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
         with st.spinner("지표 데이터를 분석 중..."):
             ai_desc_prompt = f"""
-            지표 데이터: {latest_data_summary}
-            KOSPI 상황을 진단해줘. 지침: 한자 금지, 강조기호 금지, 주요 지표 요약 및 시장 진단 포함.
+            주식 시장 지표 데이터: {latest_data_summary}
+            
+            위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
+            지침:
+            1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
+            2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+            3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
+            4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
+                [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
+                [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
+            5. 쉽고 전문적인 톤을 유지해.
             """
             analysis_output = get_ai_analysis(ai_desc_prompt)
+            # 야간 모드 시인성을 위해 배경색 및 글자색 고정 적용
             clean_output = analysis_output.replace('**', '').replace('##', '').strip()
             st.markdown(f"""
             <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
@@ -522,62 +549,112 @@ try:
             """, unsafe_allow_html=True)
 
     def create_chart(series, title, threshold, desc_text):
-        if series is not None and not series.empty and not series.isnull().all():
-            fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title, connectgaps=True))
+        # 데이터가 비어있지 않은지 확인 후 그래프 생성
+        if series is not None and not series.empty:
+            fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title, connectgaps=True)) # connectgaps 추가
             fig.add_hline(y=threshold, line_width=2, line_color="red")
+            # 주석 위치 계산을 위한 안전장치
             annot_idx = len(series)//2 if len(series) > 0 else 0
             fig.add_annotation(x=series.index[annot_idx], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
+            fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
+            fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="COVID 지수 폭락 기점", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
             return fig
-        # 데이터가 없을 경우 빈 차트에 에러 메시지 표시
-        fig = go.Figure()
-        fig.add_annotation(text="데이터 로드 실패 (Yahoo Finance 점검 중)", showarrow=False, font=dict(size=14, color="gray"))
-        return fig
+        return go.Figure()
 
     r1_c1, r1_c2, r1_c3 = st.columns(3)
     with r1_c1:
         st.subheader("미국 S&P 500")
         st.plotly_chart(create_chart(sp_s, "S&P 500", sp_s.last('365D').mean()*0.9, "평균 대비 -10% 하락 시"), use_container_width=True)
+        st.info("**미국 지수**: KOSPI와 강한 정(+)의 상관성  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
     with r1_c2:
         st.subheader("원/달러 환율")
         fx_th = float(fx_s.last('365D').mean() * 1.02)
         st.plotly_chart(create_chart(fx_s, "원/달러 환율", fx_th, f"{fx_th:.1f}원 돌파 시 위험"), use_container_width=True)
+        st.info("**환율**: +2% 상회 시 외국인 자본 유출 심화  \n**빨간선 기준**: 최근 1년 평균 환율 대비 +2% 상승 지점")
     with r1_c3:
         st.subheader("실물 경기 지표 (Copper)")
         st.plotly_chart(create_chart(cp_s, "Copper", cp_s.last('365D').mean()*0.9, "수요 위축 시 위험"), use_container_width=True)
+        st.info("**실물 경기**: 구리 가격 하락은 수요 둔화 선행 신호  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
 
     r2_c1, r2_c2, r2_c3 = st.columns(3)
     with r2_c1:
         st.subheader("장단기 금리차")
+        # 금리차 그래프 생성
         st.plotly_chart(create_chart(yield_curve, "금리차", 0.0, "0 이하 역전 시 위험"), use_container_width=True)
+        st.info("**금리차**: 금리 역전은 경기 침체 강력 전조  \n**빨간선 기준**: 금리차가 0(수평)이 되는 역전 한계 지점")
     with r2_c2:
         st.subheader("KOSPI 기술적 분석")
         ks_recent = ks_s.last('30D')
         fig_ks = go.Figure()
+        # 현재가 그래프: 선 굵기 및 마커 추가로 가독성 향상
         fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ks_recent.values, name="현재가", line=dict(color='royalblue', width=3), mode='lines+markers', connectgaps=True))
+        # 20일 이동평균선: 계산된 ma20을 reindex하여 끊김 없이 시각화
         fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ma20.reindex(ks_recent.index).values, name="20일선", line=dict(color='orange', width=2, dash='dot'), connectgaps=True))
+        # 화살표 위치 수정: y값을 실제 20일선 지수값(ma20.iloc[-1])으로 명확히 지정
+        fig_ks.add_annotation(
+            x=ks_recent.index[-1], 
+            y=ma20.iloc[-1], # 화살표가 0이 아닌 실제 지수 위치를 가리키도록 수정
+            text="20일 평균선 하회 시 위험", 
+            showarrow=True, 
+            arrowhead=2, 
+            ax=0, 
+            ay=-40, 
+            font=dict(color="red", size=12),
+            bgcolor="white",
+            bordercolor="red"
+        )
         fig_ks.update_layout(margin=dict(l=0, r=0, t=30, b=0), height=350)
         st.plotly_chart(fig_ks, use_container_width=True)
+        st.info("**기술적 분석**: 20일선 하회 시 단기 추세 하락")
     with r2_c3:
         st.subheader("VIX 공포 지수")
         st.plotly_chart(create_chart(vx_s, "VIX", 30, "30 돌파 시 패닉"), use_container_width=True)
+        st.info("**VIX 지수**: 지수 급등은 투매 가능성 시사  \n**빨간선 기준**: 시장의 극단적 공포를 상징하는 지수 30 지점")
 
     st.markdown("---")
     r3_c1, r3_c2, r3_c3 = st.columns(3)
     with r3_c1:
         st.subheader("글로벌 물동량 지표 (BDRY)")
-        # 데이터 유효성 검사 강화 후 차트 생성
-        fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2) if not fr_s.empty else 0
+        fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2)
         st.plotly_chart(create_chart(fr_s, "BDRY", fr_th, "물동량 급감 시 위험"), use_container_width=True)
+        st.info("**물동량**: 지지선 하향 돌파 시 경기 수축 신호  \n**빨간선 기준**: 최근 1년 평균 대비 -15% 하락 지점")
     with r3_c2:
         st.subheader("에너지 가격 (WTI 원유)")
         wt_th = round(float(wt_s.last('365D').mean() * 1.2), 2)
         st.plotly_chart(create_chart(wt_s, "WTI", wt_th, "비용 압력 증가"), use_container_width=True)
+        st.info("**유가**: 급등 시 생산 비용 상승 및 인플레 압박  \n**빨간선 기준**: 최근 1년 평균 대비 +20% 급등 지점")
     with r3_c3:
         st.subheader("달러 인덱스 (DXY)")
         dx_th = round(float(dx_s.last('365D').mean() * 1.03), 1)
         st.plotly_chart(create_chart(dx_s, "DXY", dx_th, "유동성 위축 위험"), use_container_width=True)
+        st.info("**달러 가치**: 달러 상승은 유동성 축소 및 위험자산 회피  \n**빨간선 기준**: 최근 1년 평균 대비 +3% 강세 지점")
+
+    st.markdown("---")
+    st.subheader("📊 지수간 동조화 및 섹터 분석")
+    sp_norm = (sp_s - sp_s.mean()) / sp_s.std(); fr_norm = (fr_s - fr_s.mean()) / fr_s.std()
+    fig_norm = go.Figure(); fig_norm.add_trace(go.Scatter(x=sp_norm.index, y=sp_norm.values, name="S&P 500 (Std)", line=dict(color='blue'), connectgaps=True))
+    fig_norm.add_trace(go.Scatter(x=fr_norm.index, y=fr_norm.values, name="BDRY (Std)", line=dict(color='orange'), connectgaps=True))
+    fig_norm.update_layout(title="Z-Score 동조화 추세"); st.plotly_chart(fig_norm, use_container_width=True)
+    st.info("""
+**[현재 상황 상세 해석 가이드]**
+* **주가지수(Blue)가 위에 있을 때**: 실물 경기 뒷받침 없이 기대감만으로 지수가 과열된 상태일 수 있습니다. 하락 가능성이 높습니다.
+* **지표들이 비슷한 위치일 때**: 주가와 실물 경기가 동조화되어 움직이는 안정적인 추세입니다.
+* **글로벌 물동량(Orange)이 위에 있을 때**: 실물 경기는 회복되었으나 주가가 저평가된 상태입니다. 우상향 가능성을 시사합니다.
+""")
+
+    sector_perf = []
+    for n, t in sector_map.items():
+        try:
+            cur = sector_raw[t].iloc[-1]; pre = sector_raw[t].iloc[-2]
+            sector_perf.append({"섹터": n, "등락률": round(((cur - pre) / pre) * 100, 2)})
+        except: pass
+    if sector_perf:
+        df_p = pd.DataFrame(sector_perf)
+        fig_h = px.bar(df_p, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률", title="금일 섹터별 대표 종목 등락 현황 (%)")
+        st.plotly_chart(fig_h, use_container_width=True)
 
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
+# 하단 캡션 Groq로 수정
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
