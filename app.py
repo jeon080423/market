@@ -192,34 +192,33 @@ with st.expander("📖 지수 가이드북"):
     
     st.divider()
 
-    st.subheader("2. 선행성 분석 범위 및 효과 (Lag Analysis)")
-    st.markdown("#### **① 선행성 분석 범위 (Lag Optimization)**")
+    st.subheader("2. 선행성 및 정규화 알고리즘 (Advanced Logic)")
+    st.markdown("#### **① 수익률 기반 시차 분석 (Return-based Lag Analysis)**")
     st.write("""
-    * **단기 선행성 (1~5일)**: 현재 모델의 `find_best_lag` 함수는 각 지표와 KOSPI 간의 상관계수가 가장 높게 나타나는 지연 시간을 0일에서 5일 사이에서 찾습니다. 이는 매크로 지표의 변화가 국내 증시에 즉각적 혹은 수일 내에 반영되는 단기적 '전조 신호'를 포착하는 데 최적화되어 있습니다.
-    * **중장기 선행성 (1~3개월)**: '장단기 금리차'와 같은 특정 지표는 수개월 이상의 시차를 두고 실물 경기에 영향을 주지만, 본 대시보드는 주식 시장의 단기 하락 위험 모니터링에 초점을 맞추고 있어 모델 내부적으로는 최근의 변동 기여도를 우선시합니다.
+    * **정상성 확보**: 단순 지수가 아닌 '수익률(Return)' 데이터를 사용하여 상관관계를 분석함으로써 통계적 왜곡을 방지하고 가중치의 신뢰도를 높였습니다.
+    * **시차 최적화**: 각 지표가 KOSPI에 영향을 주는 최적의 시차(0~5일)를 회귀 분석을 통해 실시간으로 탐색합니다.
     """)
     
-    st.markdown("#### **② 지표별 특성에 따른 선행 효과**")
+    st.markdown("#### **② 하이브리드 정규화 및 볼록성 (Hybrid Normalization & Convexity)**")
     st.write("""
-    * **공포 지수(VIX) 및 환율**: 통상적으로 당일 혹은 1~2일 내외의 매우 짧은 선행성을 보이며 시장의 즉각적인 심리를 반영합니다.
-    * **구리 가격 및 물동량(BDRY)**: 실물 경기를 반영하므로 주가지수보다 수일에서 수주 앞서 추세적 변화를 보이는 경향이 있습니다.
-    * **장단기 금리차**: 실제 경기 침체는 6개월~1년 이상의 시차를 두고 발생할 수 있으나, 금융 시장은 이를 선반영하여 수주 내에 하락 압력을 받기 시작합니다.
+    * **시그모이드 정규화**: Z-Score(표준점수)를 시그모이드 함수에 통과시켜 0~100 사이로 변환합니다. 이는 극단적인 이상치(Black Swan) 발생 시 지수가 상한선에 막혀 변동을 포착하지 못하는 문제를 해결합니다.
+    * **위험 볼록성(Convexity)**: 시장의 공포는 선형적으로 증가하지 않습니다. 본 모델은 지수함수적 가중치를 적용하여, 위험 지수가 70점을 넘어서는 국면에서 더욱 민감하고 빠르게 반응하도록 설계되었습니다.
     """)
     
     st.markdown("#### **③ 요약**")
-    st.info("본 대시보드의 위험 지수는 수개월 단위의 거시적 경제 지표보다는, **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하고 대비하는데 최적화되어 설계되었습니다.")
+    st.info("본 모델은 통계적 정상성을 확보한 수익률 기반 분석과 이상치에 강건한 시그모이드 정규화를 통해, **패닉 국면에서 더욱 정교하고 빠른 경보**를 제공합니다.")
 
     st.divider()
     
-    st.subheader("3. 수리적 산출 공식")
+    st.subheader("3. 고도화된 수리적 산출 공식")
     @st.cache_data
     def get_math_formulas():
-        st.markdown("#### **① 시차 상관관계 (Time-Lagged Correlation)**")
-        st.latex(r"\rho(k) = \frac{Cov(X_{t-k}, Y_t)}{\sigma_{X_{t-k}} \sigma_{Y_t}} \quad (0 \le k \le 5)")
-        st.markdown("#### **② 통계적 변동 기여도 분석 (Feature Importance)**")
-        st.latex(r"Importance_i = |\beta_i| \times \sigma_{X_i}")
-        st.markdown("#### **③ Z-Score 표준화 (Standardization)**")
-        st.latex(r"Z = \frac{x - \mu}{\sigma}")
+        st.markdown("#### **① 시차 수익률 상관관계 (Lagged Return Correlation)**")
+        st.latex(r"\rho(k) = Corr(r_{X, t-k}, r_{Y, t}) \quad (r: \text{Return})")
+        st.markdown("#### **② 하이브리드 정규화 (Hybrid Normalization: Z-Score + Sigmoid)**")
+        st.latex(r"Z = \frac{x - \mu}{\sigma}, \quad Score = \frac{1}{1 + e^{-Z}} \times 100")
+        st.markdown("#### **③ 위험 가중치 복합 기여도 (Weighted Convexity)**")
+        st.latex(r"Risk = \frac{\sum (w_i \times S_i)}{\sum w_i}, \quad Adjusted = \frac{e^{k \cdot Risk} - 1}{e^k - 1}")
     get_math_formulas()
 
 # 4. 데이터 수집 함수 (최적화: 일괄 다운로드)
@@ -312,31 +311,60 @@ try:
 
     def get_hist_score_val(series, current_idx, inverse=False):
         try:
+            # 최근 1년(252거래일) 데이터 추출
             sub = series.loc[:current_idx].iloc[-252:]
             if len(sub) < 10: return 50.0
-            min_v, max_v = sub.min(), sub.max(); curr_v = series.loc[current_idx]
-            if max_v == min_v: return 50.0
-            return ((max_v - curr_v) / (max_v - min_v)) * 100 if inverse else ((curr_v - min_v) / (max_v - min_v)) * 100
+            
+            mu, std = float(sub.mean()), float(sub.std())
+            if std == 0: return 50.0
+            
+            curr_v = float(series.loc[current_idx])
+            z = (curr_v - mu) / std
+            
+            # Sigmoid 정규화: Z-score를 0~100 사이로 매핑 (이상치에 강건함)
+            # z=0일 때 50, z=2일 때 약 88, z=-2일 때 약 12
+            score = 100 / (1 + np.exp(-z))
+            return (100 - score) if inverse else score
         except: return 50.0
 
     @st.cache_data(ttl=3600)
     def calculate_ml_lagged_weights(_ks_s, _sp_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s):
-        def find_best_lag(feature, target, max_lag=5):
-            corrs = [abs(feature.shift(lag).corr(target)) for lag in range(max_lag + 1)]
+        # 1. 수익률(pct_change) 기반으로 변환하여 통계적 정상성 확보
+        def get_ret(s): return s.pct_change().dropna()
+        
+        target_ret = get_ret(_ks_s)
+        
+        def find_best_lag_ret(feature_s, target_s, max_lag=5):
+            f_ret = get_ret(feature_s)
+            common_idx = f_ret.index.intersection(target_s.index)
+            corrs = [abs(f_ret.shift(lag).reindex(common_idx).corr(target_s.reindex(common_idx))) for lag in range(max_lag + 1)]
             return np.argmax(corrs)
-        best_lags = {'SP': find_best_lag(_sp_s, _ks_s), 'FX': find_best_lag(_fx_s, _ks_s), 'B10': find_best_lag(_b10_s, _ks_s), 'CP': find_best_lag(_cp_s, _ks_s), 'VX': find_best_lag(_vx_s, _ks_s)}
+            
+        best_lags = {
+            'SP': find_best_lag_ret(_sp_s, target_ret), 
+            'FX': find_best_lag_ret(_fx_s, target_ret), 
+            'B10': find_best_lag_ret(_b10_s, target_ret), 
+            'CP': find_best_lag_ret(_cp_s, target_ret), 
+            'VX': find_best_lag_ret(_vx_s, target_ret)
+        }
+        
         data_rows = []
+        # 최근 252거래일 동안의 지표 상태(Score)와 KOSPI 수익률 간의 관계 분석
         for d in _ks_s.index[-252:]:
+            if d not in target_ret.index: continue
+            
             s_sp = get_hist_score_val(_sp_s.shift(best_lags['SP']), d, True)
             s_fx = get_hist_score_val(_fx_s.shift(best_lags['FX']), d)
             s_b10 = get_hist_score_val(_b10_s.shift(best_lags['B10']), d)
             s_cp = get_hist_score_val(_cp_s.shift(best_lags['CP']), d, True)
             s_vx = get_hist_score_val(_vx_s.shift(best_lags['VX']), d)
-            data_rows.append([ (s_fx + s_b10 + s_cp) / 3, s_sp, s_vx, max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500)), _ks_s.loc[d] ])
+            s_tech = max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500))
+            
+            data_rows.append([ (s_fx + s_b10 + s_cp) / 3, s_sp, s_vx, s_tech, target_ret.loc[d] ])
         
-        df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI']).replace([np.inf, -np.inf], np.nan).dropna()
-        X = (df_reg.iloc[:, :4] - df_reg.iloc[:, :4].mean()) / (df_reg.iloc[:, :4].std() + 1e-6)
-        Y = (df_reg['KOSPI'] - df_reg['KOSPI'].mean()) / (df_reg['KOSPI'].std() + 1e-6)
+        df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI_Ret']).replace([np.inf, -np.inf], np.nan).dropna()
+        X = df_reg.iloc[:, :4]
+        Y = df_reg['KOSPI_Ret']
         
         coeffs = np.linalg.lstsq(X, Y, rcond=None)[0]
         adjusted_importance = (np.abs(coeffs) * X.std().values) + 1e-6 
@@ -363,14 +391,14 @@ try:
 
     with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
         st.caption("""
-        본 모델은 **시차 상관분석**과 **선형 회귀(OLS)** 통계 기법을 결합하여 가중치를 제안합니다.
+        본 모델은 **수익률 기반 시차 분석(Return-based Lag)**과 **고도화된 선형 회귀(OLS)** 기법을 결합합니다.
         
-        1. **시차 최적화 (Lag Optimization)**:
-            각 지표와 KOSPI 간의 상관계수가 최대가 되는 지연 일수(0~5일)를 자동으로 탐색합니다.
-        2. **기여도 역산 (OLS Regression)**:
-            `np.linalg.lstsq`를 사용하여 과거 데이터상 각 팩터가 KOSPI 변동에 미친 통계적 영향력을 산출합니다.
-        3. **가중치 정규화**:
-            산출된 계수값을 바탕으로 변동성 기여도를 계산하고, 이를 확률적으로 정규화하여 권장 가중치로 제시합니다.
+        1. **통계적 정상성 확보 (Stationarity)**:
+            단순 지급 대신 '수익률' 데이터를 사용하여 가격 수준에 따른 왜곡을 방지하고 순수한 변동 관계를 분석합니다.
+        2. **수익률 시차 최적화**:
+            각 매크로 지표의 수익률이 KOSPI 수익률에 가장 큰 영향을 미치는 지연 일수(0~5일)를 측정합니다.
+        3. **기여도 역산 및 정규화**:
+            최근 1년 데이터를 기반으로 각 팩터가 KOSPI 변동에 미친 통계적 기여도를 산출하여 권장 가중치로 제시합니다.
         """)
 
     st.sidebar.markdown("---")
@@ -389,13 +417,24 @@ try:
 
     def calculate_score(current_series, full_series, inverse=False):
         recent = full_series.last('365D')
-        min_v, max_v = float(recent.min()), float(recent.max()); curr_v = float(current_series.iloc[-1])
-        if max_v == min_v: return 50.0
-        return float(max(0, min(100, ((max_v - curr_v) / (max_v - min_v)) * 100 if inverse else ((curr_v - min_v) / (max_v - min_v)) * 100)))
+        mu, std = float(recent.mean()), float(recent.std())
+        curr_v = float(current_series.iloc[-1])
+        if std == 0: return 50.0
+        
+        z = (curr_v - mu) / std
+        score = 100 / (1 + np.exp(-z))
+        return float(max(0, min(100, (100 - score) if inverse else score)))
 
     m_now = (calculate_score(fx_s, fx_s) + calculate_score(b10_s, b10_s) + calculate_score(cp_s, cp_s, True)) / 3
     t_now = max(0.0, min(100.0, float(100 - (float(ks_s.iloc[-1]) / float(ma20.iloc[-1]) - 0.9) * 500)))
-    total_risk_index = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear) / total_w
+    
+    # 기초 위험 지수 계산 (가중 평균)
+    base_risk = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear) / total_w
+    
+    # 비선형 볼록성(Convexity) 적용: 위험이 높을수록 지수가 지수함수적으로 민감하게 반응
+    # k값이 클수록 패닉 국면에서 더 강력하게 반응함 (k=0.5 설정)
+    k = 0.5
+    total_risk_index = ((np.exp(k * base_risk / 100) - 1) / (np.exp(k) - 1)) * 100
 
     c_gauge, c_guide = st.columns([1, 1.6])
     with c_guide: 
@@ -436,7 +475,7 @@ try:
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number", 
             value=total_risk_index, 
-            title={'text': "주식 시장 위험 지수", 'font': {'size': 20}},
+            title={'text': "KOSPI 위험 모니터링 지수", 'font': {'size': 20}},
             number={'suffix': ""}, 
             gauge={
                 'axis': {'range': [0, 100]}, 
