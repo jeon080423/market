@@ -310,9 +310,10 @@ corr_val = 0.0
 hist_risks = [50.0] * 7 # 기본값 50점
 total_risk_index = 50.0
 latest_data_summary = "데이터를 불러오는 중입니다..."
-ai_news_container = st.empty()
-bt_analysis_container = st.empty()
-ai_indicator_container = st.empty()
+# 컨테이너 변수 초기화 (레이아웃에서 나중에 할당)
+ai_news_container = None
+bt_analysis_container = None
+ai_indicator_container = None
 
 try:
     with st.spinner('시차 상관관계 및 가중치 분석 중...'):
@@ -540,8 +541,8 @@ try:
             all_titles += a['title'] + ". "
         
     with cr:
-        # 이미 상단에서 선언된 ai_news_container 사용
-        pass
+        # 뉴스 분석 AI 컨테이너 정의 (위치: 뉴스 리스트 오른쪽)
+        ai_news_container = st.container()
 
     # 7. 백테스팅
     st.markdown("---")
@@ -563,8 +564,8 @@ try:
         
         # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
-        # 이미 상단에서 선언된 bt_analysis_container 사용
-        pass
+        # 모델 유효성 진단 AI 컨테이너 정의 (위치: 백테스팀 그래프 하단)
+        bt_analysis_container = st.container()
 
     with cb2:
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
@@ -614,7 +615,6 @@ try:
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
-    # 이미 상단에서 선언된 ai_indicator_container 사용
     pass
 
     def create_chart(series, title, threshold, desc_text):
@@ -686,18 +686,23 @@ try:
         st.subheader("글로벌 물동량 지표 (BDRY)")
         if not fr_s.empty:
             fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2)
-            st.plotly_chart(create_chart(fr_s, "BDRY", fr_th, "물동량 급감 시 위험"), use_container_width=True)
-        st.info("**물동량**: 지지선 하향 돌파 시 경기 수축 신호  \n**빨간선 기준**: 최근 1년 평균 대비 -15% 하락 지점")
+            st.plotly_chart(create_chart(fr_s, "교역량", fr_th, "물동량 급감 시 위험"), use_container_width=True)
+            st.info("**물동량(BDRY)**: 해상 운송 지수는 실물 경제 회복의 선행 지표")
     with r3_c2:
-        st.subheader("에너지 가격 (WTI 원유)")
-        wt_th = round(float(wt_s.last('365D').mean() * 1.2), 2)
-        st.plotly_chart(create_chart(wt_s, "WTI", wt_th, "비용 압력 증가"), use_container_width=True)
-        st.info("**유가**: 급등 시 생산 비용 상승 및 인플레 압박  \n**빨간선 기준**: 최근 1년 평균 대비 +20% 급등 지점")
+        st.subheader("유가 (WTI)")
+        if not wt_s.empty:
+            wt_th = round(float(wt_s.last('365D').mean() * 1.2), 2)
+            st.plotly_chart(create_chart(wt_s, "유가", wt_th, "에너지 비용 급증 시 위험"), use_container_width=True)
+            st.info("**유가**: 급격한 유가 상승은 인플레이션 및 비용 압박 요인")
     with r3_c3:
         st.subheader("달러 인덱스 (DXY)")
-        dx_th = round(float(dx_s.last('365D').mean() * 1.03), 1)
-        st.plotly_chart(create_chart(dx_s, "DXY", dx_th, "유동성 위축 위험"), use_container_width=True)
-        st.info("**달러 가치**: 달러 상승은 유동성 축소 및 위험자산 회피  \n**빨간선 기준**: 최근 1년 평균 대비 +3% 강세 지점")
+        if not dx_s.empty:
+            dx_th = round(float(dx_s.last('365D').mean() * 1.05), 2)
+            st.plotly_chart(create_chart(dx_s, "달러 인덱스", dx_th, "달러 강세 시 신흥국 매도 압력"), use_container_width=True)
+            st.info("**달러 강세**: 글로벌 안전자산 선호 심리는 KOSPI 하락 요인")
+
+    # 현재 시장 지표 종합 진단 AI 컨테이너 정의 (위치: 모든 지표 차트 하단)
+    ai_indicator_container = st.container()
 
     st.markdown("---")
     st.subheader("📊 지수간 동조화 및 섹터 분석")
@@ -751,7 +756,7 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 
 # --- [AI 분석: 맨 마지막에 처리] ---
 # 1. AI 뉴스 통합 분석
-if news_data:
+if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
             prompt = f"""
@@ -777,51 +782,53 @@ if news_data:
             """, unsafe_allow_html=True)
 
 # 2. 모델 유효성 진단
-with bt_analysis_container:
-    with st.spinner("AI가 추세를 분석 중..."):
-        bt_prompt = f"""
-        시장 위험 지수(Risk Index)의 통계적 유효성을 정밀히 진단해줘.
-        
-        [분석 데이터]
-        - 지수-코스피 최근 1년 상관계수: {corr_val:.2f} (음의 상관성이 높을수록 위험 포착 능력이 우수함)
-        - 현재 시점 위험 지수: {hist_risks[-1]:.1f} (0~100 범위)
-        - 최근 7일간의 지수 변동 추이 요약: {[round(r, 1) for r in hist_risks[-7:]]}
-        
-        [진단 요청 사항]
-        1. 현재의 상관계수가 모델의 통계적 유의성(신뢰도)을 얼마나 보장하는지 전문가 관점에서 설명해줘.
-        2. 최근 7일간의 위험 지수 변화가 실제 코스피 흐름과 얼마나 동조화되고 있는지, 혹은 선행 전조를 보이고 있는지 정교하게 분석해줘.
-        3. 과거의 주요 하락장 데이터와 비교했을 때, 현재의 위험 수준이 실질적으로 경계해야 할 단계인지 구체적인 투자 전략 제언과 함께 답변해줘.
-        
-        지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
-        """
-        bt_analysis = get_ai_analysis(bt_prompt)
-        st.markdown(f"""
-        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-            <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
-        </div>
-        """, unsafe_allow_html=True)
-
-# 3. 현재 시장 지표 종합 진단
-with ai_indicator_container:
-    with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
-        with st.spinner("지표 데이터를 분석 중..."):
-            ai_desc_prompt = f"""
-            주식 시장 지표 데이터: {latest_data_summary}
+if bt_analysis_container:
+    with bt_analysis_container:
+        with st.spinner("AI가 추세를 분석 중..."):
+            bt_prompt = f"""
+            시장 위험 지수(Risk Index)의 통계적 유효성을 정밀히 진단해줘.
             
-            위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
-            지침:
-            1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
-            2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
-            3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
-            4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
-                [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
-                [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
-            5. 쉽고 전문적인 톤을 유지해.
+            [분석 데이터]
+            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f} (음의 상관성이 높을수록 위험 포착 능력이 우수함)
+            - 현재 시점 위험 지수: {hist_risks[-1]:.1f} (0~100 범위)
+            - 최근 7일간의 지수 변동 추이 요약: {[round(r, 1) for r in hist_risks[-7:]]}
+            
+            [진단 요청 사항]
+            1. 현재의 상관계수가 모델의 통계적 유의성(신뢰도)을 얼마나 보장하는지 전문가 관점에서 설명해줘.
+            2. 최근 7일간의 위험 지수 변화가 실제 코스피 흐름과 얼마나 동조화되고 있는지, 혹은 선행 전조를 보이고 있는지 정교하게 분석해줘.
+            3. 과거의 주요 하락장 데이터와 비교했을 때, 현재의 위험 수준이 실질적으로 경계해야 할 단계인지 구체적인 투자 전략 제언과 함께 답변해줘.
+            
+            지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
             """
-            analysis_output = get_ai_analysis(ai_desc_prompt)
-            clean_output = analysis_output.replace('**', '').replace('##', '').strip()
+            bt_analysis = get_ai_analysis(bt_prompt)
             st.markdown(f"""
-            <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
-                {clean_output}
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
+                <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
             </div>
             """, unsafe_allow_html=True)
+
+# 3. 현재 시장 지표 종합 진단
+if ai_indicator_container:
+    with ai_indicator_container:
+        with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
+            with st.spinner("지표 데이터를 분석 중..."):
+                ai_desc_prompt = f"""
+                주식 시장 지표 데이터: {latest_data_summary}
+                
+                위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
+                지침:
+                1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
+                2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+                3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
+                4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
+                    [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
+                    [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
+                5. 쉽고 전문적인 톤을 유지해.
+                """
+                analysis_output = get_ai_analysis(ai_desc_prompt)
+                clean_output = analysis_output.replace('**', '').replace('##', '').strip()
+                st.markdown(f"""
+                <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
+                    {clean_output}
+                </div>
+                """, unsafe_allow_html=True)
