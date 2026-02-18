@@ -5,5 +5,5 @@ numpy
 plotly
 requests
 beautifulsoup4
-groq
+google-generativeai
 streamlit-autorefresh

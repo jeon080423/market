@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from io import StringIO
-from groq import Groq
+import google.generativeai as genai
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -24,35 +24,37 @@ except ImportError:
 # 2. Secrets에서 API Key 불러오기
 try:
     NEWS_API_KEY = st.secrets["news_api"]["api_key"]
-    # gemini 대신 groq 키 호출
-    GROQ_API_KEY = st.secrets["groq"]["api_key"]
+    GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
+    
+    # 구글 시트 설정 (Secrets에서 불러오기)
+    SHEET_ID = st.secrets["gsheets"]["sheet_id"]
+    GSHEET_WEBAPP_URL = st.secrets["gsheets"]["webapp_url"]
 except KeyError:
-    st.error("Secrets 설정(API Key)이 누락되었습니다. 설정을 확인해 주세요.")
+    st.error("Secrets 설정(API Key 또는 GSheet 정보)이 누락되었습니다. 설정을 확인해 주세요.")
     st.stop()
 
-# Groq 설정 및 모델 초기화
+# Gemini 설정 및 모델 초기화
 try:
-    client = Groq(api_key=GROQ_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
 except Exception as e:
-    st.error(f"Groq 설정 중 오류 발생: {e}")
+    st.error(f"Gemini 설정 중 오류 발생: {e}")
 
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
-    try:
-        # Groq 클라이언트를 사용한 텍스트 생성
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            model="openai/gpt-oss-20b",
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
+    models = ["gemini-3-pro", "gemini-2.5-pro"]
+    
+    for model_name in models:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            # 토큰 초과나 할당량 오류 등으로 실패할 경우 다음 모델 시도
+            if model_name == models[0]:
+                continue
+            return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
+    return "모델을 초기화할 수 없습니다."
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -62,14 +64,11 @@ try:
     ADMIN_ID = st.secrets["auth"]["admin_id"]
     ADMIN_PW = st.secrets["auth"]["admin_pw"]
 except KeyError:
-    ADMIN_ID = "admin_temp" 
-    ADMIN_PW = "temp_pass"
+    st.error("관리자 인증 정보(Secrets)가 누락되었습니다.")
+    st.stop()
 
-# 구글 시트 설정
-SHEET_ID = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
+# 구글 시트 URL 생성
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-GSHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyli4kg7O_pxUOLAOFRCCiyswB5TXrA0RUMvjlTirSxLi4yz3tXH1YoGtNUyjztpDsb/exec" 
-
 # CSS 주입: 제목 폰트 유동성 및 가이드북 간격/정렬 조정
 st.markdown("""
     <style>
@@ -204,14 +203,21 @@ def load_data():
         "바이오": "207940.KS", "인터넷": "035420.KS", "금융": "055550.KS",
         "철강": "005490.KS", "방산": "047810.KS", "유틸리티": "015760.KS"
     }
-    sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
     
-    # [수정] iloc 대신 티커 이름으로 명확하게 컬럼 추출하여 데이터 누락 방지
+    sp500_sector_tickers = {
+        "반도체": "NVDA", "자동차": "TSLA", "2차전지": "ALB",
+        "바이오": "AMGN", "인터넷": "GOOGL", "금융": "JPM",
+        "철강": "NUE", "방산": "LMT", "유틸리티": "NEE"
+    }
+    
+    sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
+    sp500_sector_raw = yf.download(list(sp500_sector_tickers.values()), period="5d")['Close']
+    
     return (
         data[[tickers["kospi"]]], data[[tickers["sp500"]]], data[[tickers["fx"]]], 
         data[[tickers["us10y"]]], data[[tickers["us2y"]]], data[[tickers["vix"]]], 
         data[[tickers["copper"]]], data[[tickers["freight"]]], data[[tickers["wti"]]], 
-        data[[tickers["dxy"]]], sector_raw, sector_tickers
+        data[[tickers["dxy"]]], sector_raw, sector_tickers, sp500_sector_raw, sp500_sector_tickers
     )
 
 # 4.5 글로벌 경제 뉴스 수집 함수 (최적화: 캐시 연장)
@@ -239,7 +245,7 @@ def get_market_news():
 
 try:
     with st.spinner('시차 상관관계 및 가중치 분석 중...'):
-        kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map = load_data()
+        kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map, sp500_sector_raw, sp500_sector_map = load_data()
 
     def get_clean_series(df):
         if df is None or df.empty: return pd.Series(dtype='float64')
@@ -407,7 +413,7 @@ try:
     st.markdown("---")
     cn, cr = st.columns(2)
     with cn:
-        # 제목 텍스트 Groq로 수정
+        # 제목 텍스트 업데이트
         st.subheader("📰 글로벌 경제 뉴스")
         news_data = get_market_news()
         all_titles = ""
@@ -642,19 +648,39 @@ try:
 * **글로벌 물동량(Orange)이 위에 있을 때**: 실물 경기는 회복되었으나 주가가 저평가된 상태입니다. 우상향 가능성을 시사합니다.
 """)
 
-    sector_perf = []
-    for n, t in sector_map.items():
-        try:
-            cur = sector_raw[t].iloc[-1]; pre = sector_raw[t].iloc[-2]
-            sector_perf.append({"섹터": n, "등락률": round(((cur - pre) / pre) * 100, 2)})
-        except: pass
-    if sector_perf:
-        df_p = pd.DataFrame(sector_perf)
-        fig_h = px.bar(df_p, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률", title="금일 섹터별 대표 종목 등락 현황 (%)")
-        st.plotly_chart(fig_h, use_container_width=True)
+    st.markdown("---")
+    sc1, sc2 = st.columns(2)
+    
+    with sc1:
+        st.subheader("🇰🇷 KOSPI 섹터별 대표 종목 등락")
+        sector_perf = []
+        for n, t in sector_map.items():
+            try:
+                cur = sector_raw[t].ffill().iloc[-1]; pre = sector_raw[t].ffill().iloc[-2]
+                sector_perf.append({"섹터": n, "등락률": round(((cur - pre) / pre) * 100, 2)})
+            except: pass
+        if sector_perf:
+            df_p = pd.DataFrame(sector_perf)
+            fig_h = px.bar(df_p, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률")
+            fig_h.update_layout(height=400, margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_h, use_container_width=True)
+
+    with sc2:
+        st.subheader("🇺🇸 S&P 500 섹터별 대표 등락 (ETF)")
+        sp500_sector_perf = []
+        for n, t in sp500_sector_map.items():
+            try:
+                cur = sp500_sector_raw[t].ffill().iloc[-1]; pre = sp500_sector_raw[t].ffill().iloc[-2]
+                sp500_sector_perf.append({"섹터": n, "등락률": round(((cur - pre) / pre) * 100, 2)})
+            except: pass
+        if sp500_sector_perf:
+            df_sp_p = pd.DataFrame(sp500_sector_perf)
+            fig_sp_h = px.bar(df_sp_p, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률")
+            fig_sp_h.update_layout(height=400, margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_sp_h, use_container_width=True)
 
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
 # 하단 캡션 Groq로 수정
-st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Groq AI 분석 엔진 가동 중")
+st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
