@@ -462,32 +462,8 @@ try:
             all_titles += a['title'] + ". "
         
     with cr:
-        # "AI 뉴스 통합 분석" 위치 유지 (오른쪽 열 상단)
-        if news_data:
-            with st.spinner("AI가 뉴스를 분석 중입니다..."):
-                prompt = f"""
-                다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
-                
-                각 뉴스별로 번역하여 목록을 만들어주되, 뉴스 항목별로 반드시 줄바꿈을 해서 구분해줘.
-                또한, 위 뉴스들을 종합하여 금융 시장의 리스크와 변동성 측면에서 투자자가 유의해야 할 점을 '[시장 리스크 심층 분석]'이라는 제목 하에 상세히 분석해줘.
-                
-                지침:
-                1. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
-                2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해.
-                3. 번역 목록과 분석 내용 사이에는 명확한 구분을 위해 줄바꿈을 두 번 넣어줘.
-                4. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
-                5. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
-                6. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
-                """
-                summary_text = get_ai_analysis(prompt)
-                
-                # 야간 모드 시인성 해결을 위한 스타일 적용
-                st.markdown(f"""
-                <div class="ai-analysis-box">
-                    <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
-                    {summary_text.replace('🔎 AI 뉴스 통합 분석:', '').strip()}
-                </div>
-                """, unsafe_allow_html=True)
+        # AI 뉴스 통합 분석을 위한 컨테이너 생성
+        ai_news_container = st.container()
 
     # 7. 백테스팅
     st.markdown("---")
@@ -509,28 +485,8 @@ try:
         
         # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
-        with st.spinner("AI가 추세를 분석 중..."):
-            bt_prompt = f"""
-            시장 위험 지수(Risk Index)의 통계적 유효성을 정밀히 진단해줘.
-            
-            [분석 데이터]
-            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f} (음의 상관성이 높을수록 위험 포착 능력이 우수함)
-            - 현재 시점 위험 지수: {hist_risks[-1]:.1f} (0~100 범위)
-            - 최근 7일간의 지수 변동 추이 요약: {[round(r, 1) for r in hist_risks[-7:]]}
-            
-            [진단 요청 사항]
-            1. 현재의 상관계수가 모델의 통계적 유의성(신뢰도)을 얼마나 보장하는지 전문가 관점에서 설명해줘.
-            2. 최근 7일간의 위험 지수 변화가 실제 코스피 흐름과 얼마나 동조화되고 있는지, 혹은 선행 전조를 보이고 있는지 정교하게 분석해줘.
-            3. 과거의 주요 하락장 데이터와 비교했을 때, 현재의 위험 수준이 실질적으로 경계해야 할 단계인지 구체적인 투자 전략 제언과 함께 답변해줘.
-            
-            지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
-            """
-            bt_analysis = get_ai_analysis(bt_prompt)
-            st.markdown(f"""
-            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6;">
-                <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
-            </div>
-            """, unsafe_allow_html=True)
+        # 모델 유효성 진단을 위한 컨테이너 생성 (그래프 아래)
+        bt_analysis_container = st.container()
 
     with cb2:
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
@@ -580,29 +536,8 @@ try:
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
-    with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
-        with st.spinner("지표 데이터를 분석 중..."):
-            ai_desc_prompt = f"""
-            주식 시장 지표 데이터: {latest_data_summary}
-            
-            위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
-            지침:
-            1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
-            2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
-            3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
-            4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
-                [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
-                [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
-            5. 쉽고 전문적인 톤을 유지해.
-            """
-            analysis_output = get_ai_analysis(ai_desc_prompt)
-            # 야간 모드 시인성을 위해 배경색 및 글자색 고정 적용
-            clean_output = analysis_output.replace('**', '').replace('##', '').strip()
-            st.markdown(f"""
-            <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
-                {clean_output}
-            </div>
-            """, unsafe_allow_html=True)
+    # 현재 시장 지표 종합 진단을 위한 컨테이너 생성
+    ai_indicator_container = st.container()
 
     def create_chart(series, title, threshold, desc_text):
         # 데이터가 비어있지 않은지 확인 후 그래프 생성
@@ -733,5 +668,82 @@ try:
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")
 
-# 하단 캡션 Groq로 수정
+# 하단 캡션
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
+
+# --- [AI 분석: 맨 마지막에 처리] ---
+# 1. AI 뉴스 통합 분석
+if news_data:
+    with ai_news_container:
+        with st.spinner("AI가 뉴스를 분석 중입니다..."):
+            prompt = f"""
+            다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
+            
+            각 뉴스별로 번역하여 목록을 만들어주되, 뉴스 항목별로 반드시 줄바꿈을 해서 구분해줘.
+            또한, 위 뉴스들을 종합하여 금융 시장의 리스크와 변동성 측면에서 투자자가 유의해야 할 점을 '[시장 리스크 심층 분석]'이라는 제목 하에 상세히 분석해줘.
+            
+            지침:
+            1. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
+            2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해.
+            3. 번역 목록과 분석 내용 사이에는 명확한 구분을 위해 줄바꿈을 두 번 넣어줘.
+            4. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
+            5. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+            6. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
+            """
+            summary_text = get_ai_analysis(prompt)
+            st.markdown(f"""
+            <div class="ai-analysis-box">
+                <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
+                {summary_text.replace('🔎 AI 뉴스 통합 분석:', '').strip()}
+            </div>
+            """, unsafe_allow_html=True)
+
+# 2. 모델 유효성 진단
+with bt_analysis_container:
+    with st.spinner("AI가 추세를 분석 중..."):
+        bt_prompt = f"""
+        시장 위험 지수(Risk Index)의 통계적 유효성을 정밀히 진단해줘.
+        
+        [분석 데이터]
+        - 지수-코스피 최근 1년 상관계수: {corr_val:.2f} (음의 상관성이 높을수록 위험 포착 능력이 우수함)
+        - 현재 시점 위험 지수: {hist_risks[-1]:.1f} (0~100 범위)
+        - 최근 7일간의 지수 변동 추이 요약: {[round(r, 1) for r in hist_risks[-7:]]}
+        
+        [진단 요청 사항]
+        1. 현재의 상관계수가 모델의 통계적 유의성(신뢰도)을 얼마나 보장하는지 전문가 관점에서 설명해줘.
+        2. 최근 7일간의 위험 지수 변화가 실제 코스피 흐름과 얼마나 동조화되고 있는지, 혹은 선행 전조를 보이고 있는지 정교하게 분석해줘.
+        3. 과거의 주요 하락장 데이터와 비교했을 때, 현재의 위험 수준이 실질적으로 경계해야 할 단계인지 구체적인 투자 전략 제언과 함께 답변해줘.
+        
+        지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
+        """
+        bt_analysis = get_ai_analysis(bt_prompt)
+        st.markdown(f"""
+        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
+            <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
+        </div>
+        """, unsafe_allow_html=True)
+
+# 3. 현재 시장 지표 종합 진단
+with ai_indicator_container:
+    with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
+        with st.spinner("지표 데이터를 분석 중..."):
+            ai_desc_prompt = f"""
+            주식 시장 지표 데이터: {latest_data_summary}
+            
+            위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
+            지침:
+            1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
+            2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
+            3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
+            4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
+                [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
+                [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
+            5. 쉽고 전문적인 톤을 유지해.
+            """
+            analysis_output = get_ai_analysis(ai_desc_prompt)
+            clean_output = analysis_output.replace('**', '').replace('##', '').strip()
+            st.markdown(f"""
+            <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
+                {clean_output}
+            </div>
+            """, unsafe_allow_html=True)
