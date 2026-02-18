@@ -235,7 +235,12 @@ def load_data():
         "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB"
     }
     
-    data = yf.download(list(tickers.values()), start=start_date, end=end_date)['Close']
+    try:
+        data = yf.download(list(tickers.values()), start=start_date, end=end_date)['Close']
+        if data.empty:
+            data = pd.DataFrame(columns=list(tickers.values()))
+    except:
+        data = pd.DataFrame(columns=list(tickers.values()))
     
     sector_tickers = {
         "반도체": "005930.KS", "자동차": "005380.KS", "2차전지": "051910.KS",
@@ -249,14 +254,30 @@ def load_data():
         "철강": "NUE", "방산": "LMT", "유틸리티": "NEE"
     }
     
-    sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
-    sp500_sector_raw = yf.download(list(sp500_sector_tickers.values()), period="5d")['Close']
+    try:
+        sector_raw = yf.download(list(sector_tickers.values()), period="5d")['Close']
+        if sector_raw.empty: sector_raw = pd.DataFrame(columns=list(sector_tickers.values()))
+    except:
+        sector_raw = pd.DataFrame(columns=list(sector_tickers.values()))
+        
+    try:
+        sp500_sector_raw = yf.download(list(sp500_sector_tickers.values()), period="5d")['Close']
+        if sp500_sector_raw.empty: sp500_sector_raw = pd.DataFrame(columns=list(sp500_sector_tickers.values()))
+    except:
+        sp500_sector_raw = pd.DataFrame(columns=list(sp500_sector_tickers.values()))
     
     return (
-        data[[tickers["kospi"]]], data[[tickers["sp500"]]], data[[tickers["fx"]]], 
-        data[[tickers["us10y"]]], data[[tickers["us2y"]]], data[[tickers["vix"]]], 
-        data[[tickers["copper"]]], data[[tickers["freight"]]], data[[tickers["wti"]]], 
-        data[[tickers["dxy"]]], sector_raw, sector_tickers, sp500_sector_raw, sp500_sector_tickers
+        data[[tickers["kospi"]]] if tickers["kospi"] in data.columns else pd.DataFrame(columns=[tickers["kospi"]]), 
+        data[[tickers["sp500"]]] if tickers["sp500"] in data.columns else pd.DataFrame(columns=[tickers["sp500"]]), 
+        data[[tickers["fx"]]] if tickers["fx"] in data.columns else pd.DataFrame(columns=[tickers["fx"]]), 
+        data[[tickers["us10y"]]] if tickers["us10y"] in data.columns else pd.DataFrame(columns=[tickers["us10y"]]), 
+        data[[tickers["us2y"]]] if tickers["us2y"] in data.columns else pd.DataFrame(columns=[tickers["us2y"]]), 
+        data[[tickers["vix"]]] if tickers["vix"] in data.columns else pd.DataFrame(columns=[tickers["vix"]]), 
+        data[[tickers["copper"]]] if tickers["copper"] in data.columns else pd.DataFrame(columns=[tickers["copper"]]), 
+        data[[tickers["freight"]]] if tickers["freight"] in data.columns else pd.DataFrame(columns=[tickers["freight"]]), 
+        data[[tickers["wti"]]] if tickers["wti"] in data.columns else pd.DataFrame(columns=[tickers["wti"]]), 
+        data[[tickers["dxy"]]] if tickers["dxy"] in data.columns else pd.DataFrame(columns=[tickers["dxy"]]), 
+        sector_raw, sector_tickers, sp500_sector_raw, sp500_sector_tickers
     )
 
 # 4.5 글로벌 경제 뉴스 수집 함수 (최적화: 캐시 연장)
@@ -281,6 +302,17 @@ def get_market_news():
         return []
     except:
         return []
+
+# --- [전역 변수 및 컨테이너 초기화 (NameError 방지)] ---
+news_data = []
+all_titles = ""
+corr_val = 0.0
+hist_risks = [50.0] * 7 # 기본값 50점
+total_risk_index = 50.0
+latest_data_summary = "데이터를 불러오는 중입니다..."
+ai_news_container = st.empty()
+bt_analysis_container = st.empty()
+ai_indicator_container = st.empty()
 
 try:
     with st.spinner('시차 상관관계 및 가중치 분석 중...'):
@@ -364,12 +396,18 @@ try:
             data_rows.append([ (s_fx + s_b10 + s_cp) / 3, s_sp, s_vx, s_tech, target_ret.loc[d] ])
         
         df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI_Ret']).replace([np.inf, -np.inf], np.nan).dropna()
+        if df_reg.empty:
+            return np.array([0.25, 0.25, 0.25, 0.25])
+            
         X = df_reg.iloc[:, :4]
         Y = df_reg['KOSPI_Ret']
         
-        coeffs = np.linalg.lstsq(X, Y, rcond=None)[0]
-        adjusted_importance = (np.abs(coeffs) * X.std().values) + 1e-6 
-        return adjusted_importance / np.sum(adjusted_importance)
+        try:
+            coeffs = np.linalg.lstsq(X, Y, rcond=None)[0]
+            adjusted_importance = (np.abs(coeffs) * X.std().values) + 1e-6 
+            return adjusted_importance / np.sum(adjusted_importance)
+        except:
+            return np.array([0.25, 0.25, 0.25, 0.25])
 
     sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
 
@@ -502,8 +540,8 @@ try:
             all_titles += a['title'] + ". "
         
     with cr:
-        # AI 뉴스 통합 분석을 위한 컨테이너 생성
-        ai_news_container = st.container()
+        # 이미 상단에서 선언된 ai_news_container 사용
+        pass
 
     # 7. 백테스팅
     st.markdown("---")
@@ -525,8 +563,8 @@ try:
         
         # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
-        # 모델 유효성 진단을 위한 컨테이너 생성 (그래프 아래)
-        bt_analysis_container = st.container()
+        # 이미 상단에서 선언된 bt_analysis_container 사용
+        pass
 
     with cb2:
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
@@ -576,8 +614,8 @@ try:
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
-    # 현재 시장 지표 종합 진단을 위한 컨테이너 생성
-    ai_indicator_container = st.container()
+    # 이미 상단에서 선언된 ai_indicator_container 사용
+    pass
 
     def create_chart(series, title, threshold, desc_text):
         # 데이터가 비어있지 않은지 확인 후 그래프 생성
