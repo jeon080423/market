@@ -23,21 +23,53 @@ except ImportError:
     pass
 
 # 2. Secrets에서 API Key 불러오기
-try:
-    NEWS_API_KEY = st.secrets["news_api"]["api_key"]
-    GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
+def check_secrets():
+    secrets_status = {
+        "news_api": "news_api" in st.secrets and "api_key" in st.secrets["news_api"],
+        "gemini": "gemini" in st.secrets and "api_key" in st.secrets["gemini"],
+        "auth": "auth" in st.secrets and "admin_id" in st.secrets["auth"] and "admin_pw" in st.secrets["auth"],
+        "gsheet": ("gsheets" in st.secrets and "sheet_id" in st.secrets["gsheets"]) or ("gsheet" in st.secrets and "sheet_id" in st.secrets["gsheet"])
+    }
     
-    # 구글 시트 설정 (Secrets에서 불러오기) - gsheets 또는 gsheet 모두 허용
-    if "gsheets" in st.secrets:
-        SHEET_ID = st.secrets["gsheets"]["sheet_id"]
-    elif "gsheet" in st.secrets:
-        SHEET_ID = st.secrets["gsheet"]["sheet_id"]
-    else:
-        raise KeyError("gsheets")
+    if not all(secrets_status.values()):
+        st.error("⚠️ 상단의 [Secrets 설정]이 누락되었거나 형식이 잘못되었습니다.")
         
-except KeyError as e:
-    st.error(f"Secrets 설정({e})이 누락되었습니다. 설정을 확인해 주세요.")
-    st.stop()
+        with st.expander("🛠️ 스트리밋 클라우드 시크릿 설정 방법 보기", expanded=True):
+            st.markdown("""
+            스트리밀릿 클라우드의 **App Settings > Secrets** 창에 아래 내용을 그대로 복사해서 넣어주세요.
+            """)
+            st.code(f"""
+[news_api]
+api_key = "발급받은_NewsAPI_키"
+
+[gemini]
+api_key = "발급받은_Gemini_API_키"
+
+[auth]
+admin_id = "사용할_관리자_아이디"
+admin_pw = "사용할_관리자_비밀번호"
+
+[gsheet]
+sheet_id = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
+            """, language="toml")
+            
+            st.info("💡 모든 설정을 완료한 후 앱을 다시 로드하면 정상적으로 작동합니다.")
+        st.stop()
+    
+    # 실제 값 할당
+    news_key = st.secrets["news_api"]["api_key"]
+    gemini_key = st.secrets["gemini"]["api_key"]
+    admin_id = st.secrets["auth"]["admin_id"]
+    admin_pw = st.secrets["auth"]["admin_pw"]
+    
+    if "gsheets" in st.secrets:
+        sheet_id = st.secrets["gsheets"]["sheet_id"]
+    else:
+        sheet_id = st.secrets["gsheet"]["sheet_id"]
+        
+    return news_key, gemini_key, admin_id, admin_pw, sheet_id
+
+NEWS_API_KEY, GEMINI_API_KEY, ADMIN_ID, ADMIN_PW, SHEET_ID = check_secrets()
 
 # Gemini 설정 및 모델 초기화
 try:
@@ -74,14 +106,6 @@ def get_ai_analysis(prompt):
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
-
-# 관리자 설정 (보안 강화: st.secrets 사용)
-try:
-    ADMIN_ID = st.secrets["auth"]["admin_id"]
-    ADMIN_PW = st.secrets["auth"]["admin_pw"]
-except KeyError:
-    st.error("관리자 인증 정보(Secrets)가 누락되었습니다.")
-    st.stop()
 
 # 구글 시트 URL 생성
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
