@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
 import json
+import time
 from io import StringIO
 import google.generativeai as genai
 
@@ -47,19 +48,29 @@ except Exception as e:
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
-    models = ["gemini-3-pro", "gemini-2.5-pro"]
+    # 우선순위 모델 리스트 (Gemini 3 Preview -> Gemini 2.5 시리즈)
+    models = ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
     
     for model_name in models:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            # 토큰 초과나 할당량 오류 등으로 실패할 경우 다음 모델 시도
-            if model_name == models[0]:
-                continue
-            return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
-    return "모델을 초기화할 수 없습니다."
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                return response.text
+            except Exception as e:
+                # 429(Quota Exceeded) 에러인 경우 잠시 대기 후 재시도 또는 다음 모델로 전환
+                err_msg = str(e).lower()
+                if "429" in err_msg or "quota" in err_msg:
+                    if attempt < max_retries - 1:
+                        time.sleep(2) # 2초 대기 후 재시도
+                        continue
+                    else:
+                        # 재시도 끝에 실패 시 다음 모델로 한 단계 강등
+                        break
+                return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
+    
+    return "현재 모든 AI 모델의 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요."
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
