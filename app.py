@@ -26,11 +26,16 @@ try:
     NEWS_API_KEY = st.secrets["news_api"]["api_key"]
     GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
     
-    # 구글 시트 설정 (Secrets에서 불러오기)
-    SHEET_ID = st.secrets["gsheets"]["sheet_id"]
-    GSHEET_WEBAPP_URL = st.secrets["gsheets"]["webapp_url"]
-except KeyError:
-    st.error("Secrets 설정(API Key 또는 GSheet 정보)이 누락되었습니다. 설정을 확인해 주세요.")
+    # 구글 시트 설정 (Secrets에서 불러오기) - gsheets 또는 gsheet 모두 허용
+    if "gsheets" in st.secrets:
+        SHEET_ID = st.secrets["gsheets"]["sheet_id"]
+    elif "gsheet" in st.secrets:
+        SHEET_ID = st.secrets["gsheet"]["sheet_id"]
+    else:
+        raise KeyError("gsheets")
+        
+except KeyError as e:
+    st.error(f"Secrets 설정({e})이 누락되었습니다. 설정을 확인해 주세요.")
     st.stop()
 
 # Gemini 설정 및 모델 초기화
