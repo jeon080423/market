@@ -468,11 +468,13 @@ try:
                 prompt = f"""
                 다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
                 
-                이 뉴스별로 번역하고, 뉴스 중 금융 시장의 리스크와 변동성 관련 뉴스가 있다면 투자자가 유의해야 할 점으로 따로 분석해줘.
+                각 뉴스별로 번역하여 목록을 만들어주되, 뉴스 항목별로 반드시 줄바꿈을 해서 구분해줘.
+                또한, 위 뉴스들을 종합하여 금융 시장의 리스크와 변동성 측면에서 투자자가 유의해야 할 점을 '[시장 리스크 심층 분석]'이라는 제목 하에 상세히 분석해줘.
+                
                 지침:
                 1. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
                 2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해.
-                3. 분석 내용을 두 개의 핵심 문장으로 요약하고, 각 문장은 줄바꿈으로 구분해.
+                3. 번역 목록과 분석 내용 사이에는 명확한 구분을 위해 줄바꿈을 두 번 넣어줘.
                 4. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
                 5. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
                 6. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
@@ -509,10 +511,19 @@ try:
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
         with st.spinner("AI가 추세를 분석 중..."):
             bt_prompt = f"""
-            최근 1년 시장 위험 지수와 KOSPI의 상관계수는 {corr_val:.2f}이며, 현재 위험 지수는 {hist_risks[-1]:.1f}입니다. 
-            상관계수는 위험지수와 KOSPI와의 관계를 설명하는 지표이지 위험을 알려주는 지표는 아니라는 것을 기본적으로 학습해.
-            과거 대비 현재 상황이 우려되는 상황인지 투자자 관점에서 진단해줘 특히 최근 7일 이내의 지수 변동을 종합해서 분석해줘.
-            지침: 한자 금지, 강조기호 금지.
+            시장 위험 지수(Risk Index)의 통계적 유효성을 정밀히 진단해줘.
+            
+            [분석 데이터]
+            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f} (음의 상관성이 높을수록 위험 포착 능력이 우수함)
+            - 현재 시점 위험 지수: {hist_risks[-1]:.1f} (0~100 범위)
+            - 최근 7일간의 지수 변동 추이 요약: {[round(r, 1) for r in hist_risks[-7:]]}
+            
+            [진단 요청 사항]
+            1. 현재의 상관계수가 모델의 통계적 유의성(신뢰도)을 얼마나 보장하는지 전문가 관점에서 설명해줘.
+            2. 최근 7일간의 위험 지수 변화가 실제 코스피 흐름과 얼마나 동조화되고 있는지, 혹은 선행 전조를 보이고 있는지 정교하게 분석해줘.
+            3. 과거의 주요 하락장 데이터와 비교했을 때, 현재의 위험 수준이 실질적으로 경계해야 할 단계인지 구체적인 투자 전략 제언과 함께 답변해줘.
+            
+            지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
             """
             bt_analysis = get_ai_analysis(bt_prompt)
             st.markdown(f"""
@@ -542,7 +553,7 @@ try:
         bs_2008 = get_norm_risk_proxy("^KS11", "2008-01-01", "2009-01-01")
         fig_bs1 = go.Figure()
         fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
-        fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='black', dash='dot'), connectgaps=True))
+        fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
         st.plotly_chart(fig_bs1, use_container_width=True)
         if avg_current_risk > 60: st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 위기 초기와 유사합니다.")
         else: st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
