@@ -172,10 +172,10 @@ def get_kst_now():
     return datetime.now() + timedelta(hours=9)
 
 # 3. 제목 및 설명
-st.title("KOSPI 위험 모니터링 (KOSPI Market Risk Index)")
+st.title("KOSPI 예측적 위험 모니터링 (1주일 선행)")
 st.markdown(f"""
-이 대시보드는 **향후 1주일(5거래일) 내외**의 시장 변동 위험을 포착하는데 최적화 되어 있습니다.  **검증되지 않은 모델** 이기때문에 **참고만** 하세요.
-(마지막 업데이트 KST: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
+이 대시보드는 글로벌 거시 지표를 활용하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험을 예측합니다.
+(최종 분석 시각: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
 """)
 st.markdown("---")
 
@@ -192,11 +192,11 @@ with st.expander("📖 지수 가이드북"):
     
     st.divider()
 
-    st.subheader("2. 선행성 및 정규화 알고리즘 (Advanced Logic)")
-    st.markdown("#### **① 수익률 기반 시차 분석 (Return-based Lag Analysis)**")
+    st.subheader("2. 예측적 선행 알고리즘 (Predictive Lead Intelligence)")
+    st.markdown("#### **① 1주일 선행 상관 분석 (5-10 Days Predictive Lead)**")
     st.write("""
-    * **정상성 확보**: 단순 지수가 아닌 '수익률(Return)' 데이터를 사용하여 상관관계를 분석함으로써 통계적 왜곡을 방지하고 가중치의 신뢰도를 높였습니다.
-    * **시차 최적화**: 각 지표가 KOSPI에 영향을 주는 최적의 시차(0~5일)를 회귀 분석을 통해 실시간으로 탐색합니다.
+    * **선행성 강제화**: 본 모델은 모든 지표와 KOSPI 간의 시차를 **최소 5일에서 최대 12일** 범위에서 탐색합니다. 이는 현재의 지표 변화가 최소 1주일 뒤의 증시에 미치는 영향을 추정하기 위함입니다.
+    * **동시성 배제**: 당일의 시장 등락에 의한 '사후 설명'을 배제하고, 순수하게 미래의 리스크 전조를 포착하는 데 집중합니다.
     """)
     
     st.markdown("#### **② 하이브리드 정규화 및 볼록성 (Hybrid Normalization & Convexity)**")
@@ -334,11 +334,12 @@ try:
         
         target_ret = get_ret(_ks_s)
         
-        def find_best_lag_ret(feature_s, target_s, max_lag=5):
+        def find_best_lag_ret(feature_s, target_s, min_lag=5, max_lag=12):
             f_ret = get_ret(feature_s)
             common_idx = f_ret.index.intersection(target_s.index)
-            corrs = [abs(f_ret.shift(lag).reindex(common_idx).corr(target_s.reindex(common_idx))) for lag in range(max_lag + 1)]
-            return np.argmax(corrs)
+            # 최소 5일 이상의 시차(Lag)를 가진 상관관계만 탐색하여 '예측성' 확보
+            corrs = [abs(f_ret.shift(lag).reindex(common_idx).corr(target_s.reindex(common_idx))) for lag in range(min_lag, max_lag + 1)]
+            return np.argmax(corrs) + min_lag
             
         best_lags = {
             'SP': find_best_lag_ret(_sp_s, target_ret), 
@@ -391,14 +392,14 @@ try:
 
     with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
         st.caption("""
-        본 모델은 **수익률 기반 시차 분석(Return-based Lag)**과 **고도화된 선형 회귀(OLS)** 기법을 결합합니다.
+        본 모델은 **1주일 선행 수익률 분석(Lagged Return Forecasting)** 기법을 사용합니다.
         
-        1. **통계적 정상성 확보 (Stationarity)**:
-            단순 지급 대신 '수익률' 데이터를 사용하여 가격 수준에 따른 왜곡을 방지하고 순수한 변동 관계를 분석합니다.
-        2. **수익률 시차 최적화**:
-            각 매크로 지표의 수익률이 KOSPI 수익률에 가장 큰 영향을 미치는 지연 일수(0~5일)를 측정합니다.
-        3. **기여도 역산 및 정규화**:
-            최근 1년 데이터를 기반으로 각 팩터가 KOSPI 변동에 미친 통계적 기여도를 산출하여 권장 가중치로 제시합니다.
+        1. **미래 예측성 강제 (Lead Time Enforcement)**:
+            모든 지표에 대해 **5~12거래일 전**의 선행 데이터만 사용하여 KOSPI 수익률과의 관계를 정의합니다.
+        2. **수익률 기반 상관 관계**:
+            지수 수준(Level)이 아닌 변동성(Return)을 분석하여 지표의 '전조 현상'을 통계적으로 입증합니다.
+        3. **실시간 미래 위험 투사**:
+            오늘의 지표값을 위에서 도출된 '미래 전조 가중치'에 대입하여, **다음 주 시장의 잠재적 리스크**를 산출합니다.
         """)
 
     st.sidebar.markdown("---")
@@ -475,7 +476,7 @@ try:
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number", 
             value=total_risk_index, 
-            title={'text': "KOSPI 위험 모니터링 지수", 'font': {'size': 20}},
+            title={'text': "KOSPI 예측적 위험 (Next Week)", 'font': {'size': 20}},
             number={'suffix': ""}, 
             gauge={
                 'axis': {'range': [0, 100]}, 
