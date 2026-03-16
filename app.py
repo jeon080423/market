@@ -35,10 +35,17 @@ def check_secrets():
     if missing_keys:
         st.error(f"⚠️ 다음 Secrets 설정이 누락되었거나 형식이 잘못되었습니다: {', '.join(missing_keys)}")
         
-        with st.expander("🛠️ 스트리밋 클라우드 시크릿 설정 방법 보기", expanded=True):
-            st.markdown("""
-            스트리밀릿 클라우드의 **App Settings > Secrets** 창에 아래 내용을 참고하여 설정을 완료해주세요.
+        with st.expander("🛠️ 스트리밋 클라우드 시크릿 설정 방법 (중요한 해결책)", expanded=True):
+            st.markdown(f"""
+            ### 원인 분석
+            현재 시스템이 다음 키를 찾을 수 없습니다: **{', '.join(missing_keys)}**
+            
+            ### 해결 방법
+            1.  **Streamlit Cloud** 대시보드로 이동합니다.
+            2.  해당 앱의 **Settings > Secrets** 메뉴를 클릭합니다.
+            3.  기존 내용을 모두 지우고 아래 형식을 **정확하게** 복사해서 넣어주세요 (이미 있다면 오타가 없는지 확인하세요).
             """)
+            
             st.code(f"""
 [news_api]
 api_key = "발급받은_NewsAPI_키"
@@ -54,7 +61,14 @@ admin_pw = "사용할_관리자_비밀번호"
 sheet_id = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
             """, language="toml")
             
-            st.info("💡 모든 설정을 완료한 후 앱을 다시 로드하면 정상적으로 작동합니다.")
+            # 디버깅 도움말 (사용자에게 현재 어떤 키가 들어있는지 보여주어 오타 확인 유도)
+            try:
+                found_keys = list(st.secrets.keys())
+                st.info(f"🔍 **현재 감지된 상위 섹션들:** `{found_keys}` (위의 `[...]` 부분과 일치해야 합니다)")
+            except:
+                pass
+                
+            st.warning("💡 **주의:** `[`와 `]` 대괄호를 포함한 모든 줄을 그대로 복사해야 브라우저가 섹션을 인식합니다.")
         st.stop()
     
     # 실제 값 할당
