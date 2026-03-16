@@ -24,11 +24,40 @@ except ImportError:
 
 # 2. Secrets에서 API Key 불러오기
 def check_secrets():
+    # Streamlit Cloud의 secrets는 대소문자를 구분할 수 있으므로, 
+    # 모든 키를 소문자로 변환하여 체크하는 헬퍼 함수 정의
+    def get_case_insensitive_secret(keys):
+        # flat keys (e.g. news_api_key) or nested keys (e.g. ["news_api"]["api_key"])
+        for k in keys:
+            if isinstance(k, list): # Nested
+                section = k[0].lower()
+                field = k[1].lower()
+                for s_key in st.secrets.keys():
+                    if s_key.lower() == section:
+                        section_obj = st.secrets[s_key]
+                        if hasattr(section_obj, "get"):
+                            for f_key in section_obj.keys():
+                                if f_key.lower() == field:
+                                    return section_obj[f_key]
+            else: # Flat
+                target = k.lower()
+                for s_key in st.secrets.keys():
+                    if s_key.lower() == target:
+                        return st.secrets[s_key]
+        return None
+
+    news_key = get_case_insensitive_secret([["news_api", "api_key"], "news_api_key"])
+    gemini_key = get_case_insensitive_secret([["gemini", "api_key"], "gemini_api_key", "google_api_key"])
+    # admin 비밀번호는 pw or password 둘 다 허용
+    admin_id = get_case_insensitive_secret([["auth", "admin_id"], "admin_id"])
+    admin_pw = get_case_insensitive_secret([["auth", "admin_pw"], ["auth", "admin_password"], "admin_pw", "admin_password"])
+    sheet_id = get_case_insensitive_secret([["gsheets", "sheet_id"], ["gsheet", "sheet_id"], "sheet_id"])
+    
     secrets_status = {
-        "news_api": "news_api" in st.secrets and "api_key" in st.secrets["news_api"],
-        "gemini": "gemini" in st.secrets and "api_key" in st.secrets["gemini"],
-        "auth": "auth" in st.secrets and "admin_id" in st.secrets["auth"] and "admin_pw" in st.secrets["auth"],
-        "gsheet": ("gsheets" in st.secrets and "sheet_id" in st.secrets["gsheets"]) or ("gsheet" in st.secrets and "sheet_id" in st.secrets["gsheet"])
+        "news_api": news_key is not None,
+        "gemini": gemini_key is not None,
+        "auth": admin_id is not None and admin_pw is not None,
+        "gsheet": sheet_id is not None
     }
     
     missing_keys = [k for k, v in secrets_status.items() if not v]
@@ -38,12 +67,11 @@ def check_secrets():
         with st.expander("🛠️ 스트리밋 클라우드 시크릿 설정 방법 (중요한 해결책)", expanded=True):
             st.markdown(f"""
             ### 원인 분석
-            현재 시스템이 다음 키를 찾을 수 없습니다: **{', '.join(missing_keys)}**
+            현재 시스템이 다음 필수 설정을 찾을 수 없습니다: **{', '.join(missing_keys)}**
+            (대소문자 오타나 `[section]` 형식이 맞지 않을 수 있습니다.)
             
             ### 해결 방법
-            1.  **Streamlit Cloud** 대시보드로 이동합니다.
-            2.  해당 앱의 **Settings > Secrets** 메뉴를 클릭합니다.
-            3.  기존 내용을 모두 지우고 아래 형식을 **정확하게** 복사해서 넣어주세요 (이미 있다면 오타가 없는지 확인하세요).
+            1.  **Streamlit Cloud** 대시보드의 **Settings > Secrets**에서 아래 내용을 참고하여 설정을 수정해 보세요.
             """)
             
             st.code(f"""
@@ -54,33 +82,25 @@ api_key = "발급받은_NewsAPI_키"
 api_key = "발급받은_Gemini_API_키"
 
 [auth]
-admin_id = "사용할_관리자_아이디"
-admin_pw = "사용할_관리자_비밀번호"
+admin_id = "아이디"
+admin_pw = "비밀번호"
 
 [gsheet]
-sheet_id = "1eu_AeA54pL0Y0axkhpbf5_Ejx0eqdT0oFM3WIepuisU"
+sheet_id = "구글시트_ID"
             """, language="toml")
             
-            # 디버깅 도움말 (사용자에게 현재 어떤 키가 들어있는지 보여주어 오타 확인 유도)
             try:
                 found_keys = list(st.secrets.keys())
-                st.info(f"🔍 **현재 감지된 상위 섹션들:** `{found_keys}` (위의 `[...]` 부분과 일치해야 합니다)")
-            except:
-                pass
+                st.info(f"🔍 **현재 감지된 최상위 키들:** `{found_keys}`")
+                # 각 섹션 내부의 키도 보여주기 (값은 제외)
+                for k in found_keys:
+                    section = st.secrets[k]
+                    if hasattr(section, "keys"):
+                        st.write(f"- `{k}` 섹션 내부 키: `{list(section.keys())}`")
+            except: pass
                 
-            st.warning("💡 **주의:** `[`와 `]` 대괄호를 포함한 모든 줄을 그대로 복사해야 브라우저가 섹션을 인식합니다.")
+            st.warning("💡 **참고:** 이미 입력했다고 생각되신다면, `[news_api]`와 같은 섹션 제목이 정확한지 다시 한번 확인 부탁드립니다.")
         st.stop()
-    
-    # 실제 값 할당
-    news_key = st.secrets["news_api"]["api_key"]
-    gemini_key = st.secrets["gemini"]["api_key"]
-    admin_id = st.secrets["auth"]["admin_id"]
-    admin_pw = st.secrets["auth"]["admin_pw"]
-    
-    if "gsheets" in st.secrets:
-        sheet_id = st.secrets["gsheets"]["sheet_id"]
-    else:
-        sheet_id = st.secrets["gsheet"]["sheet_id"]
         
     return news_key, gemini_key, admin_id, admin_pw, sheet_id
 
