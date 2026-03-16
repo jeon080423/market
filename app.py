@@ -589,14 +589,22 @@ try:
             all_titles += a['title'] + ". "
         
         st.markdown("---")
-        st.subheader("🇺🇸 트럼프 소셜 최신 브리핑")
+        st.subheader("🇺🇸 트럼프 소셜 최신 브리핑 (번역/원문)")
         trump_data = get_trump_feed()
-        trump_combined = ""
         if trump_data:
             for t in trump_data:
-                st.markdown(f"**{t['title']}**")
-                trump_combined += t['title'] + ". " + t['description'] + " "
-            ai_trump_container = st.container()
+                # 번역과 원문을 상단에 사이드바 형태로 배치하기 위해 컬럼 사용
+                t_col1, t_col2 = st.columns(2)
+                
+                # AI 번역 요청 (개별 포스트별로 번역하도록 변경하여 위치 제어)
+                t_translate_prompt = f"다음 영문 포스트를 한국어로 번역만 해줘: {t['title']}. {t['description']}. 지침: 번역 외의 말은 하지 마. 한자 사용 금지."
+                t_translated = get_ai_analysis(t_translate_prompt)
+                
+                with t_col1:
+                    st.markdown(f"<div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; height: 100%;'><strong>[번역]</strong><br>{t_translated}</div>", unsafe_allow_html=True)
+                with t_col2:
+                    st.markdown(f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px; height: 100%;'><strong>[Original]</strong><br>{t['title']}<br><small>{t['description']}</small></div>", unsafe_allow_html=True)
+                st.write("") # 간격
         else:
             st.write("최신 트윗을 불러올 수 없습니다.")
         
@@ -836,29 +844,6 @@ if news_data and ai_news_container:
             <div class="ai-analysis-box">
                 <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
                 {summary_text.strip()}
-            </div>
-            """, unsafe_allow_html=True)
-
-# 3. 트럼프 소셜 시장 영향 해석
-if trump_data and ai_trump_container:
-    with ai_trump_container:
-        with st.spinner("트럼프 메시지를 해석 중..."):
-            t_prompt = f"""
-            다음은 도널드 트럼프의 최신 소셜 미디어 포스트 내용입니다: {trump_combined}
-            
-            이 메시지들의 내용을 한국어로 해석하여 제시하되, 특히 금융 시장에 미치거나 미칠 수 있는 영향에 초점을 맞춰서 설명해줘.
-            
-            지침:
-            1. 원문을 단순히 번역하는 것이 아니라, 시장 참여자들이 어떻게 받아들여야 할지에 대한 '해석된 내용'을 직접적으로 제시해.
-            2. "해석하자면~", "이것은 ~를 의미합니다"와 같은 메타적인 표현을 줄이고, 정제된 분석 리포트 형식으로 본론만 작성해.
-            3. 반드시 표준 한국어 문법을 준수하고 한자(漢字)를 사용하지 마.
-            4. 답변에 강조 기호(예: **, ##)를 사용하지 마.
-            """
-            trump_interpretation = get_ai_analysis(t_prompt)
-            st.markdown(f"""
-            <div class="ai-analysis-box" style="border-left: 5px solid #ff4b4b;">
-                <strong>💡 트럼프 메시지 시장 영향 해석</strong><br><br>
-                {trump_interpretation.strip()}
             </div>
             """, unsafe_allow_html=True)
 
