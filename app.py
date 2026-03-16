@@ -31,12 +31,13 @@ def check_secrets():
         "gsheet": ("gsheets" in st.secrets and "sheet_id" in st.secrets["gsheets"]) or ("gsheet" in st.secrets and "sheet_id" in st.secrets["gsheet"])
     }
     
-    if not all(secrets_status.values()):
-        st.error("⚠️ 상단의 [Secrets 설정]이 누락되었거나 형식이 잘못되었습니다.")
+    missing_keys = [k for k, v in secrets_status.items() if not v]
+    if missing_keys:
+        st.error(f"⚠️ 다음 Secrets 설정이 누락되었거나 형식이 잘못되었습니다: {', '.join(missing_keys)}")
         
         with st.expander("🛠️ 스트리밋 클라우드 시크릿 설정 방법 보기", expanded=True):
             st.markdown("""
-            스트리밀릿 클라우드의 **App Settings > Secrets** 창에 아래 내용을 그대로 복사해서 넣어주세요.
+            스트리밀릿 클라우드의 **App Settings > Secrets** 창에 아래 내용을 참고하여 설정을 완료해주세요.
             """)
             st.code(f"""
 [news_api]
@@ -239,7 +240,11 @@ def load_data():
     other_tickers.remove(tickers["kospi"])
     
     try:
-        data = yf.download(other_tickers, start=start_date, end=end_date)['Close']
+        raw_data = yf.download(other_tickers, start=start_date, end=end_date)
+        if 'Close' in raw_data.columns.levels[0] if isinstance(raw_data.columns, pd.MultiIndex) else 'Close' in raw_data.columns:
+            data = raw_data['Close']
+        else:
+            data = raw_data
         if data.empty:
             data = pd.DataFrame(columns=other_tickers)
     except:
@@ -247,7 +252,14 @@ def load_data():
         
     try:
         # KOSPI 단독 다운로드 (타임존/결측치 병합 오류 방지)
-        kospi_data = yf.download(tickers["kospi"], start=start_date, end=end_date)[['Close']]
+        raw_kospi = yf.download(tickers["kospi"], start=start_date, end=end_date)
+        if isinstance(raw_kospi.columns, pd.MultiIndex) and 'Close' in raw_kospi.columns.levels[0]:
+            kospi_data = raw_kospi['Close']
+        elif 'Close' in raw_kospi.columns:
+            kospi_data = raw_kospi[['Close']]
+        else:
+            kospi_data = raw_kospi
+        
         kospi_data.columns = [tickers["kospi"]]
         if kospi_data.empty:
             kospi_data = pd.DataFrame(columns=[tickers["kospi"]])
