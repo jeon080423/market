@@ -330,6 +330,26 @@ def get_market_news():
     except:
         return []
 
+# 4.6 트럼프 소셜 피드 수집 함수
+@st.cache_data(ttl=600)
+def get_trump_feed():
+    # Trump's Truth Social RSS feed proxy
+    url = "https://trumpstruth.org/feed"
+    try:
+        res = requests.get(url, timeout=10)
+        # XML 파싱을 위해 BeautifulSoup 사용 (lxml 없이 원활한 작동을 위해 html.parser 사용)
+        soup = BeautifulSoup(res.content, "html.parser")
+        items = soup.find_all("item")
+        feed_data = []
+        for item in items[:3]:
+            # 불필요한 HTML 태그 제거 및 텍스트 추출
+            title = item.title.get_text() if item.title else ""
+            desc = item.description.get_text() if item.description else ""
+            feed_data.append({"title": title, "description": desc})
+        return feed_data
+    except:
+        return []
+
 # --- [전역 변수 및 컨테이너 초기화 (NameError 방지)] ---
 news_data = []
 all_titles = ""
@@ -339,6 +359,7 @@ total_risk_index = 50.0
 latest_data_summary = "데이터를 불러오는 중입니다..."
 # 컨테이너 변수 초기화 (레이아웃에서 나중에 할당)
 ai_news_container = None
+ai_trump_container = None
 bt_analysis_container = None
 ai_indicator_container = None
 
@@ -567,6 +588,18 @@ try:
             st.markdown(f"- [{a['title']}]({a['link']})")
             all_titles += a['title'] + ". "
         
+        st.markdown("---")
+        st.subheader("🇺🇸 트럼프 소셜 최신 브리핑")
+        trump_data = get_trump_feed()
+        trump_combined = ""
+        if trump_data:
+            for t in trump_data:
+                st.markdown(f"**{t['title']}**")
+                trump_combined += t['title'] + ". " + t['description'] + " "
+            ai_trump_container = st.container()
+        else:
+            st.write("최신 트윗을 불러올 수 없습니다.")
+        
     with cr:
         # 뉴스 분석 AI 컨테이너 정의 (위치: 뉴스 리스트 오른쪽)
         ai_news_container = st.container()
@@ -789,22 +822,43 @@ if news_data and ai_news_container:
             prompt = f"""
             다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
             
-            각 뉴스별로 번역하여 목록을 만들어주되, 뉴스 항목별로 반드시 줄바꿈을 해서 구분해줘.
-            또한, 위 뉴스들을 종합하여 금융 시장의 리스크와 변동성 측면에서 투자자가 유의해야 할 점을 '[시장 리스크 심층 분석]'이라는 제목 하에 상세히 분석해줘.
+            위 뉴스들의 핵심 내용을 한국어로 번역하여 목록을 만들어줘.
             
             지침:
-            1. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
-            2. 영어 등 외국어 단어를 그대로 사용하지 말고 적절한 한국어로 번역해서 표현해.
-            3. 번역 목록과 분석 내용 사이에는 명확한 구분을 위해 줄바꿈을 두 번 넣어줘.
-            4. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
-            5. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
-            6. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
+            1. 분석이나 추가 설명 없이 뉴스 탑라인(제목)만 한국어로 번역해서 리스트 형태로 제시해.
+            2. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
+            3. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
+            4. 한자(漢字)를 단 하나도 포함하지 마.
+            5. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
             """
             summary_text = get_ai_analysis(prompt)
             st.markdown(f"""
             <div class="ai-analysis-box">
-                <strong>🔎 AI 뉴스 통합 분석</strong><br><br>
-                {summary_text.replace('🔎 AI 뉴스 통합 분석:', '').strip()}
+                <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
+                {summary_text.strip()}
+            </div>
+            """, unsafe_allow_html=True)
+
+# 3. 트럼프 소셜 시장 영향 해석
+if trump_data and ai_trump_container:
+    with ai_trump_container:
+        with st.spinner("트럼프 메시지를 해석 중..."):
+            t_prompt = f"""
+            다음은 도널드 트럼프의 최신 소셜 미디어 포스트 내용입니다: {trump_combined}
+            
+            이 메시지들의 내용을 한국어로 해석하여 제시하되, 특히 금융 시장에 미치거나 미칠 수 있는 영향에 초점을 맞춰서 설명해줘.
+            
+            지침:
+            1. 원문을 단순히 번역하는 것이 아니라, 시장 참여자들이 어떻게 받아들여야 할지에 대한 '해석된 내용'을 직접적으로 제시해.
+            2. "해석하자면~", "이것은 ~를 의미합니다"와 같은 메타적인 표현을 줄이고, 정제된 분석 리포트 형식으로 본론만 작성해.
+            3. 반드시 표준 한국어 문법을 준수하고 한자(漢字)를 사용하지 마.
+            4. 답변에 강조 기호(예: **, ##)를 사용하지 마.
+            """
+            trump_interpretation = get_ai_analysis(t_prompt)
+            st.markdown(f"""
+            <div class="ai-analysis-box" style="border-left: 5px solid #ff4b4b;">
+                <strong>💡 트럼프 메시지 시장 영향 해석</strong><br><br>
+                {trump_interpretation.strip()}
             </div>
             """, unsafe_allow_html=True)
 
