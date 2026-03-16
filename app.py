@@ -235,12 +235,39 @@ def load_data():
         "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB"
     }
     
+    other_tickers = list(tickers.values())
+    other_tickers.remove(tickers["kospi"])
+    
     try:
-        data = yf.download(list(tickers.values()), start=start_date, end=end_date)['Close']
+        data = yf.download(other_tickers, start=start_date, end=end_date)['Close']
         if data.empty:
-            data = pd.DataFrame(columns=list(tickers.values()))
+            data = pd.DataFrame(columns=other_tickers)
     except:
-        data = pd.DataFrame(columns=list(tickers.values()))
+        data = pd.DataFrame(columns=other_tickers)
+        
+    try:
+        # KOSPI 단독 다운로드 (타임존/결측치 병합 오류 방지)
+        kospi_data = yf.download(tickers["kospi"], start=start_date, end=end_date)[['Close']]
+        kospi_data.columns = [tickers["kospi"]]
+        if kospi_data.empty:
+            kospi_data = pd.DataFrame(columns=[tickers["kospi"]])
+    except:
+        kospi_data = pd.DataFrame(columns=[tickers["kospi"]])
+        
+    # KOSPI 데이터를 data DataFrame에 병합
+    try:
+        if hasattr(data.index, 'tz') and data.index.tz is not None:
+            data.index = data.index.tz_localize(None)
+    except: pass
+    
+    if not kospi_data.empty:
+        try:
+            if hasattr(kospi_data.index, 'tz') and kospi_data.index.tz is not None:
+                kospi_data.index = kospi_data.index.tz_localize(None)
+        except: pass
+        data = data.join(kospi_data, how='outer')
+    else:
+        data[tickers["kospi"]] = np.nan
     
     sector_tickers = {
         "반도체": "005930.KS", "자동차": "005380.KS", "2차전지": "051910.KS",
