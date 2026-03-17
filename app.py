@@ -712,8 +712,8 @@ try:
         st.plotly_chart(fig_gauge, use_container_width=True)
 
     st.markdown("---")
-    cn, cr = st.columns(2)
-    with cn:
+    c_news_left, c_news_right = st.columns(2)
+    with c_news_left:
         # 제목 텍스트 업데이트
         st.subheader("📰 글로벌 경제 뉴스")
         news_data, news_panic_count = get_market_news()
@@ -722,11 +722,17 @@ try:
             st.markdown(f"- [{a['title']}]({a['link']})")
             all_titles += a['title'] + ". "
             
+    with c_news_right:
+        # 뉴스 분석 AI 컨테이너 정의 (위치: 뉴스 리스트 오른쪽)
+        ai_news_container = st.container()
+        
         # 뉴스 기반 공포 심리 경보
-        if news_panic_count >= 2:
+        if 'news_panic_count' in locals() and news_panic_count >= 2:
             st.error(f"🚨 **[주의] 뉴스 공포 심리 확산 감지**\n\n최근 24시간 내 시장 헤드라인에서 치명적 위험 키워드(War, Default 등)가 **{news_panic_count}회** 감지되었습니다. 투자 심리 악화에 대비하세요.")
-            
-        st.markdown("---")
+
+    st.markdown("---")
+    c_trump_left, c_trump_right = st.columns(2)
+    with c_trump_left:
         st.subheader("🇺🇸 트럼프 소셜 최신 브리핑 (Original)")
         trump_data = get_trump_feed()
         if trump_data:
@@ -735,11 +741,8 @@ try:
         else:
             st.write("최신 트윗을 불러올 수 없습니다.")
         
-    with cr:
-        # 뉴스 분석 AI 컨테이너 정의 (위치: 뉴스 리스트 오른쪽)
-        ai_news_container = st.container()
-        # 트럼프 번역 AI 컨테이너 정의 (뉴스 컨테이너 아래 영역)
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) # 글로벌 뉴스 파트와의 기준 높이 단차 보정용 여백
+    with c_trump_right:
+        # 트럼프 번역 AI 컨테이너 정의
         ai_trump_container = st.container()
 
     # 7. 백테스팅
