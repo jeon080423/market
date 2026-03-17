@@ -635,28 +635,20 @@ try:
             all_titles += a['title'] + ". "
         
         st.markdown("---")
-        st.subheader("🇺🇸 트럼프 소셜 최신 브리핑 (번역/원문)")
+        st.subheader("🇺🇸 트럼프 소셜 최신 브리핑 (Original)")
         trump_data = get_trump_feed()
         if trump_data:
             for t in trump_data:
-                # 번역과 원문을 상단에 사이드바 형태로 배치하기 위해 컬럼 사용
-                t_col1, t_col2 = st.columns(2)
-                
-                # AI 번역 요청 (개별 포스트별로 번역하도록 변경하여 위치 제어)
-                t_translate_prompt = f"다음 영문 포스트를 한국어로 번역만 해줘: {t['title']}. {t['description']}. 지침: 번역 외의 말은 하지 마. 한자 사용 금지."
-                t_translated = get_ai_analysis(t_translate_prompt)
-                
-                with t_col1:
-                    st.markdown(f"<div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; height: 100%;'><strong>[번역]</strong><br>{t_translated}</div>", unsafe_allow_html=True)
-                with t_col2:
-                    st.markdown(f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px; height: 100%;'><strong>[Original]</strong><br>{t['title']}<br><small>{t['description']}</small></div>", unsafe_allow_html=True)
-                st.write("") # 간격
+                st.markdown(f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[Original]</strong><br>{t['title']}<br><small>{t['description']}</small></div>", unsafe_allow_html=True)
         else:
             st.write("최신 트윗을 불러올 수 없습니다.")
         
     with cr:
         # 뉴스 분석 AI 컨테이너 정의 (위치: 뉴스 리스트 오른쪽)
         ai_news_container = st.container()
+        # 트럼프 번역 AI 컨테이너 정의 (뉴스 컨테이너 아래 영역)
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) # 글로벌 뉴스 파트와의 기준 높이 단차 보정용 여백
+        ai_trump_container = st.container()
 
     # 7. 백테스팅
     st.markdown("---")
@@ -886,12 +878,24 @@ if news_data and ai_news_container:
             5. 답변에 'AI 뉴스 통합 분석'이라는 제목성 문구는 포함하지 마.
             """
             summary_text = get_ai_analysis(prompt)
+            formatted_summary = summary_text.strip().replace('\n', '<br>')
             st.markdown(f"""
             <div class="ai-analysis-box">
                 <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
-                {summary_text.strip()}
+                {formatted_summary}
             </div>
             """, unsafe_allow_html=True)
+
+# 1.5 트럼프 트윗 통합 번역
+if 'trump_data' in locals() and trump_data and ai_trump_container:
+    with ai_trump_container:
+        with st.spinner("트럼프 트윗 번역 중..."):
+            st.markdown("<div class='ai-analysis-box' style='padding: 15px 20px; border-left: 5px solid #dc3545;'><strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>", unsafe_allow_html=True)
+            for t in trump_data:
+                t_translate_prompt = f"다음 영문 포스트를 한국어로 번역만 해줘: {t['title']}. {t['description']}. 지침: 번역 외의 말은 하지 마. 한자 사용 금지."
+                t_translated = get_ai_analysis(t_translate_prompt)
+                st.markdown(f"<div style='background-color: #ffffff; color: #31333F; border: 1px solid #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[번역]</strong><br>{t_translated}</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
 # 2. 모델 유효성 진단
 if bt_analysis_container:
@@ -913,9 +917,10 @@ if bt_analysis_container:
             지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
             """
             bt_analysis = get_ai_analysis(bt_prompt)
+            formatted_analysis = bt_analysis.replace('**', '').replace('##', '').replace('\n', '<br>')
             st.markdown(f"""
             <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-                <strong>🤖 모델 유효성 진단:</strong><br>{bt_analysis.replace('**', '').replace('##', '')}
+                <strong>🤖 모델 유효성 진단:</strong><br>{formatted_analysis}
             </div>
             """, unsafe_allow_html=True)
 
@@ -938,7 +943,7 @@ if ai_indicator_container:
                 5. 쉽고 전문적인 톤을 유지해.
                 """
                 analysis_output = get_ai_analysis(ai_desc_prompt)
-                clean_output = analysis_output.replace('**', '').replace('##', '').strip()
+                clean_output = analysis_output.replace('**', '').replace('##', '').strip().replace('\n', '<br>')
                 st.markdown(f"""
                 <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
                     {clean_output}
