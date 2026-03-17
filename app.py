@@ -267,7 +267,7 @@ def load_data():
     tickers = {
         "kospi": "^KS11", "sp500": "^GSPC", "fx": "KRW=X", 
         "us10y": "^TNX", "us2y": "^IRX", "vix": "^VIX", 
-        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB"
+        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX=F"
     }
     
     other_tickers = list(tickers.values())
@@ -778,7 +778,6 @@ try:
             bgcolor="white",
             bordercolor="red"
         )
-        fig_ks.update_layout(margin=dict(l=0, r=0, t=30, b=0), height=350)
         st.plotly_chart(fig_ks, use_container_width=True)
         st.info("**기술적 분석**: 20일선 하회 시 단기 추세 하락")
     with r2_c3:
