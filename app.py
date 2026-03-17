@@ -731,7 +731,7 @@ try:
         trump_data = get_trump_feed()
         if trump_data:
             for t in trump_data:
-                st.markdown(f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[Original]</strong><br>{t['title']}<br><small>{t['description']}</small></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='border: 1px solid #ddd; background-color: #f8f9fa; color: #31333F; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[Original]</strong><br>{t['title']}<br><small>{t['description']}</small></div>", unsafe_allow_html=True)
         else:
             st.write("최신 트윗을 불러올 수 없습니다.")
         
