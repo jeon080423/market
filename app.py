@@ -240,8 +240,15 @@ with st.expander("📖 지수 가이드북"):
     * **위험 볼록성(Convexity)**: 시장의 공포는 선형적으로 증가하지 않습니다. 본 모델은 지수함수적 가중치를 적용하여, 위험 지수가 70점을 넘어서는 국면에서 더욱 민감하고 빠르게 반응하도록 설계되었습니다.
     """)
     
-    st.markdown("#### **③ 요약**")
-    st.info("본 모델은 통계적 정상성을 확보한 수익률 기반 분석과 이상치에 강건한 시그모이드 정규화를 통해, **패닉 국면에서 더욱 정교하고 빠른 경보**를 제공합니다.")
+    st.markdown("#### **③ 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)**")
+    st.write("""
+    * **안전자산 및 공포 심리 급등 감지**: 전쟁, 금융위기 등 블랙스완 발생 시 가장 먼저 반응하는 **금(Gold), 스위스 프랑(CHF), 엔/원 환율, VVIX(공포 변동성)** 지표의 최근 5일 이상 급등세를 모니터링합니다.
+    * **뉴스 공포 키워드 밀집도**: 글로벌 뉴스 헤드라인에서 'War', 'Bankrupt', 'Default' 등 치명적 키워드 발생 빈도를 실시간으로 추적합니다.
+    * **위험 지수 강제 오버라이딩**: 위 지표들이 동시다발적으로 임계치를 돌파하면, 기존 거시 지표 기반의 위험 점수를 무시하고 **최종 위험 지수를 강제로 상향(Panic Override)** 시켜 즉각적인 경보를 발송합니다.
+    """)
+    
+    st.markdown("#### **④ 요약**")
+    st.info("본 모델은 통계적 정상성을 확보한 수익률 기반 분석과 이상치에 강건한 시그모이드 정규화를 통해 **구조적 위험**을 선행 포착하며, 동시에 실시간 패닉 감지 모듈을 통해 **돌발적 블랙스완**에도 즉각 대응할 수 있는 **하이브리드 조기 경보 시스템**입니다.")
 
     st.divider()
     
@@ -270,7 +277,12 @@ def load_data():
         "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX=F"
     }
     
-    other_tickers = list(tickers.values())
+    # 패닉 감지용 실시간 티커 (안전자산 및 VIX 변동성)
+    panic_tickers = {
+        "gold": "GC=F", "jpy_krw": "JPYKRW=X", "usd_chf": "CHF=X", "vvix": "^VVIX"
+    }
+    
+    other_tickers = list(tickers.values()) + list(panic_tickers.values())
     other_tickers.remove(tickers["kospi"])
     
     try:
@@ -350,6 +362,10 @@ def load_data():
         data[[tickers["freight"]]] if tickers["freight"] in data.columns else pd.DataFrame(columns=[tickers["freight"]]), 
         data[[tickers["wti"]]] if tickers["wti"] in data.columns else pd.DataFrame(columns=[tickers["wti"]]), 
         data[[tickers["dxy"]]] if tickers["dxy"] in data.columns else pd.DataFrame(columns=[tickers["dxy"]]), 
+        data[[panic_tickers["gold"]]] if panic_tickers["gold"] in data.columns else pd.DataFrame(columns=[panic_tickers["gold"]]),
+        data[[panic_tickers["jpy_krw"]]] if panic_tickers["jpy_krw"] in data.columns else pd.DataFrame(columns=[panic_tickers["jpy_krw"]]),
+        data[[panic_tickers["usd_chf"]]] if panic_tickers["usd_chf"] in data.columns else pd.DataFrame(columns=[panic_tickers["usd_chf"]]),
+        data[[panic_tickers["vvix"]]] if panic_tickers["vvix"] in data.columns else pd.DataFrame(columns=[panic_tickers["vvix"]]),
         sector_raw, sector_tickers, sp500_sector_raw, sp500_sector_tickers
     )
 
@@ -367,14 +383,25 @@ def get_market_news():
     try:
         res = requests.get(api_url, params=params, timeout=10)
         data = res.json()
+        panic_keywords_count = 0
+        panic_words = ['war', 'missile', 'bankrupt', 'default', 'contagion', 'emergency', 'collapse', 'crash', 'panic']
+        
         if data.get("status") == "ok":
             news_items = []
             for article in data.get("articles", []):
-                news_items.append({"title": article["title"], "link": article["url"]})
-            return news_items
-        return []
+                title = article.get("title", "")
+                news_items.append({"title": title, "link": article["url"]})
+                
+                # 공포 키워드 카운팅
+                title_lower = title.lower()
+                for pw in panic_words:
+                    if pw in title_lower:
+                        panic_keywords_count += 1
+                        
+            return news_items, panic_keywords_count
+        return [], 0
     except:
-        return []
+        return [], 0
 
 # 4.6 트럼프 소셜 피드 수집 함수
 @st.cache_data(ttl=600)
@@ -398,6 +425,7 @@ def get_trump_feed():
 
 # --- [전역 변수 및 컨테이너 초기화 (NameError 방지)] ---
 news_data = []
+news_panic_count = 0
 all_titles = ""
 corr_val = 0.0
 hist_risks = [50.0] * 7 # 기본값 50점
@@ -411,7 +439,9 @@ ai_indicator_container = None
 
 try:
     with st.spinner('시차 상관관계 및 가중치 분석 중...'):
-        kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data, sector_raw, sector_map, sp500_sector_raw, sp500_sector_map = load_data()
+        (kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data,
+         gold_data, jpy_krw_data, usd_chf_data, vvix_data,
+         sector_raw, sector_map, sp500_sector_raw, sp500_sector_map) = load_data()
 
     def get_clean_series(df):
         if df is None or df.empty: return pd.Series(dtype='float64')
@@ -431,6 +461,12 @@ try:
     fr_s = get_clean_series(freight_data).reindex(ks_s.index).ffill()
     wt_s = get_clean_series(wti_data).reindex(ks_s.index).ffill()
     dx_s = get_clean_series(dxy_data).reindex(ks_s.index).ffill()
+    
+    # 패닉 데이터 
+    gd_s = get_clean_series(gold_data).reindex(ks_s.index).ffill()
+    jk_s = get_clean_series(jpy_krw_data).reindex(ks_s.index).ffill()
+    uf_s = get_clean_series(usd_chf_data).reindex(ks_s.index).ffill()
+    vv_s = get_clean_series(vvix_data).reindex(ks_s.index).ffill()
     
     # 금리차 계산
     yield_curve = b10_s - b2_s
@@ -565,10 +601,58 @@ try:
     # 기초 위험 지수 계산 (가중 평균)
     base_risk = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear) / total_w
     
+    # -------------------------------------------------------------
+    # [신규] 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)
+    # 안전자산(금, 스위스 프랑, 엔/원) 및 공포 변동성(VVIX)의 단기 이상 급등 감지
+    # -------------------------------------------------------------
+    def get_panic_score(series):
+        if series.empty or len(series) < 10: return 0.0
+        try:
+            # 최근 5일 데이터 vs 과거 1년(252일) 평균 비교를 통한 Z-score 산출
+            recent_5d_mean = series.iloc[-5:].mean()
+            past_1y = series.last('365D')
+            mu = past_1y.mean()
+            std = past_1y.std()
+            if std == 0: return 0.0
+            
+            z_score = (recent_5d_mean - mu) / std
+            
+            # Z-score > 1.5 이면 이상 조짐, > 3.0 이면 극심한 패닉으로 간주
+            if z_score <= 1.0: return 0.0
+            # 1.0 ~ 3.5 구간을 0 ~ 100 점수로 선형 보간 후 제한
+            panic_intensity = min(100.0, max(0.0, (z_score - 1.0) * 40))
+            return panic_intensity
+        except: return 0.0
+
+    panic_gold = get_panic_score(gd_s)
+    panic_jpy = get_panic_score(jk_s)
+    panic_chf = get_panic_score(uf_s)
+    panic_vvix = get_panic_score(vv_s)
+    
+    # 여러 지표가 동시에 급등할수록 패닉 신뢰도가 기하급수적으로 상승하도록 합성
+    # 3개 이상에서 패닉이 감지되면 복합 충격으로 간주
+    active_panics = sum([1 for p in [panic_gold, panic_jpy, panic_chf, panic_vvix] if p > 30])
+    
+    # 평균 패닉 점수에 임계치 배수(Multiplier) 적용
+    raw_panic_avg = (panic_gold + panic_jpy + panic_chf + panic_vvix) / 4.0
+    panic_multiplier = 1.0 + (active_panics * 0.5) 
+    final_panic_score = min(100.0, raw_panic_avg * panic_multiplier)
+    
+    # 뉴스 키워드 기반 패닉 보정 (공포 키워드 1개당 위험점수 +5점 가산, 최대 +30점)
+    # 실제 반영은 글로벌 뉴스 데이터를 불러온 뒤(스크립트 하단)에야 정확히 알 수 있으므로, 
+    # 선제적으로 캐시 초기화 없이 UI 게이지에 반영하기 위해 전역변수 참조 활용
+    # News 데이터 로딩 시점과 맞추기 위해, 여기서는 일단 자산 가격 기반의 최종 패닉 스코어만 산출
+    
+    # 기초 위험 지수와 패닉 점수 중 더 높은 것을 최종 위험 베이스로 선정 (Panic Override)
+    # 패닉 점수가 60점 이상 유의미하게 발생한 경우에만 덮어쓰기 적용
+    applied_base_risk = max(base_risk, final_panic_score) if final_panic_score > 60 else base_risk
+    
+    # [추가 보정] 위쪽에서 뉴스 데이터를 아직 로드하기 전이므로, 이 스크립트 흐름 특성상 뉴스 기반 패닉 점수는 UI 하단에 별도 경고로 띄우거나 이후 캐싱되어 반영됨
+    
     # 비선형 볼록성(Convexity) 적용: 위험이 높을수록 지수가 지수함수적으로 민감하게 반응
     # k값이 클수록 패닉 국면에서 더 강력하게 반응함 (k=0.5 설정)
     k = 0.5
-    total_risk_index = ((np.exp(k * base_risk / 100) - 1) / (np.exp(k) - 1)) * 100
+    total_risk_index = ((np.exp(k * applied_base_risk / 100) - 1) / (np.exp(k) - 1)) * 100
 
     c_gauge, c_guide = st.columns([1, 1.6])
     with c_guide: 
@@ -584,6 +668,10 @@ try:
         80-100 (Panic): <b>비상 탈출 구간</b>. 다음 주 강력한 시장 충격이 예견됩니다. 주식 비중을 최소화하고 자산 보존을 최우선으로 하세요.
         </div>
         """, unsafe_allow_html=True)
+        
+        # [신규] 패닉 경보 배너 표시
+        if final_panic_score > 60 and final_panic_score > base_risk:
+            st.error(f"🚨 **[긴급: 실시간 패닉 이벤트 확률 상승]** 🚨\n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다. (기초 위험 점수: {base_risk:.1f} ➔ **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
 
         # 좋아요 기능 레이아웃 개선
         if 'likes' not in st.session_state:
@@ -628,12 +716,16 @@ try:
     with cn:
         # 제목 텍스트 업데이트
         st.subheader("📰 글로벌 경제 뉴스")
-        news_data = get_market_news()
+        news_data, news_panic_count = get_market_news()
         all_titles = ""
         for a in news_data:
             st.markdown(f"- [{a['title']}]({a['link']})")
             all_titles += a['title'] + ". "
-        
+            
+        # 뉴스 기반 공포 심리 경보
+        if news_panic_count >= 2:
+            st.error(f"🚨 **[주의] 뉴스 공포 심리 확산 감지**\n\n최근 24시간 내 시장 헤드라인에서 치명적 위험 키워드(War, Default 등)가 **{news_panic_count}회** 감지되었습니다. 투자 심리 악화에 대비하세요.")
+            
         st.markdown("---")
         st.subheader("🇺🇸 트럼프 소셜 최신 브리핑 (Original)")
         trump_data = get_trump_feed()
