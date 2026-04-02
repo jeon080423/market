@@ -586,7 +586,7 @@ try:
         st.error("가중치 합이 0일 수 없습니다."); st.stop()
 
     def calculate_score(current_series, full_series, inverse=False):
-        recent = full_series.last('365D')
+        recent = full_series[full_series.index >= (full_series.index.max() - pd.Timedelta(days=365))]
         mu, std = float(recent.mean()), float(recent.std())
         curr_v = float(current_series.iloc[-1])
         if std == 0: return 50.0
@@ -610,7 +610,7 @@ try:
         try:
             # 최근 5일 데이터 vs 과거 1년(252일) 평균 비교를 통한 Z-score 산출
             recent_5d_mean = series.iloc[-5:].mean()
-            past_1y = series.last('365D')
+            past_1y = series[series.index >= (series.index.max() - pd.Timedelta(days=365))]
             mu = past_1y.mean()
             std = past_1y.std()
             if std == 0: return 0.0
@@ -809,7 +809,7 @@ try:
     
     # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
-    - S&P 500 현재가: {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s.last('365D').mean())-1)*100:+.1f}%)
+    - S&P 500 현재가: {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
     - 원/달러 환율: {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
     - 구리 가격: {cp_s.iloc[-1]:.2f} (최근 추세: {'상승' if cp_s.iloc[-1] > cp_s.iloc[-5] else '하락'})
     - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
@@ -834,16 +834,16 @@ try:
     r1_c1, r1_c2, r1_c3 = st.columns(3)
     with r1_c1:
         st.subheader("미국 S&P 500")
-        st.plotly_chart(create_chart(sp_s, "S&P 500", sp_s.last('365D').mean()*0.9, "평균 대비 -10% 하락 시"), use_container_width=True)
+        st.plotly_chart(create_chart(sp_s, "S&P 500", sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "평균 대비 -10% 하락 시"), use_container_width=True)
         st.info("**미국 지수**: KOSPI와 강한 정(+)의 상관성  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
     with r1_c2:
         st.subheader("원/달러 환율")
-        fx_th = float(fx_s.last('365D').mean() * 1.02)
+        fx_th = float(fx_s[fx_s.index >= (fx_s.index.max() - pd.Timedelta(days=365))].mean() * 1.02)
         st.plotly_chart(create_chart(fx_s, "원/달러 환율", fx_th, f"{fx_th:.1f}원 돌파 시 위험"), use_container_width=True)
         st.info("**환율**: +2% 상회 시 외국인 자본 유출 심화  \n**빨간선 기준**: 최근 1년 평균 환율 대비 +2% 상승 지점")
     with r1_c3:
         st.subheader("실물 경기 지표 (Copper)")
-        st.plotly_chart(create_chart(cp_s, "Copper", cp_s.last('365D').mean()*0.9, "수요 위축 시 위험"), use_container_width=True)
+        st.plotly_chart(create_chart(cp_s, "Copper", cp_s[cp_s.index >= (cp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "수요 위축 시 위험"), use_container_width=True)
         st.info("**실물 경기**: 구리 가격 하락은 수요 둔화 선행 신호  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
 
     r2_c1, r2_c2, r2_c3 = st.columns(3)
@@ -854,7 +854,7 @@ try:
         st.info("**금리차**: 금리 역전은 경기 침체 강력 전조  \n**빨간선 기준**: 금리차가 0(수평)이 되는 역전 한계 지점")
     with r2_c2:
         st.subheader("KOSPI 기술적 분석")
-        ks_recent = ks_s.last('30D')
+        ks_recent = ks_s[ks_s.index >= (ks_s.index.max() - pd.Timedelta(days=30))]
         fig_ks = go.Figure()
         # 현재가 그래프: 선 굵기 및 마커 추가로 가독성 향상
         fig_ks.add_trace(go.Scatter(x=ks_recent.index, y=ks_recent.values, name="현재가", line=dict(color='royalblue', width=3), mode='lines+markers', connectgaps=True))
@@ -885,19 +885,19 @@ try:
     with r3_c1:
         st.subheader("글로벌 물동량 지표 (BDRY)")
         if not fr_s.empty:
-            fr_th = round(float(fr_s.last('365D').mean() * 0.85), 2)
+            fr_th = round(float(fr_s[fr_s.index >= (fr_s.index.max() - pd.Timedelta(days=365))].mean() * 0.85), 2)
             st.plotly_chart(create_chart(fr_s, "교역량", fr_th, "물동량 급감 시 위험"), use_container_width=True)
             st.info("**물동량(BDRY)**: 해상 운송 지수는 실물 경제 회복의 선행 지표")
     with r3_c2:
         st.subheader("유가 (WTI)")
         if not wt_s.empty:
-            wt_th = round(float(wt_s.last('365D').mean() * 1.2), 2)
+            wt_th = round(float(wt_s[wt_s.index >= (wt_s.index.max() - pd.Timedelta(days=365))].mean() * 1.2), 2)
             st.plotly_chart(create_chart(wt_s, "유가", wt_th, "에너지 비용 급증 시 위험"), use_container_width=True)
             st.info("**유가**: 급격한 유가 상승은 인플레이션 및 비용 압박 요인")
     with r3_c3:
         st.subheader("달러 인덱스 (DXY)")
         if not dx_s.empty:
-            dx_th = round(float(dx_s.last('365D').mean() * 1.05), 2)
+            dx_th = round(float(dx_s[dx_s.index >= (dx_s.index.max() - pd.Timedelta(days=365))].mean() * 1.05), 2)
             st.plotly_chart(create_chart(dx_s, "달러 인덱스", dx_th, "달러 강세 시 신흥국 매도 압력"), use_container_width=True)
             st.info("**달러 강세**: 글로벌 안전자산 선호 심리는 KOSPI 하락 요인")
 
