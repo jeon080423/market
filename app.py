@@ -274,7 +274,7 @@ def load_data():
     tickers = {
         "kospi": "^KS11", "sp500": "^GSPC", "fx": "KRW=X", 
         "us10y": "^TNX", "us2y": "^IRX", "vix": "^VIX", 
-        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX=F"
+        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB"
     }
     
     # 패닉 감지용 실시간 티커 (안전자산 및 VIX 변동성)
@@ -312,12 +312,6 @@ def load_data():
     except:
         kospi_data = pd.DataFrame(columns=[tickers["kospi"]])
         
-    # KOSPI 데이터를 data DataFrame에 병합
-    try:
-        if hasattr(data.index, 'tz') and data.index.tz is not None:
-            data.index = data.index.tz_localize(None)
-    except: pass
-    
     if not kospi_data.empty:
         try:
             if hasattr(kospi_data.index, 'tz') and kospi_data.index.tz is not None:
@@ -326,6 +320,27 @@ def load_data():
         data = data.join(kospi_data, how='outer')
     else:
         data[tickers["kospi"]] = np.nan
+
+    # DXY 단독 다운로드 (데이터 정렬 오류 방지)
+    try:
+        raw_dxy = yf.download(tickers["dxy"], start=start_date, end=end_date)
+        if isinstance(raw_dxy.columns, pd.MultiIndex) and 'Close' in raw_dxy.columns.levels[0]:
+            dxy_standalone = raw_dxy['Close']
+        elif 'Close' in raw_dxy.columns:
+            dxy_standalone = raw_dxy[['Close']]
+        else:
+            dxy_standalone = raw_dxy
+
+        dxy_standalone.columns = [tickers["dxy"]]
+        if hasattr(dxy_standalone.index, 'tz') and dxy_standalone.index.tz is not None:
+            dxy_standalone.index = dxy_standalone.index.tz_localize(None)
+        
+        if tickers["dxy"] in data.columns:
+            data = data.drop(columns=[tickers["dxy"]])
+        data = data.join(dxy_standalone, how='outer')
+    except:
+        if tickers["dxy"] not in data.columns:
+            data[tickers["dxy"]] = np.nan
     
     sector_tickers = {
         "반도체": "005930.KS", "자동차": "005380.KS", "2차전지": "051910.KS",
@@ -820,7 +835,7 @@ try:
 
     def create_chart(series, title, threshold, desc_text):
         # 데이터가 비어있지 않은지 확인 후 그래프 생성
-        if series is not None and not series.empty:
+        if series is not None and not series.empty and not series.isnull().all():
             fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title, connectgaps=True)) # connectgaps 추가
             fig.add_hline(y=threshold, line_width=2, line_color="red")
             # 주석 위치 계산을 위한 안전장치
