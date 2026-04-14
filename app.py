@@ -921,8 +921,10 @@ try:
 
     st.markdown("---")
     st.subheader("📊 지수간 동조화 및 섹터 분석")
-    sp_norm = (sp_s - sp_s.mean()) / sp_s.std(); fr_norm = (fr_s - fr_s.mean()) / fr_s.std()
-    fig_norm = go.Figure(); fig_norm.add_trace(go.Scatter(x=sp_norm.index, y=sp_norm.values, name="S&P 500 (Std)", line=dict(color='blue'), connectgaps=True))
+    sp_norm = (sp_s - sp_s.mean()) / sp_s.std(); fr_norm = (fr_s - fr_s.mean()) / fr_s.std(); ks_norm = (ks_s - ks_s.mean()) / ks_s.std()
+    fig_norm = go.Figure()
+    fig_norm.add_trace(go.Scatter(x=ks_norm.index, y=ks_norm.values, name="KOSPI (Std)", line=dict(color='red'), connectgaps=True))
+    fig_norm.add_trace(go.Scatter(x=sp_norm.index, y=sp_norm.values, name="S&P 500 (Std)", line=dict(color='blue'), connectgaps=True))
     fig_norm.add_trace(go.Scatter(x=fr_norm.index, y=fr_norm.values, name="BDRY (Std)", line=dict(color='orange'), connectgaps=True))
     fig_norm.update_layout(title="Z-Score 동조화 추세"); st.plotly_chart(fig_norm, use_container_width=True)
     st.info("""
