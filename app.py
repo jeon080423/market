@@ -140,6 +140,23 @@ def get_ai_analysis(prompt):
     
     return "현재 모든 AI 모델 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요."
 
+# AI 응답 정제 함수 (메타 텍스트 및 영문 노이즈 제거)
+def clean_ai_output(text):
+    if not text: return ""
+    lines = text.strip().split('\n')
+    filtered = []
+    for line in lines:
+        l = line.strip()
+        if not l: continue
+        # 한글이 포함되어 있지 않으면 메타 텍스트로 간주하여 제외 (특수문자/숫자만 있는 줄도 제외)
+        if not re.search('[가-힣]', l): continue
+        # 불필요한 레이블 및 머리말 제거 (정규표현식)
+        l = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과|진단|분석|요약|핵심|Para\s*\d+|[*-])\s*[:：-]?\s*', '', l, flags=re.IGNORECASE)
+        # 마크다운 강조 기호 및 특수문자 제거
+        l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
+        if l: filtered.append(l)
+    return '<br>'.join(filtered)
+
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
 
@@ -978,40 +995,17 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
-            prompt = f"""
-            Translate the following news titles into Korean.
-            Output ONLY the Korean translations as a clean list.
-            Strict rules:
-            - NO English original text.
-            - NO explanations or task descriptions.
-            - NO metadata or checklists.
-            - ONLY one Korean sentence per line.
-            - NO markdown formatting or bold text.
-            
-            Titles:
-            {all_titles}
-            """
+            prompt = f"Translate the following news titles into Korean. Output ONLY the Korean translations as a bulleted list: {all_titles}"
             summary_text = get_ai_analysis(prompt)
+            clean_summary = clean_ai_output(summary_text)
             
-            # 후처리: 영문이나 메타 텍스트 제거
-            lines = summary_text.strip().split('\n')
-            filtered_lines = []
-            for line in lines:
-                clean_line = line.strip()
-                if not clean_line: continue
-                # 한글이 포함되어 있지 않으면 메타 텍스트로 간주하여 제외
-                if not re.search('[가-힣]', clean_line): continue
-                # 불필요한 레이블 제거
-                clean_line = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과)\s*[:：-]\s*', '', clean_line, flags=re.IGNORECASE)
-                filtered_lines.append(clean_line)
-            
-            formatted_summary = '<br>'.join(filtered_lines)
-            st.markdown(f"""
-            <div class="ai-analysis-box">
-                <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
-                {formatted_summary}
-            </div>
-            """, unsafe_allow_html=True)
+            if clean_summary:
+                st.markdown(f"""
+                <div class="ai-analysis-box">
+                    <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
+                    {clean_summary}
+                </div>
+                """, unsafe_allow_html=True)
 
 # 1.5 트럼프 트윗 통합 번역
 if 'trump_data' in locals() and trump_data and ai_trump_container:
@@ -1019,24 +1013,11 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
             all_trump_translated = []
             for t in trump_data:
-                t_translate_prompt = f"Translate the following English post into a natural Korean paragraph. Only output the translated text. Do not include vocabulary lists or explanations: {t['title']}. {t['description']}"
+                t_translate_prompt = f"Translate the following English post into a natural Korean paragraph. Only output the translated text: {t['title']}. {t['description']}"
                 t_translated = get_ai_analysis(t_translate_prompt)
-                
-                # 트럼프 번역 후처리 고도화
-                t_clean = t_translated.strip()
-                t_lines = []
-                for l in t_clean.split('\n'):
-                    l = l.strip()
-                    if not re.search('[가-힣]', l): continue
-                    if re.search(r'^[*-]?\s*["\'][a-zA-Z0-9\s]+["\']\s*[:：-]', l): continue
-                    if re.search(r'^[*-]?\s*[a-zA-Z0-9\s]+\s*[:：-]\s*[가-힣]', l): continue
-                    l = re.sub(r'^(Korean|Translation|번역|번역문|Para\s*\d+|Meaning|Core)\s*[:：-]\s*', '', l, flags=re.IGNORECASE)
-                    l = l.strip('*').strip()
-                    if l: t_lines.append(l)
-                
-                t_final = ' '.join(t_lines)
-                if t_final:
-                    all_trump_translated.append(f"- {t_final}")
+                t_clean = clean_ai_output(t_translated)
+                if t_clean:
+                    all_trump_translated.append(f"- {t_clean}")
             
             if all_trump_translated:
                 formatted_trump = '<br>'.join(all_trump_translated)
@@ -1069,10 +1050,10 @@ if bt_analysis_container:
             지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
             """
             bt_analysis = get_ai_analysis(bt_prompt)
-            formatted_analysis = bt_analysis.replace('**', '').replace('##', '').replace('\n', '<br>')
+            clean_bt = clean_ai_output(bt_analysis)
             st.markdown(f"""
             <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-                <strong>🤖 모델 유효성 진단:</strong><br>{formatted_analysis}
+                <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
             </div>
             """, unsafe_allow_html=True)
 
@@ -1095,9 +1076,9 @@ if ai_indicator_container:
                 5. 쉽고 전문적인 톤을 유지해.
                 """
                 analysis_output = get_ai_analysis(ai_desc_prompt)
-                clean_output = analysis_output.replace('**', '').replace('##', '').strip().replace('\n', '<br>')
+                clean_indicator = clean_ai_output(analysis_output)
                 st.markdown(f"""
                 <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
-                    {clean_output}
+                    {clean_indicator}
                 </div>
                 """, unsafe_allow_html=True)
