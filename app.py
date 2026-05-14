@@ -978,21 +978,39 @@ if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
             prompt = f"""
-            다음은 최근 주요 경제 뉴스 제목들입니다: {all_titles}
+            Translate the following news titles into Korean.
+            Output ONLY the Korean translations as a clean list.
+            Strict rules:
+            - NO English original text.
+            - NO explanations or task descriptions.
+            - NO metadata or checklists.
+            - ONLY one Korean sentence per line.
+            - NO markdown formatting or bold text.
             
-            위 뉴스들의 핵심 내용을 한국어로 번역하여 리스트 형태로만 제시해줘.
-            
-            지침 (반드시 준수):
-            1. 어떠한 영문 원문이나 부연 설명 없이 오직 한국어 번역문만 리스트 형태로 출력해.
-            2. 입력받은 뉴스 각각에 대해 한 줄씩 번역문을 작성해.
-            3. 분석, 요약, 핵심 요약(Core) 등 추가적인 항목을 절대 포함하지 마.
-            4. 반드시 표준 한국어 문법을 준수하고, 전문적인 경제 용어를 올바르게 사용해.
-            5. 답변에 강조 기호(예: **, ##)를 절대 사용하지 마.
-            6. 한자(漢字)를 단 하나도 포함하지 마.
-            7. '번역문:', '결과:' 와 같은 머리말도 생략하고 순수하게 리스트 내용만 출력해.
+            Titles:
+            {all_titles}
             """
             summary_text = get_ai_analysis(prompt)
-            formatted_summary = summary_text.strip().replace('\n', '<br>')
+            
+            # 후처리: 영문이나 메타 텍스트(예: "Headline 1:", "Constraints:")가 포함된 줄 제거 시도
+            lines = summary_text.strip().split('\n')
+            filtered_lines = []
+            for line in lines:
+                clean_line = line.strip()
+                # 영문 비율이 높거나 특정 키워드가 포함된 줄 제외
+                if not clean_line: continue
+                if any(x in clean_line.lower() for x in ['headline', 'translation', 'meaning', 'korean:', 'checked', 'task:', 'constraint']):
+                    # 만약 "Korean: " 으로 시작하는 실제 번역문이라면 앞부분만 제거
+                    if 'korean:' in clean_line.lower():
+                        filtered_lines.append(clean_line.split(':', 1)[-1].strip())
+                    continue
+                # 영문 알파벳이 너무 많으면 제외 (한글이 포함되어 있는지 확인)
+                import re
+                if not re.search('[가-힣]', clean_line):
+                    continue
+                filtered_lines.append(clean_line)
+            
+            formatted_summary = '<br>'.join(filtered_lines)
             st.markdown(f"""
             <div class="ai-analysis-box">
                 <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
