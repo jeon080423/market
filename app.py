@@ -1017,8 +1017,7 @@ if news_data and ai_news_container:
 if 'trump_data' in locals() and trump_data and ai_trump_container:
     with ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
-            # 빨간색 박스 스타일(border-left) 제거 및 뉴스 박스와 통일감 유지
-            st.markdown("<div class='ai-analysis-box'><strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>", unsafe_allow_html=True)
+            all_trump_translated = []
             for t in trump_data:
                 t_translate_prompt = f"Translate the following English post into a natural Korean paragraph. Only output the translated text. Do not include vocabulary lists or explanations: {t['title']}. {t['description']}"
                 t_translated = get_ai_analysis(t_translate_prompt)
@@ -1028,21 +1027,27 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
                 t_lines = []
                 for l in t_clean.split('\n'):
                     l = l.strip()
-                    # 한글이 아예 없는 줄은 제외
                     if not re.search('[가-힣]', l): continue
-                    # "Term": "Translation" 형태의 어휘 설명 줄 제외 (따옴표로 감싸진 영문 뒤에 콜론이 오는 경우 등)
                     if re.search(r'^[*-]?\s*["\'][a-zA-Z0-9\s]+["\']\s*[:：-]', l): continue
                     if re.search(r'^[*-]?\s*[a-zA-Z0-9\s]+\s*[:：-]\s*[가-힣]', l): continue
-                    # 불필요한 레이블 및 서론 제거
                     l = re.sub(r'^(Korean|Translation|번역|번역문|Para\s*\d+|Meaning|Core)\s*[:：-]\s*', '', l, flags=re.IGNORECASE)
                     l = l.strip('*').strip()
                     if l: t_lines.append(l)
                 
                 t_final = ' '.join(t_lines)
-                
                 if t_final:
-                    st.markdown(f"<div style='background-color: #ffffff; color: #31333F; border: 1px solid #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[번역]</strong><br>{t_final}</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+                    all_trump_translated.append(f"- {t_final}")
+            
+            if all_trump_translated:
+                formatted_trump = '<br>'.join(all_trump_translated)
+                st.markdown(f"""
+                <div class="ai-analysis-box">
+                    <strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
+                    {formatted_trump}
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.write("번역된 내용이 없습니다.")
 
 # 2. 모델 유효성 진단
 if bt_analysis_container:
