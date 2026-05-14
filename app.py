@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import time
+import re
 from io import StringIO
 import google.generativeai as genai
 
@@ -124,20 +125,20 @@ def get_ai_analysis(prompt):
             try:
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
-                return response.text
+                if response and hasattr(response, 'text'):
+                    return response.text
+                return "AI 응답 형식이 올바르지 않습니다."
             except Exception as e:
-                # 429(Quota Exceeded) 에러인 경우 잠시 대기 후 재시도 또는 다음 모델로 전환
                 err_msg = str(e).lower()
-                if "429" in err_msg or "quota" in err_msg:
-                    if attempt < max_retries - 1:
-                        time.sleep(2) # 2초 대기 후 재시도
-                        continue
-                    else:
-                        # 재시도 끝에 실패 시 다음 모델로 한 단계 강등
-                        break
-                return f"AI 분석을 가져오는 중 오류가 발생했습니다: {str(e)}"
+                # 429(Quota) 또는 500(Internal Server Error) 등의 경우 다음 모델로 전환 시도
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                else:
+                    # 다음 모델로 넘어감
+                    break
     
-    return "현재 모든 AI 모델의 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요."
+    return "현재 모든 AI 모델 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요."
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -992,22 +993,16 @@ if news_data and ai_news_container:
             """
             summary_text = get_ai_analysis(prompt)
             
-            # 후처리: 영문이나 메타 텍스트(예: "Headline 1:", "Constraints:")가 포함된 줄 제거 시도
+            # 후처리: 영문이나 메타 텍스트 제거
             lines = summary_text.strip().split('\n')
             filtered_lines = []
             for line in lines:
                 clean_line = line.strip()
-                # 영문 비율이 높거나 특정 키워드가 포함된 줄 제외
                 if not clean_line: continue
-                if any(x in clean_line.lower() for x in ['headline', 'translation', 'meaning', 'korean:', 'checked', 'task:', 'constraint']):
-                    # 만약 "Korean: " 으로 시작하는 실제 번역문이라면 앞부분만 제거
-                    if 'korean:' in clean_line.lower():
-                        filtered_lines.append(clean_line.split(':', 1)[-1].strip())
-                    continue
-                # 영문 알파벳이 너무 많으면 제외 (한글이 포함되어 있는지 확인)
-                import re
-                if not re.search('[가-힣]', clean_line):
-                    continue
+                # 한글이 포함되어 있지 않으면 메타 텍스트로 간주하여 제외
+                if not re.search('[가-힣]', clean_line): continue
+                # 불필요한 레이블 제거
+                clean_line = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과)\s*[:：-]\s*', '', clean_line, flags=re.IGNORECASE)
                 filtered_lines.append(clean_line)
             
             formatted_summary = '<br>'.join(filtered_lines)
@@ -1024,9 +1019,18 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
             st.markdown("<div class='ai-analysis-box' style='padding: 15px 20px; border-left: 5px solid #dc3545;'><strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>", unsafe_allow_html=True)
             for t in trump_data:
-                t_translate_prompt = f"다음 영문 포스트를 한국어로 번역만 해줘: {t['title']}. {t['description']}. 지침: 번역 외의 말은 하지 마. 한자 사용 금지."
+                t_translate_prompt = f"Translate this to Korean. Only output the Korean text: {t['title']}. {t['description']}"
                 t_translated = get_ai_analysis(t_translate_prompt)
-                st.markdown(f"<div style='background-color: #ffffff; color: #31333F; border: 1px solid #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[번역]</strong><br>{t_translated}</div>", unsafe_allow_html=True)
+                
+                # 트럼프 번역 후처리
+                t_clean = t_translated.strip()
+                # 한글이 없는 줄은 제외하고, 레이블 제거
+                t_lines = [re.sub(r'^(Korean|Translation|번역|번역문)\s*[:：-]\s*', '', l.strip(), flags=re.IGNORECASE) 
+                           for l in t_clean.split('\n') if re.search('[가-힣]', l)]
+                t_final = ' '.join(t_lines)
+                
+                if t_final:
+                    st.markdown(f"<div style='background-color: #ffffff; color: #31333F; border: 1px solid #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;'><strong>[번역]</strong><br>{t_final}</div>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
 # 2. 모델 유효성 진단
