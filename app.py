@@ -148,11 +148,13 @@ def clean_ai_output(text):
     for line in lines:
         l = line.strip()
         if not l: continue
-        # 한글이 포함되어 있지 않으면 메타 텍스트로 간주하여 제외 (특수문자/숫자만 있는 줄도 제외)
+        # 한글이 포함되어 있지 않으면 제외
         if not re.search('[가-힣]', l): continue
-        # 불필요한 레이블 및 머리말 제거 (정규표현식)
+        # 어휘 설명 형태 ("단어": "뜻" 또는 "단어" - "뜻") 제외
+        # 문장이라면 보통 조사가 붙거나 길어짐. 짧은 단어:뜻 형태는 제거.
+        if re.search(r'^[*-]?\s*["\']?[a-zA-Z0-9\s]+["\']?\s*[:：-]\s*[가-힣\s]{1,15}$', l): continue
+        # 불필요한 레이블 제거
         l = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과|진단|분석|요약|핵심|Para\s*\d+|[*-])\s*[:：-]?\s*', '', l, flags=re.IGNORECASE)
-        # 마크다운 강조 기호 및 특수문자 제거
         l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
         if l: filtered.append(l)
     return '<br>'.join(filtered)
@@ -995,7 +997,20 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
-            prompt = f"Translate the following news titles into Korean. Output ONLY the Korean translations as a bulleted list: {all_titles}"
+            prompt = f"""
+            Task: Translate the following English news titles into professional Korean.
+            Rules:
+            - Output ONLY the Korean translations.
+            - One line per translation.
+            - NO English, NO word definitions, NO explanations.
+            
+            Example:
+            Input: Fed signals rate cut in September.
+            Output: 연준이 9월 금리 인하 신호를 보냈습니다.
+            
+            Input: {all_titles}
+            Output:
+            """
             summary_text = get_ai_analysis(prompt)
             clean_summary = clean_ai_output(summary_text)
             
@@ -1013,7 +1028,19 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
             all_trump_translated = []
             for t in trump_data:
-                t_translate_prompt = f"Translate the following English post into a natural Korean paragraph. Only output the translated text: {t['title']}. {t['description']}"
+                t_translate_prompt = f"""
+                Task: Translate the following social media post into one natural Korean paragraph.
+                Rules:
+                - Output ONLY the Korean translation.
+                - NO vocabulary lists, NO definitions, NO English.
+                - Focus on the overall meaning as a sentence.
+                
+                Example Input: The economy is growing faster than ever. It's a great time for business.
+                Example Output: 경제가 그 어느 때보다 빠르게 성장하고 있습니다. 사업하기에 아주 좋은 시기입니다.
+                
+                Input: {t['title']}. {t['description']}
+                Output:
+                """
                 t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
                 if t_clean:
