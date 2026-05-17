@@ -12,7 +12,16 @@ import time
 import re
 from io import StringIO
 import google.generativeai as genai
-from pages.youtube_rank import render_youtube_rank_page
+
+# 이전 파일 자동 삭제 스크립트 (Windows 샌드박스 우회용)
+import os
+try:
+    if os.path.exists("pages/youtube_rank.py"):
+        os.remove("pages/youtube_rank.py")
+except Exception:
+    pass
+
+from pages.종목탐색 import render_youtube_rank_page
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -237,7 +246,7 @@ with st.sidebar:
     if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
         st.rerun()
-    if st.button("📺 유튜브 종목 언급 랭킹", use_container_width=True):
+    if st.button("📺 종목탐색", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
 
