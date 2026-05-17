@@ -1,0 +1,200 @@
+import os
+import re
+import pandas as pd
+import streamlit as st
+import FinanceDataReader as fdr
+
+EN_STOCK_MAP = {
+    "Samsung": "삼성전자",
+    "SK Hynix": "SK하이닉스",
+    "LG Energy": "LG에너지솔루션",
+    "Hyundai Motor": "현대차",
+    "Hyundai": "현대차",
+    "Kia": "기아",
+    "Kakao": "카카오",
+    "Naver": "NAVER",
+    "Celltrion": "셀트리온",
+    "POSCO": "POSCO홀딩스",
+    "KB Financial": "KB금융",
+    "Shinhan": "신한지주",
+    "Samsung C&T": "삼성물산",
+    "Samsung Bio": "삼성바이오로직스",
+    "Samsung SDI": "삼성SDI",
+    "LG Chem": "LG화학",
+    "LG Electronics": "LG전자",
+    "Hana Financial": "하나금융지주",
+    "SK Innovation": "SK이노베이션",
+    "Korea Electric": "한국전력",
+    "Ecopro": "에코프로",
+    "Ecopro BM": "에코프로비엠",
+    "L&F": "엘앤에프",
+    "HLB": "HLB",
+    "Alteogen": "알테오젠",
+    "HPSP": "HPSP",
+    "Rainbow Robotics": "레인보우로보틱스",
+    "Doosan": "두산에너빌리티",
+    "Samsung Electro-Mechanics": "삼성전기",
+    "Samsung Heavy": "삼성중공업",
+    "Korean Air": "대한항공",
+    "Meritz": "메리츠금융지주",
+    "HD Hyundai": "HD현대",
+    "Hanwha Aerospace": "한화에어로스페이스",
+    "Hanwha": "한화",
+    "SK Telecom": "SK텔레콤",
+    "KT": "KT",
+    "S-Oil": "S-Oil",
+    "Korea Zinc": "고려아연",
+    "Coway": "코웨이",
+    "Netmarble": "넷마블",
+    "KOGAS": "한국가스공사",
+    "Orion": "오리온",
+    "Amorepacific": "아모레퍼시픽",
+    "Yuhan": "유한양행"
+}
+
+# Regex global cache
+_compiled_names_regex = None
+_compiled_tickers_regex = None
+_name_to_ticker_map = None
+
+@st.cache_data(ttl=3600)
+def load_krx_stocks() -> pd.DataFrame:
+    """
+    KOSPI/KOSDAQ 종목 목록 (KRX)
+    - FinanceDataReader로 실시간 조회 후 CSV로 백업
+    - 조회 실패 시 로컬 CSV 폴백
+    - 반환: DataFrame [ticker, name, market, changes, chg_rate]
+    """
+    os.makedirs("data", exist_ok=True)
+    fallback_path = os.path.join("data", "krx_stocks.csv")
+    
+    try:
+        # Fetch live KOSPI & KOSDAQ listings
+        kospi = fdr.StockListing("KOSPI")[["Code", "Name", "Changes", "ChgRate"]].assign(market="KOSPI")
+        kosdaq = fdr.StockListing("KOSDAQ")[["Code", "Name", "Changes", "ChgRate"]].assign(market="KOSDAQ")
+        
+        df = pd.concat([kospi, kosdaq], ignore_index=True)
+        df = df.rename(columns={
+            "Code": "ticker",
+            "Name": "name",
+            "Changes": "changes",
+            "ChgRate": "chg_rate"
+        })
+        
+        # Clean numerical columns
+        df["changes"] = pd.to_numeric(df["changes"], errors="coerce").fillna(0)
+        df["chg_rate"] = pd.to_numeric(df["chg_rate"], errors="coerce").fillna(0.0)
+        
+        # Backup to CSV
+        df.to_csv(fallback_path, index=False, encoding="utf-8-sig")
+        return df
+    except Exception as e:
+        # Fallback to local CSV if available
+        if os.path.exists(fallback_path):
+            try:
+                df = pd.read_csv(fallback_path)
+                df["changes"] = pd.to_numeric(df["changes"], errors="coerce").fillna(0)
+                df["chg_rate"] = pd.to_numeric(df["chg_rate"], errors="coerce").fillna(0.0)
+                return df
+            except Exception:
+                pass
+        
+        # Absolute minimal fallback
+        st.warning("종목 정보를 가져오는 중 오류가 발생하여 기본 종목 정보만 사용합니다.")
+        minimal_stocks = [
+            {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
+            {"ticker": "000660", "name": "SK하이닉스", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
+            {"ticker": "373220", "name": "LG에너지솔루션", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
+            {"ticker": "005380", "name": "현대차", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
+            {"ticker": "035420", "name": "NAVER", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
+            {"ticker": "035720", "name": "카카오", "market": "KOSPI", "changes": 0, "chg_rate": 0.0}
+        ]
+        return pd.DataFrame(minimal_stocks)
+
+def filter_by_price_direction(df: pd.DataFrame, direction: str = "up") -> pd.DataFrame:
+    """
+    - direction: "up" (상승) or "down" (하락)
+    - 상승: chg_rate > 0
+    - 하락: chg_rate < 0
+    """
+    # Safeguard copying
+    df_filtered = df.copy()
+    df_filtered["chg_rate"] = pd.to_numeric(df_filtered["chg_rate"], errors="coerce").fillna(0.0)
+    
+    if direction == "up":
+        return df_filtered[df_filtered["chg_rate"] > 0]
+    elif direction == "down":
+        return df_filtered[df_filtered["chg_rate"] < 0]
+    return df_filtered
+
+def init_compiled_patterns(stock_list: list[dict]):
+    """
+    Compiles and caches the name and ticker patterns for fast matching.
+    """
+    global _compiled_names_regex, _compiled_tickers_regex, _name_to_ticker_map
+    if _compiled_names_regex is not None:
+        return
+
+    name_to_ticker = {}
+    
+    for stock in stock_list:
+        ticker = stock.get("ticker")
+        name = stock.get("name")
+        if not ticker or not name:
+            continue
+            
+        # Lowercase mapping for case-insensitive lookup
+        name_to_ticker[name.lower()] = ticker
+        name_to_ticker[ticker] = ticker
+        
+        # Add English mapping if exists
+        for eng, kor in EN_STOCK_MAP.items():
+            if kor.lower() == name.lower():
+                name_to_ticker[eng.lower()] = ticker
+
+    # Sort names by length descending to prevent partial match issues (e.g. '삼성전자우' matches '삼성전자' first if not sorted)
+    sorted_names = sorted(name_to_ticker.keys(), key=len, reverse=True)
+    
+    # 1. Names pattern: matches Korean names or English aliases. Case-insensitive.
+    # Exclude pure number tickers from names pattern
+    name_keys = [k for k in sorted_names if not k.isdigit()]
+    _compiled_names_regex = re.compile("|".join(re.escape(k) for k in name_keys), re.IGNORECASE)
+    
+    # 2. Tickers pattern: matches 6-digit tickers strictly with boundary conditions.
+    ticker_keys = [k for k in sorted_names if k.isdigit()]
+    _compiled_tickers_regex = re.compile(r'(?<!\d)(' + "|".join(re.escape(t) for t in ticker_keys) + r')(?!\d)')
+    
+    _name_to_ticker_map = name_to_ticker
+
+def count_stock_mentions(text: str, stock_list: list[dict]) -> dict[str, int]:
+    """
+    - stock_list: [{"name": "삼성전자", "ticker": "005930", "market": "KOSPI"}, ...]
+    - 종목명 및 티커를 정규식으로 검색 (단어 경계 처리)
+    - 영문 채널용: 영문 종목명도 매핑 테이블로 추가 (예: "Samsung" → "삼성전자")
+    - 반환: {"005930": 3, "000660": 1, ...}
+    """
+    if not text:
+        return {}
+
+    # Initialize compiled patterns
+    init_compiled_patterns(stock_list)
+    
+    mentions = {}
+    
+    # Find all stock names/aliases matches
+    if _compiled_names_regex:
+        name_matches = _compiled_names_regex.findall(text)
+        for m in name_matches:
+            ticker = _name_to_ticker_map.get(m.lower())
+            if ticker:
+                mentions[ticker] = mentions.get(ticker, 0) + 1
+
+    # Find all ticker number matches
+    if _compiled_tickers_regex:
+        ticker_matches = _compiled_tickers_regex.findall(text)
+        for m in ticker_matches:
+            ticker = _name_to_ticker_map.get(m)
+            if ticker:
+                mentions[ticker] = mentions.get(ticker, 0) + 1
+
+    return mentions

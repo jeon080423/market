@@ -12,6 +12,7 @@ import time
 import re
 from io import StringIO
 import google.generativeai as genai
+from pages.youtube_rank import render_youtube_rank_page
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -225,6 +226,25 @@ st.markdown("""
 # 한국 시간(KST) 설정을 위한 함수
 def get_kst_now():
     return datetime.now() + timedelta(hours=9)
+
+# active_tab 초기화
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = "risk_monitor"
+
+# 사이드바 공통 메뉴 추가
+with st.sidebar:
+    st.subheader("📋 대시보드 메뉴")
+    if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
+        st.session_state["active_tab"] = "risk_monitor"
+        st.rerun()
+    if st.button("📺 유튜브 종목 언급 랭킹", use_container_width=True):
+        st.session_state["active_tab"] = "youtube_rank"
+        st.rerun()
+
+# 유튜브 랭킹 페이지 라우팅
+if st.session_state["active_tab"] == "youtube_rank":
+    render_youtube_rank_page()
+    st.stop()
 
 # 3. 제목 및 설명
 st.title("KOSPI 예측적 위험 모니터링 (1주일 선행)")

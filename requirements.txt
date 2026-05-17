@@ -7,3 +7,5 @@ requests
 beautifulsoup4
 google-generativeai
 streamlit-autorefresh
+youtube-transcript-api
+FinanceDataReader
