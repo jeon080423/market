@@ -47,8 +47,8 @@ def render_rank_table(df: pd.DataFrame, title: str, period_label: str):
         st.info(f"📅 최근 {period_label} 동안 언급된 종목이 없습니다.")
         return
 
-    # Limit to top 20
-    df_display = df.head(20).copy()
+    # Limit to top 10 as requested by the user
+    df_display = df.head(10).copy()
     
     # Add rank index and emojis
     df_display.insert(0, "순위", range(1, len(df_display) + 1))
@@ -92,6 +92,7 @@ def render_rank_table(df: pd.DataFrame, title: str, period_label: str):
     st.dataframe(
         styled_df,
         use_container_width=True,
+        height=388,  # 10개 순위 데이터와 헤더가 세로 스크롤 없이 시원하게 다 채워지도록 최적화
         hide_index=True,
         column_config={
             "순위": st.column_config.TextColumn("순위", width="small"),
