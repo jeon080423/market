@@ -94,11 +94,12 @@ def render_rank_table(df: pd.DataFrame, title: str, period_label: str):
         use_container_width=True,
         hide_index=True,
         column_config={
-            "순위": st.column_config.TextColumn("순위", width="medium"),
+            "순위": st.column_config.TextColumn("순위", width="small"),
+            "종목명": st.column_config.TextColumn("종목명", width="medium"),
             "티커": st.column_config.TextColumn("티커", width="small"),
-            "가중치 점수": st.column_config.NumberColumn("가중치 점수", format="%.2f"),
-            "언급 수": st.column_config.NumberColumn("언급 수", format="%d"),
-            "채널 수": st.column_config.NumberColumn("채널 수", format="%d")
+            "가중치 점수": st.column_config.NumberColumn("가중치 점수", width="small", format="%.2f"),
+            "언급 수": st.column_config.NumberColumn("언급 수", width="small", format="%d"),
+            "채널 수": st.column_config.NumberColumn("채널 수", width="small", format="%d")
         }
     )
 
