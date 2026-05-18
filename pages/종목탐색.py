@@ -96,10 +96,10 @@ def render_rank_table(df: pd.DataFrame, title: str, period_label: str):
         column_config={
             "순위": st.column_config.TextColumn("순위", width="small"),
             "종목명": st.column_config.TextColumn("종목명", width="medium"),
-            "티커": st.column_config.TextColumn("티커", width="small"),
-            "가중치 점수": st.column_config.NumberColumn("가중치 점수", width="small", format="%.2f"),
+            "티커": None,  # 3열 대시보드의 가로 공간 확보를 위해 화면에서 감춤
+            "가중치 점수": st.column_config.NumberColumn("가중치 점수", width="small", format="%.1f"),
             "언급 수": st.column_config.NumberColumn("언급 수", width="small", format="%d"),
-            "채널 수": st.column_config.NumberColumn("채널 수", width="small", format="%d")
+            "채널 수": None  # 3열 대시보드의 가로 공간 확보를 위해 화면에서 감춤
         }
     )
 
@@ -188,10 +188,40 @@ def load_and_process_youtube_data():
 
 def render_youtube_rank_page():
     st.title("📺 유튜브 기반 증시 종목 언급량 탐색")
+    
     st.markdown("""
-    이 탭은 한국/미국 주식 관련 유튜브 채널의 최근 업로드된 영상 자막(및 제목)을 분석하여 **가장 많이 언급된 종목 순위**를 표시합니다.
-    * **가중치 점수**: 각 종목 언급 횟수 $\times \log_{10}(\text{채널 구독자 수} + 1)$ 의 합산 점수입니다 (대형 채널의 독점을 방지하고, 영향력을 합리적으로 반영).
+    이 탭은 한국/미국 주식 관련 유튜브 채널의 최근 업로드된 영상 자막(및 제목)을 완전히 스캔하여 **가장 많이 언급된 종목 순위**를 집계 및 분석합니다.
     """)
+    
+    # 작동 원리 및 가중치 설명 아코디언 추가
+    with st.expander("💡 유튜브 종목 탐색기 작동 원리 및 가중치 산정 방식 자세히 보기", expanded=False):
+        st.markdown("""
+        본 애플리케이션은 정보 신뢰도를 극대화하고 대형 채널의 점수 독점을 완화하기 위해 설계된 **지능형 금융 분석 엔진**입니다.
+        
+        #### 1. 데이터 수집 및 전처리 단계 (Data Harvesting)
+        * **채널 탐색**: 한국 및 미국의 대표적인 주식·경제 유튜브 채널들로부터 최근 7일 내에 업로드된 최신 영상들을 스캔합니다.
+        * **자막 완전 스캔 (Transcript Scan)**: 단순 영상 제목이나 설명을 넘어, **영상 전체의 인공지능 자막(Transcript) 스크립트 전문을 완벽히 읽어내어** 실제 종목명이 발화된 맥락을 추적합니다.
+        * **종목 추출 엔진 (Regex Engine)**: 한국어 조사('삼성전자는', '카카오가' 등)나 영어 별칭('Samsung', 'SK Hynix' 등), 6자리 티커 코드(`005930` 등)가 결합된 텍스트에서도 오차 없이 고성능 정규식 엔진이 특정 종목을 매칭해냅니다.
+
+        #### 2. 로그-댐프너(Log-Dampening) 기반 가중치 점수 산정 알고리즘 ⭐
+        단순히 유튜브 언급 빈도만 합산하게 될 경우, **구독자 수 수백만 명인 대형 채널에서 한 번 스치듯 말한 종목**이 **구독자 수 1만 명인 알짜 소형 정보 채널에서 깊이 있게 20번 분석한 종목**보다 점수가 과도하게 높게 나타나는 왜곡 현상이 발생합니다.
+        
+        이를 해결하기 위해 본 시스템은 구독자 수 규모에 상용로그($\log_{10}$) 연산을 취한 **로그-댐프너 가중치 수학 모델**을 적용했습니다.
+        
+        * **가중치 점수 연산 공식:**
+          $$\\text{가중치 점수} = \\sum \\left( \\text{해당 영상 내 종목 언급 횟수} \\times \\log_{10}(\\text{채널 구독자 수} + 1) \\right)$$
+          
+        * **예시를 통한 가중치 체감:**
+          * **A 채널 (구독자 100만 명)**: 가중치 점수 = $\\log_{10}(1,000,000) = 6.0$
+          * **B 채널 (구독자 1만 명)**: 가중치 점수 = $\\log_{10}(10,000) = 4.0$
+          * ➔ 구독자 수는 **100배** 차이가 나지만, 실제 데이터에 반영되는 영향력 가중치는 **1.5배** 수준으로 제어되어 대형 채널의 점수 독식을 방지하고 중소형 정보 채널의 깊이 있는 전문 지식도 균형감 있게 차트에 반영시킵니다.
+
+        #### 3. 주가 방향성 결합 필터링 (Market Direction Pairing)
+        * **상승 종목 언급 집중도 (📈)**: 당일 종가가 전일 대비 **상승한 종목** 중에서만 유튜브 발화량을 집계하여, 현재 시장을 주도하고 있는 테마와 매수 심리가 몰려있는 종목을 정밀 분석합니다.
+        * **하락 종목 언급 집중도 (📉)**: 당일 종가가 전일 대비 **하락한 종목** 중에서만 유튜브 발화량을 집계하여, 낙폭과대에 따른 개투 반등 기회 및 시장에서 리스크가 관리되고 있거나 급락 우려로 집중 토론되는 종목을 탐색합니다.
+        * *※ 실시간 한국거래소(KRX) 연동 지연 및 방화벽 차단 시에는 주요 대형주 50대 종목 데이터베이스를 활용하여 무중단 서비스를 제공합니다.*
+        """)
+        
     st.markdown("---")
     
     # API 키 체크
@@ -254,7 +284,7 @@ def render_youtube_rank_page():
     # 종목 데이터 로드
     stock_df = load_krx_stocks()
     if len(stock_df) < 100:
-        st.info("ℹ️ 실시간 KRX 증시 정보 연결 장애로 인해 주요 대형주(50대 종목) 데이터베이스로 대체 동작합니다.")
+        st.info("ℹ️ 실시간 KRX 증시 정보 연결 장애(방화벽 차단)로 인해 주요 대형주(50대 종목) 데이터베이스로 대체 동작하며, [상승/하락] 구분 없이 **전체 언급량 합산 랭킹**으로 자동 전환되어 표시됩니다.")
     
     # 당일 상승/하락 필터 리스트 준비
     stock_up = filter_by_price_direction(stock_df, "up")
@@ -299,7 +329,7 @@ def render_youtube_rank_page():
         return calculate_weighted_score(p_mentions, subscriber_map, p_channel_map, target_stocks)
 
     # --- ▶ 1행: 한국 유튜브 채널 × 한국 증시 상승 종목 언급량 ---
-    st.subheader("▶ 1행: 한국 유튜브 채널 × 국내 증시 상승 종목 랭킹")
+    st.subheader("📈 1행: 한국 유튜브 채널 × 국내 증시 [상승 종목] 언급량 랭킹")
     st.caption("한국어로 경제 분석/주식 추천을 다루는 채널 대상, 전일 대비 상승 종목만 매칭")
     
     col1, col2, col3 = st.columns(3)
@@ -321,7 +351,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- ▶ 2행: 미국 유튜브 채널 × 한국 증시 상승 종목 언급량 ---
-    st.subheader("▶ 2행: 미국 유튜브 채널 × 국내 증시 상승 종목 랭킹")
+    st.subheader("📈 2행: 미국 유튜브 채널 × 국내 증시 [상승 종목] 언급량 랭킹")
     st.caption("영어로 한국 증시/KOSPI를 다루는 미국/해외 채널 대상, 전일 대비 상승 종목만 매칭")
     
     col4, col5, col6 = st.columns(3)
@@ -343,7 +373,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- ▶ 3행: 한국 + 미국 유튜브 통합 × 한국 증시 하락 종목 언급량 ---
-    st.subheader("▶ 3행: 한+미 유튜브 통합 × 국내 증시 하락 종목 랭킹")
+    st.subheader("📉 3행: 한+미 유튜브 통합 × 국내 증시 [하락 종목] 언급량 랭킹")
     st.caption("모든 한국 및 해외 채널 분석 데이터 통합, 전일 대비 하락 종목만 매칭 (하락장 속 언급 비중 추적)")
     
     col7, col8, col9 = st.columns(3)
