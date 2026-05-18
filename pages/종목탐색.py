@@ -285,11 +285,7 @@ def render_youtube_rank_page():
     # 종목 데이터 로드
     stock_df = load_krx_stocks()
     if len(stock_df) < 100:
-        st.info("ℹ️ 실시간 KRX 증시 정보 연결 장애(방화벽 차단)로 인해 주요 대형주(50대 종목) 데이터베이스로 대체 동작하며, [상승/하락] 구분 없이 **전체 언급량 합산 랭킹**으로 자동 전환되어 표시됩니다.")
-    
-    # 당일 상승/하락 필터 리스트 준비
-    stock_up = filter_by_price_direction(stock_df, "up")
-    stock_down = filter_by_price_direction(stock_df, "down")
+        st.info("ℹ️ 실시간 KRX 증시 정보 연결 장애(방화벽 차단)로 인해 주요 대형주(50대 종목) 데이터베이스로 대체 동작합니다. (유튜브 전문가들의 [상승 예측] 및 [하락/리스크 우려] 의견은 정상적으로 정밀 판별 및 분리되어 실시간 반영됩니다.)")
 
     # 기간 분할 도구
     now = datetime.now(timezone.utc)
@@ -320,77 +316,90 @@ def render_youtube_rank_page():
     all_1w, all_3d, all_1d = partition_data_by_period(all_videos)
 
     # 헬퍼 함수: 특정 비디오 서브셋에 대해 가중치 스코어 df를 구함
-    def get_period_score_df(period_videos, target_stocks):
+    def get_period_score_df(period_videos, target_stocks, direction="up"):
         p_video_ids = [v["video_id"] for v in period_videos]
         
-        # Filter mention counts and channel maps to only these videos
-        p_mentions = {vid: mention_counts[vid] for vid in p_video_ids if vid in mention_counts}
+        # Filter mention counts and extract only the target direction's sentiment mentions
+        p_mentions = {}
+        for vid in p_video_ids:
+            if vid in mention_counts:
+                video_mentions = mention_counts[vid]
+                if isinstance(video_mentions, dict):
+                    if "up" in video_mentions or "down" in video_mentions:
+                        p_mentions[vid] = video_mentions.get(direction, {})
+                    else:
+                        # 호환성 유지용 (만약 구버전 캐시 형태인 경우)
+                        if direction == "up":
+                            p_mentions[vid] = video_mentions
+                        else:
+                            p_mentions[vid] = {}
+                            
         p_channel_map = {vid: video_channel_map[vid] for vid in p_video_ids if vid in video_channel_map}
         
         return calculate_weighted_score(p_mentions, subscriber_map, p_channel_map, target_stocks)
 
     # --- ▶ 1행: 한국 유튜브 채널 × 한국 증시 상승 종목 언급량 ---
-    st.subheader("📈 1행: 한국 유튜브 채널 × 국내 증시 [상승 종목] 언급량 랭킹")
-    st.caption("한국어로 경제 분석/주식 추천을 다루는 채널 대상, 전일 대비 상승 종목만 매칭")
+    st.subheader("📈 1행: 한국 유튜브 채널 × 국내 증시 [상승 예측/추천] 언급량 랭킹")
+    st.caption("한국어로 경제 분석/주식 추천을 다루는 채널 대상, 전문가들이 향후 상승/호재로 예측·추천한 의견 매칭")
     
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("#### 📅 최근 1주일")
-        df_kr_1w = get_period_score_df(kr_1w, stock_up)
+        df_kr_1w = get_period_score_df(kr_1w, stock_df, "up")
         render_rank_table(df_kr_1w, "KR_1W", "1주일")
         
     with col2:
         st.markdown("#### 📅 최근 3일")
-        df_kr_3d = get_period_score_df(kr_3d, stock_up)
+        df_kr_3d = get_period_score_df(kr_3d, stock_df, "up")
         render_rank_table(df_kr_3d, "KR_3D", "3일")
         
     with col3:
         st.markdown("#### 📅 최근 1일")
-        df_kr_1d = get_period_score_df(kr_1d, stock_up)
+        df_kr_1d = get_period_score_df(kr_1d, stock_df, "up")
         render_rank_table(df_kr_1d, "KR_1D", "1일")
 
     st.markdown("---")
 
     # --- ▶ 2행: 미국 유튜브 채널 × 한국 증시 상승 종목 언급량 ---
-    st.subheader("📈 2행: 미국 유튜브 채널 × 국내 증시 [상승 종목] 언급량 랭킹")
-    st.caption("영어로 한국 증시/KOSPI를 다루는 미국/해외 채널 대상, 전일 대비 상승 종목만 매칭")
+    st.subheader("📈 2행: 미국 유튜브 채널 × 국내 증시 [상승 예측/추천] 언급량 랭킹")
+    st.caption("영어로 한국 증시/KOSPI를 다루는 미국/해외 채널 대상, 전문가들이 향후 상승/호재로 예측·추천한 의견 매칭")
     
     col4, col5, col6 = st.columns(3)
     with col4:
         st.markdown("#### 📅 최근 1주일")
-        df_us_1w = get_period_score_df(us_1w, stock_up)
+        df_us_1w = get_period_score_df(us_1w, stock_df, "up")
         render_rank_table(df_us_1w, "US_1W", "1주일")
         
     with col5:
         st.markdown("#### 📅 최근 3일")
-        df_us_3d = get_period_score_df(us_3d, stock_up)
+        df_us_3d = get_period_score_df(us_3d, stock_df, "up")
         render_rank_table(df_us_3d, "US_3D", "3일")
         
     with col6:
         st.markdown("#### 📅 최근 1일")
-        df_us_1d = get_period_score_df(us_1d, stock_up)
+        df_us_1d = get_period_score_df(us_1d, stock_df, "up")
         render_rank_table(df_us_1d, "US_1D", "1일")
 
     st.markdown("---")
 
     # --- ▶ 3행: 한국 + 미국 유튜브 통합 × 한국 증시 하락 종목 언급량 ---
-    st.subheader("📉 3행: 한+미 유튜브 통합 × 국내 증시 [하락 종목] 언급량 랭킹")
-    st.caption("모든 한국 및 해외 채널 분석 데이터 통합, 전일 대비 하락 종목만 매칭 (하락장 속 언급 비중 추적)")
+    st.subheader("📉 3행: 한+미 유튜브 통합 × 국내 증시 [하락/리스크 경고] 언급량 랭킹")
+    st.caption("모든 한국 및 해외 채널 분석 데이터 통합, 전문가들이 조정/하락/리스크를 경고하거나 악재를 분석한 의견 매칭")
     
     col7, col8, col9 = st.columns(3)
     with col7:
         st.markdown("#### 📅 최근 1주일")
-        df_all_1w = get_period_score_df(all_1w, stock_down)
+        df_all_1w = get_period_score_df(all_1w, stock_df, "down")
         render_rank_table(df_all_1w, "ALL_1W", "1주일")
         
     with col8:
         st.markdown("#### 📅 최근 3일")
-        df_all_3d = get_period_score_df(all_3d, stock_down)
+        df_all_3d = get_period_score_df(all_3d, stock_df, "down")
         render_rank_table(df_all_3d, "ALL_3D", "3일")
         
     with col9:
         st.markdown("#### 📅 최근 1일")
-        df_all_1d = get_period_score_df(all_1d, stock_down)
+        df_all_1d = get_period_score_df(all_1d, stock_df, "down")
         render_rank_table(df_all_1d, "ALL_1D", "1일")
 
 # 만약 이 파일이 단독 페이지로 직접 실행될 때도 UI가 렌더링되도록 실행 구문 추가
