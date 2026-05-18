@@ -252,6 +252,8 @@ def render_youtube_rank_page():
 
     # 종목 데이터 로드
     stock_df = load_krx_stocks()
+    if len(stock_df) < 100:
+        st.info("ℹ️ 실시간 KRX 증시 정보 연결 장애로 인해 주요 대형주(50대 종목) 데이터베이스로 대체 동작합니다.")
     
     # 당일 상승/하락 필터 리스트 준비
     stock_up = filter_by_price_direction(stock_df, "up")
