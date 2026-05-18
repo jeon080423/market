@@ -60,7 +60,10 @@ def calculate_weighted_score(
     # Compile data rows
     rows = []
     for ticker, score in scores.items():
-        name = ticker_to_name.get(ticker, ticker)
+        # Ensure we only include stocks that are in our stock mapping list (filters out raw tickers/unmatched stocks)
+        if ticker not in ticker_to_name:
+            continue
+        name = ticker_to_name[ticker]
         m_count = total_mentions.get(ticker, 0)
         c_count = len(ticker_channels.get(ticker, []))
         

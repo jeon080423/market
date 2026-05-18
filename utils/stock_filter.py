@@ -164,9 +164,15 @@ def filter_by_price_direction(df: pd.DataFrame, direction: str = "up") -> pd.Dat
     df_filtered["chg_rate"] = pd.to_numeric(df_filtered["chg_rate"], errors="coerce").fillna(0.0)
     
     if direction == "up":
-        return df_filtered[df_filtered["chg_rate"] > 0]
+        filtered = df_filtered[df_filtered["chg_rate"] > 0]
+        if filtered.empty:
+            return df_filtered  # 실시간 연결 실패 시 변동률이 0이므로, 전체 목록을 폴백으로 유지
+        return filtered
     elif direction == "down":
-        return df_filtered[df_filtered["chg_rate"] < 0]
+        filtered = df_filtered[df_filtered["chg_rate"] < 0]
+        if filtered.empty:
+            return df_filtered  # 실시간 연결 실패 시 변동률이 0이므로, 전체 목록을 폴백으로 유지
+        return filtered
     return df_filtered
 
 def init_compiled_patterns(stock_list: list[dict]):
