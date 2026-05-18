@@ -89,16 +89,6 @@ def load_krx_stocks() -> pd.DataFrame:
         df.to_csv(fallback_path, index=False, encoding="utf-8-sig")
         return df
     except Exception as e:
-        # Fallback to local CSV if available
-        if os.path.exists(fallback_path):
-            try:
-                df = pd.read_csv(fallback_path)
-                df["changes"] = pd.to_numeric(df["changes"], errors="coerce").fillna(0)
-                df["chg_rate"] = pd.to_numeric(df["chg_rate"], errors="coerce").fillna(0.0)
-                return df
-            except Exception:
-                pass
-        
         # Absolute minimal fallback (Top 50 major stocks to ensure wide coverage)
         minimal_stocks = [
             {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
@@ -127,7 +117,7 @@ def load_krx_stocks() -> pd.DataFrame:
             {"ticker": "010140", "name": "삼성중공업", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
             {"ticker": "003490", "name": "대한항공", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
             {"ticker": "138040", "name": "메리츠금융지주", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
-            {"ticker": "247540", "name": "에코프로", "market": "KOSDAQ", "changes": 0, "chg_rate": 0.0},
+            {"ticker": "086520", "name": "에코프로", "market": "KOSDAQ", "changes": 0, "chg_rate": 0.0},
             {"ticker": "247540", "name": "에코프로비엠", "market": "KOSDAQ", "changes": 0, "chg_rate": 0.0},
             {"ticker": "066970", "name": "엘앤에프", "market": "KOSDAQ", "changes": 0, "chg_rate": 0.0},
             {"ticker": "028300", "name": "HLB", "market": "KOSDAQ", "changes": 0, "chg_rate": 0.0},
@@ -151,6 +141,35 @@ def load_krx_stocks() -> pd.DataFrame:
             {"ticker": "000720", "name": "현대건설", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
             {"ticker": "008770", "name": "호텔신라", "market": "KOSPI", "changes": 0, "chg_rate": 0.0}
         ]
+        
+        # 실시간 야후 파이낸스 주가 업데이트 연동 (상승/하락 분리 고도화)
+        try:
+            import yfinance as yf
+            tickers_list = []
+            for s in minimal_stocks:
+                suffix = ".KS" if s["market"] == "KOSPI" else ".KQ"
+                tickers_list.append(f"{s['ticker']}{suffix}")
+            
+            # 5일 가격 데이터 초고속 배치 수집
+            tickers_str = " ".join(tickers_list)
+            data = yf.download(tickers_str, period="5d", interval="1d", progress=False)
+            
+            if "Close" in data:
+                close_data = data["Close"]
+                for s in minimal_stocks:
+                    suffix = ".KS" if s["market"] == "KOSPI" else ".KQ"
+                    full_ticker = f"{s['ticker']}{suffix}"
+                    if full_ticker in close_data:
+                        series = close_data[full_ticker].dropna()
+                        if len(series) >= 2:
+                            prev_price = float(series.iloc[-2])
+                            curr_price = float(series.iloc[-1])
+                            if prev_price > 0:
+                                s["changes"] = curr_price - prev_price
+                                s["chg_rate"] = ((curr_price - prev_price) / prev_price) * 100
+        except Exception:
+            pass
+            
         return pd.DataFrame(minimal_stocks)
 
 def filter_by_price_direction(df: pd.DataFrame, direction: str = "up") -> pd.DataFrame:
