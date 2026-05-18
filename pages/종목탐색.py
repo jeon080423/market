@@ -273,10 +273,24 @@ def render_youtube_rank_page():
             
     # Load from session state
     yt_data = st.session_state["youtube_data"]
+    mention_counts = yt_data.get("mention_counts", {})
+    
+    # 캐시/세션 상태 구조 자동 감지 및 갱신 세이프가드 (구버전 스키마 호환 해결)
+    is_old_schema = False
+    if mention_counts:
+        first_val = next(iter(mention_counts.values()), None)
+        if first_val is not None and not (isinstance(first_val, dict) and ("up" in first_val or "down" in first_val)):
+            is_old_schema = True
+            
+    if is_old_schema:
+        st.cache_data.clear()
+        if "youtube_data" in st.session_state:
+            del st.session_state["youtube_data"]
+        st.rerun()
+        
     all_videos = yt_data["all_videos"]
     subscriber_map = yt_data["subscriber_map"]
     video_channel_map = yt_data["video_channel_map"]
-    mention_counts = yt_data["mention_counts"]
     
     if not all_videos:
         st.warning("유튜브 채널에서 영상을 찾지 못했거나 데이터를 불러오는 데 실패했습니다.")
