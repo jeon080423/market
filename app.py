@@ -22,6 +22,7 @@ except Exception:
     pass
 
 from pages.종목탐색 import render_youtube_rank_page
+from pages.overheat import render_overheat_page
 
 # 1. 페이지 설정
 st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
@@ -229,6 +230,9 @@ st.markdown("""
         margin-bottom: 15px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
+    
+    /* 기본 사이드바 네비게이션 숨김 (중복 메뉴 방지) */
+    [data-testid="stSidebarNav"] {display: none;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -249,10 +253,16 @@ with st.sidebar:
     if st.button("📺 종목탐색", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
+    if st.button("🔥 과열 국면 시그널", use_container_width=True):
+        st.session_state["active_tab"] = "overheat_signal"
+        st.rerun()
 
-# 유튜브 랭킹 페이지 라우팅
+# 다른 페이지 라우팅
 if st.session_state["active_tab"] == "youtube_rank":
     render_youtube_rank_page()
+    st.stop()
+elif st.session_state["active_tab"] == "overheat_signal":
+    render_overheat_page()
     st.stop()
 
 # 3. 제목 및 설명
