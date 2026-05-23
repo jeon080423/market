@@ -153,51 +153,30 @@ def get_ai_analysis(prompt):
     
     return "⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다.\n\n잠시 후 다시 시도해 주세요."
 
-# AI 응답 정제 함수 (메타 텍스트 및 영문 노이즈 제거)
+# AI 응답 정제 함수 (최소한의 안전 필터만 적용)
 def clean_ai_output(text):
     if not text: return ""
     import re
     
-    # 1단계: <result> 태그가 있으면 안의 내용만 추출
+    # <result> 태그가 있으면 안의 내용만 추출, 없으면 전체 사용
     match = re.search(r'<result>(.*?)</result>', text, re.DOTALL | re.IGNORECASE)
     if match:
         text = match.group(1).strip()
     
-    # 2단계: "Draft N (Literal/Formal):", "Self-Correction:", "Here is" 등
-    #         AI의 사고 과정 헤더가 붙은 단락을 통째로 제거
-    text = re.sub(
-        r'(Draft\s*\d+\s*[\(\[].*?[\)\]]?\s*:.*?)(?=Draft\s*\d+|$)',
-        '', text, flags=re.DOTALL | re.IGNORECASE
-    )
-    text = re.sub(
-        r'(Self-Correction.*?)(?=\n[A-Z]|\Z)', '', text, flags=re.DOTALL | re.IGNORECASE
-    )
+    # AI가 "Draft 1 (Literal):..." 형태의 단락을 여러 개 뱉으면
+    # 마지막 단락만 사용 (가장 완성된 번역)
+    draft_positions = [m.start() for m in re.finditer(r'Draft\s*\d+', text, re.IGNORECASE)]
+    if len(draft_positions) >= 2:
+        text = text[draft_positions[-1]:]
+        text = re.sub(r'Draft\s*\d+[^:]*:\s*', '', text, count=1, flags=re.IGNORECASE)
+    elif len(draft_positions) == 1:
+        text = re.sub(r'Draft\s*\d+[^:]*:\s*', '', text, flags=re.IGNORECASE)
     
-    # 3단계: 줄 단위 필터링
-    lines = text.strip().split('\n')
-    filtered = []
-    for line in lines:
-        l = line.strip()
-        if not l:
-            continue
-        # 순수 영문만 있는 줄 제거 (영어 + 기호만, 한글 없음)
-        # 단, "1. 번역문" 형태처럼 숫자+점+한글은 통과
-        if not re.search('[가-힣]', l):
-            continue
-        # "Draft", "Literal", "Self-Correction", "Here is", "Note:" 로 시작하는 줄 제거
-        if re.match(r'^\s*(Draft|Literal|Self-Correction|Here is|Note:|Translation note)', l, re.IGNORECASE):
-            continue
-        # 마크다운 기호 제거
-        l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
-        if l:
-            filtered.append(l)
-    
-    result = '<br>'.join(filtered)
-    # 필터 후 완전히 비었으면 원본의 한글 문장이라도 추출해서 반환
-    if not result.strip():
-        korean_sentences = re.findall(r'[가-힣][^.!?\n]*[.!?]?', text)
-        result = ' '.join(korean_sentences).strip()
-    return result
+    # 마크다운 강조 기호만 제거하고 내용은 그대로 반환
+    text = text.replace('**', '').replace('##', '').replace('```', '').strip()
+    # 줄바꿈을 <br>로 변환하고 반환
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    return '<br>'.join(lines)
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -1091,24 +1070,22 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
-            prompt = f"""
-            Task: Translate the following English news headlines into professional Korean.
-            
-            CRITICAL RULES:
-            1. Provide EXACTLY one translated Korean headline for each English headline.
-            2. You MUST NOT include any conversational text, explanations, or thinking processes. 
-            3. You MUST output ONLY the final translated text inside <result>...</result> tags. NO preamble, NO postamble.
-            4. It is okay to use English for proper nouns (e.g., S&P 500, KOSPI) if they are more natural.
-            
-            Input Headlines:
-            {all_titles}
-            
-            Output format:
-            <result>
-            1. 첫번째 번역문
-            2. 두번째 번역문
-            </result>
-            """
+            prompt = f"""다음 영어 뉴스 헤드라인들을 전문적인 한국어로 번역해 주세요.
+
+규칙:
+- 각 헤드라인을 번호 순서대로 한 줄씩 번역하세요.
+- 번역문 외의 설명, 부연, 영어 원문 반복은 절대 하지 마세요.
+- 고유명사(기업명, 지수명 등)는 영어를 그대로 써도 됩니다.
+
+번역할 헤드라인:
+{all_titles}
+
+<result>
+1. 첫 번째 번역
+2. 두 번째 번역
+...
+</result>
+형식으로만 출력하세요."""
             summary_text = get_ai_analysis(prompt)
             clean_summary = clean_ai_output(summary_text)
             
@@ -1119,12 +1096,13 @@ if news_data and ai_news_container:
                     {clean_summary}
                 </div>
                 """, unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="ai-analysis-box">번역 결과를 불러오는 중 오류가 발생했습니다.</div>', unsafe_allow_html=True)
 
 # 1.5 트럼프 트윗 통합 번역
 if 'trump_data' in locals() and trump_data and ai_trump_container:
     with ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
-            all_trump_translated = []
             # 모든 트럼프 포스트를 하나로 합쳐서 단 한 번의 AI 호출로 처리
             all_t_text = "\n\n---\n\n".join([
                 f"{t.get('title', '')} {t.get('description', '')}".strip()
