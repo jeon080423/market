@@ -127,9 +127,10 @@ except Exception as e:
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
     # 우선순위 모델 리스트 (가장 빠르고 안정적인 최신 모델 위주로 배치)
+    # 최신 사용 가능한 모델 리스트로 업데이트 (2026년 기준)
     models = [
-        "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash",
-        "gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it", "gemini-pro"
+        "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", 
+        "gemini-pro-latest", "gemini-3.5-flash", "gemma-4-31b-it"
     ]
     
     for model_name in models:
@@ -143,7 +144,10 @@ def get_ai_analysis(prompt):
                 return "AI 응답 형식이 올바르지 않습니다."
             except Exception as e:
                 err_msg = str(e).lower()
-                # 429(Quota) 또는 500(Internal Server Error) 등의 경우 다음 모델로 전환 시도
+                if "quota" in err_msg or "429" in err_msg or "exhausted" in err_msg:
+                    return "⚠️ Gemini API 무료 사용량(Quota)을 모두 소진했습니다.\n\n내일 다시 시도하시거나, 구글 클라우드에서 결제 정보를 등록해 한도를 늘려주세요."
+                
+                # 500(Internal Server Error) 등의 경우 다음 모델로 전환 시도
                 if attempt < max_retries - 1:
                     time.sleep(1)
                     continue
