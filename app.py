@@ -127,7 +127,8 @@ except Exception as e:
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=86400) # cache for 1 day
 def get_supported_gemini_models():
-    default_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+    # gemini-2.0-flash 우선 (2.5-flash는 Thinking 모드로 느려서 제외)
+    default_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
     try:
         api_models = []
         for m in genai.list_models():
@@ -135,7 +136,7 @@ def get_supported_gemini_models():
                 model_name = m.name.replace('models/', '')
                 api_models.append(model_name)
         if api_models:
-            priority_list = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+            priority_list = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
             supported = [m for m in priority_list if m in api_models]
             supported += [m for m in api_models if m not in supported and ('vision' not in m.lower())]
             if supported:
@@ -154,7 +155,16 @@ def get_ai_analysis(prompt):
         for attempt in range(max_retries):
             try:
                 model = genai.GenerativeModel(model_name)
-                response = model.generate_content(prompt)
+                # gemini-2.5-flash는 thinking 모드를 끄서 빠르게 응답하도록 설정
+                if "2.5" in model_name:
+                    response = model.generate_content(
+                        prompt,
+                        generation_config=genai.GenerationConfig(
+                            thinking_config=genai.types.ThinkingConfig(thinking_budget=0)
+                        )
+                    )
+                else:
+                    response = model.generate_content(prompt)
                 if response and hasattr(response, 'text'):
                     return response.text
                 break
