@@ -1067,17 +1067,17 @@ if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
             prompt = f"""
-            Task: Translate the following English news titles into professional Korean.
+            Task: Translate the following English news headlines into professional Korean.
             Rules:
-            - Output ONLY the Korean translations.
-            - One line per translation.
-            - NO English, NO word definitions, NO explanations.
+            - Provide EXACTLY one translated Korean headline for each English headline.
+            - Output ONLY the Korean translations as a list starting with '- '.
+            - NO keywords, NO drafting, NO thinking process, NO English words.
+            - The number of output lines MUST exactly match the number of input headlines.
+            - Just output the final translated sentences.
             
-            Example:
-            Input: Fed signals rate cut in September.
-            Output: 연준이 9월 금리 인하 신호를 보냈습니다.
+            Input Headlines:
+            {all_titles}
             
-            Input: {all_titles}
             Output:
             """
             summary_text = get_ai_analysis(prompt)
