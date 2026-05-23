@@ -152,7 +152,7 @@ def get_ai_analysis(prompt):
                     # 다음 모델로 넘어감
                     break
     
-    return "현재 모든 AI 모델 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요."
+    return "⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다. 잠시 후 다시 시도해 주세요."
 
 # AI 응답 정제 함수 (메타 텍스트 및 영문 노이즈 제거)
 def clean_ai_output(text):
@@ -1097,22 +1097,26 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
             all_trump_translated = []
             for t in trump_data:
+                # 불필요한 공백이나 빈 텍스트 무시
+                t_text = f"{t.get('title', '')} {t.get('description', '')}".strip()
+                if len(t_text) < 10:
+                    continue
+                    
                 t_translate_prompt = f"""
-                Task: Translate the following social media post into one natural Korean paragraph.
+                Task: Translate the following social media post into ONE single natural Korean paragraph.
                 Rules:
                 - Output ONLY the Korean translation.
-                - NO vocabulary lists, NO definitions, NO English.
-                - Focus on the overall meaning as a sentence.
+                - NEVER output the original English text.
+                - Do NOT translate line by line (e.g., no "English -> Korean" format).
+                - Combine all sentences into one smooth Korean paragraph.
                 
-                Example Input: The economy is growing faster than ever. It's a great time for business.
-                Example Output: 경제가 그 어느 때보다 빠르게 성장하고 있습니다. 사업하기에 아주 좋은 시기입니다.
-                
-                Input: {t['title']}. {t['description']}
+                Input: {t_text}
                 Output:
                 """
                 t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
-                if t_clean:
+                # 에러 메시지가 섞여들어가는 것 방지
+                if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean:
                     all_trump_translated.append(f"- {t_clean}")
             
             if all_trump_translated:
