@@ -169,13 +169,15 @@ def clean_ai_output(text):
         if not l: continue
         # 한글이 포함되어 있지 않으면 제외
         if not re.search('[가-힣]', l): continue
-        # 어휘 설명 형태 ("단어": "뜻" 또는 "단어" - "뜻") 제외
-        # 문장이라면 보통 조사가 붙거나 길어짐.\n\n짧은 단어:뜻 형태는 제거.\n\nif re.search(r'^[*-]?\s*["\']?[a-zA-Z0-9\s]+["\']?\s*[:：-]\s*[가-힣\s]{1,15}$', l): continue
+        # "Self-Correction" 등 AI의 메타 인지 문장 제외
+        if "self-correction" in l.lower() or "here is" in l.lower() or "translation:" in l.lower(): continue
+        # 어휘 설명 형태 ("단어": "뜻" 또는 "단어" - "뜻") 제외 (짧은 단어:뜻 형태는 제거)
+        if re.search(r'^[*-]?\s*["\']?[a-zA-Z0-9\s]+["\']?\s*[:：-]\s*[가-힣\s]{1,15}$', l): continue
         # 불필요한 레이블 제거
         l = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과|진단|분석|요약|핵심|Para\s*\d+|[*-])\s*[:：-]?\s*', '', l, flags=re.IGNORECASE)
         l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
         if l: filtered.append(l)
-    return '<br>'.join(filtered)
+    return '<br><br>'.join(filtered)
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -507,9 +509,20 @@ def get_trump_feed():
             if title and title.startswith("[No Title]"): title = ""
             desc = re.sub(r'<[^>]+>', '', desc if desc else "").strip()
             
-            # 내용이 없거나 이미 똑같은 내용이 추가된 경우 건너뜀 (중복 방지)
+            # 내용이 없거나 이미 비슷한 내용(앞 40글자 일치)이 추가된 경우 건너뜀 (중복 방지)
             text_check = f"{title} {desc}".strip()
-            if not text_check or any(d['description'] == desc for d in feed_data):
+            if not text_check:
+                continue
+            
+            # 중복 검사 (앞 40글자가 같으면 동일 포스트로 간주)
+            is_duplicate = False
+            for d in feed_data:
+                existing_text = f"{d['title']} {d['description']}".strip()
+                if text_check[:40] == existing_text[:40]:
+                    is_duplicate = True
+                    break
+            
+            if is_duplicate:
                 continue
                 
             feed_data.append({"title": title.strip(), "description": desc})
@@ -1102,10 +1115,10 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
                 Task: Translate the following social media post into ONE single natural Korean paragraph.
                 
                 CRITICAL RULES:
-                1. Output ONLY the Korean translation.
-                2. NEVER output the original English text.
-                3. You MUST NOT include any conversational text, explanations, or thinking processes.
-                4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
+                1. 당신의 응답은 **무조건** 번역된 한국어 문장으로만 시작하고 끝나야 합니다.
+                2. 영어 원문 복사, 번역 과정에 대한 설명(Self-Correction 등), 부연 설명은 일절 금지합니다.
+                3. 반드시 한국어로만 작성하세요. (단, 고유명사는 영어 허용)
+                4. 리스트 기호(-, *) 없이 순수 텍스트 문단 1개만 출력하세요.
                 
                 Input: {t_text}
                 
