@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import FinanceDataReader as fdr
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import google.generativeai as genai
@@ -21,22 +22,36 @@ def render_overheat_page():
         
         # KODEX 200 (시총가중) vs KODEX 200 동일가중
         # 반도체 주도주 (삼성전자, SK하이닉스) vs 타 섹터 (KODEX 자동차)
-        tickers = ['069500.KS', '201590.KS', '005930.KS', '000660.KS', '091180.KS']
+        tickers_map = {
+            '069500.KS': '069500',
+            '201590.KS': '201590',
+            '005930.KS': '005930',
+            '000660.KS': '000660',
+            '091180.KS': '091180'
+        }
+        
         try:
-            raw_data = yf.download(tickers, start=start_date, end=end_date)
-            if isinstance(raw_data.columns, pd.MultiIndex):
-                if 'Close' in raw_data.columns.levels[0]:
-                    df = raw_data['Close']
-                else:
-                    df = raw_data.xs('Close', axis=1, level=0)
-            elif 'Close' in raw_data.columns:
-                df = raw_data[['Close']]
+            df_list = []
+            for col_name, fdr_ticker in tickers_map.items():
+                try:
+                    temp_df = fdr.DataReader(fdr_ticker, start_date, end_date)
+                    if not temp_df.empty:
+                        temp_df = temp_df[['Close']].rename(columns={'Close': col_name})
+                        df_list.append(temp_df)
+                except Exception:
+                    pass
+                    
+            if df_list:
+                df = pd.concat(df_list, axis=1)
+                for col in tickers_map.keys():
+                    if col not in df.columns:
+                        df[col] = pd.NA
+                return df
             else:
-                df = raw_data
-            return df
+                return pd.DataFrame(columns=list(tickers_map.keys()))
         except Exception as e:
             st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
-            return pd.DataFrame(columns=tickers)
+            return pd.DataFrame(columns=list(tickers_map.keys()))
 
     with st.spinner("데이터를 불러오는 중입니다..."):
         df = get_overheat_data()
@@ -145,7 +160,10 @@ def render_overheat_page():
 단, 한두 달의 짧은 이격만으로 시장을 섣불리 과열로 단정 짓지 말고 균형 잡힌 시각을 유지하며, 결론을 3~4문장으로 요약해주세요.
 마크다운 포맷을 사용하여 핵심 내용을 강조해주세요.
 """
-        models = ["gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it"]
+        models = [
+            "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash",
+            "gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it", "gemini-pro"
+        ]
         for model_name in models:
             for attempt in range(2):
                 try:
