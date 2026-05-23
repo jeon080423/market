@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import FinanceDataReader as fdr
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import google.generativeai as genai
 import time
 
@@ -394,7 +394,6 @@ def render_overheat_page():
     # 구글 시트 캐시 연동
     sheet_id = st.secrets.get("gsheet", {}).get("sheet_id") or st.secrets.get("sheet_id")
     from utils.ai_gsheet_cache import load_ai_cache, save_ai_cache, should_update_ai, is_data_changed_significantly
-    from datetime import datetime, timezone, timedelta
     
     KST = timezone(timedelta(hours=9))
 
