@@ -194,48 +194,89 @@ def render_youtube_rank_page():
     # API 키 체크
     if not get_youtube_api_key():
         st.error("⚠️ YouTube API 키가 설정되지 않았습니다.\n\n`.streamlit/secrets.toml`에 `YOUTUBE_API_KEY`를 등록해주세요.")
-        st.info("""
-        **설정 방법:**
-        `.streamlit/secrets.toml` 파일을 열고 다음과 같이 작성해주세요.\n\n```toml
-        YOUTUBE_API_KEY = "발급받은_유튜브_데이터_API_키"
-        ```
-        """)
         return
+
+    # 구글 시트 캐시 유틸 임포트
+    try:
+        from utils.gsheet_cache import load_youtube_cache_from_sheet, save_youtube_cache_to_sheet, should_crawl_now
+        from utils.gsheet_cache import KST
+        import streamlit as st_inner
+        sheet_id = st.secrets.get("gsheet", {}).get("sheet_id") or st.secrets.get("SHEET_ID", "")
+        gsheet_available = bool(sheet_id)
+    except Exception:
+        gsheet_available = False
+        sheet_id = ""
         
-    # 상단 새로고침 및 마지막 업데이트 시각
+    # ─────────────────────────────────────────────
+    # 상단 버튼 / 마지막 업데이트 표시
+    # ─────────────────────────────────────────────
     col_refresh, col_time = st.columns([1.5, 5])
     with col_refresh:
-        if st.button("🔄 유튜브 데이터 갱신", use_container_width=True):
-            # Clear cache and session data
-            st.cache_data.clear()
-            if "youtube_data" in st.session_state:
-                del st.session_state["youtube_data"]
-            if "youtube_quota_exceeded" in st.session_state:
-                del st.session_state["youtube_quota_exceeded"]
-            st.rerun()
-            
+        force_refresh = st.button("🔄 지금 즉시 갱신", use_container_width=True,
+                                   help="구글 시트 캐시를 무시하고 유튜브 API를 즉시 재호출합니다.")
     with col_time:
-        last_updated = st.session_state.get("youtube_last_updated", "미조회")
-        st.markdown(f"<div style='padding-top: 5px; color: gray;'>마지막 업데이트 시각: <b>{last_updated}</b></div>", unsafe_allow_html=True)
-        
-    # API Quota Exceeded handling
+        last_updated = st.session_state.get("youtube_last_updated", "")
+        if last_updated:
+            st.markdown(f"<div style='padding-top:5px;color:gray;'>마지막 업데이트: <b>{last_updated}</b></div>", unsafe_allow_html=True)
+
     if st.session_state.get("youtube_quota_exceeded", False):
         st.warning("⚠️ 유튜브 API 일일 호출 할당량이 초과되었습니다.\n\n현재 화면에는 캐시된 기존 데이터가 표시됩니다.")
 
-    # 1시간 TTL 캐싱 데이터 로딩
-    if "youtube_data" not in st.session_state:
-        with st.spinner("유튜브 채널 데이터 수집 및 분석 중..."):
+    # ─────────────────────────────────────────────
+    # 1단계: 구글 시트에서 직전 저장 데이터 즉시 로드
+    # ─────────────────────────────────────────────
+    cached_data, cached_saved_at = None, None
+    if gsheet_available and "youtube_data" not in st.session_state:
+        with st.spinner("📂 구글 시트에서 이전 데이터를 불러오는 중..."):
+            cached_data, cached_saved_at = load_youtube_cache_from_sheet(sheet_id)
+        if cached_data:
+            st.session_state["youtube_data"] = cached_data
+            st.session_state["youtube_last_updated"] = cached_saved_at + " (시트 캐시)"
+            st.info(f"📋 구글 시트 캐시 데이터를 표시합니다. (저장 시각: {cached_saved_at})")
+
+    # ─────────────────────────────────────────────
+    # 2단계: 오늘 아직 크롤링을 안 했거나 강제 갱신이면 실제 API 호출
+    # ─────────────────────────────────────────────
+    need_crawl = force_refresh or (
+        gsheet_available and should_crawl_now(sheet_id)
+    ) or (
+        not gsheet_available and "youtube_data" not in st.session_state
+    )
+
+    if need_crawl:
+        if "youtube_data" in st.session_state:
+            st.info("🔄 백그라운드에서 오늘의 최신 데이터를 크롤링하여 업데이트합니다...")
+        with st.spinner("📡 유튜브 채널 데이터 수집 및 분석 중... (최초 1분 내외 소요)"):
             all_videos, subscriber_map, video_channel_map, mention_counts = load_and_process_youtube_data()
-            
-            # Save in session state
-            st.session_state["youtube_data"] = {
+
+        if all_videos:
+            new_data = {
                 "all_videos": all_videos,
                 "subscriber_map": subscriber_map,
                 "video_channel_map": video_channel_map,
                 "mention_counts": mention_counts
             }
-            st.session_state["youtube_last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+            st.session_state["youtube_data"] = new_data
+            now_kst_str = datetime.now(KST).strftime("%Y-%m-%d %H:%M KST")
+            st.session_state["youtube_last_updated"] = now_kst_str
+
+            # 구글 시트에 저장
+            if gsheet_available:
+                with st.spinner("💾 구글 시트에 결과 저장 중..."):
+                    ok = save_youtube_cache_to_sheet(sheet_id, new_data)
+                if ok:
+                    st.success(f"✅ 최신 데이터를 구글 시트에 저장했습니다. ({now_kst_str})")
+                else:
+                    st.warning("⚠️ 구글 시트 저장에 실패했습니다. (세션 내 메모리에만 유지)")
+            st.rerun()
+
+    # ─────────────────────────────────────────────
+    # 3단계: 최종 데이터 없으면 안내 후 종료
+    # ─────────────────────────────────────────────
+    if "youtube_data" not in st.session_state:
+        st.warning("유튜브 채널에서 영상을 찾지 못했거나 데이터를 불러오는 데 실패했습니다.")
+        return
+
     # Load from session state
     yt_data = st.session_state["youtube_data"]
     all_videos = yt_data["all_videos"]
@@ -246,6 +287,7 @@ def render_youtube_rank_page():
     if not all_videos:
         st.warning("유튜브 채널에서 영상을 찾지 못했거나 데이터를 불러오는 데 실패했습니다.")
         return
+
 
     # 종목 데이터 로드
     stock_df = load_krx_stocks()

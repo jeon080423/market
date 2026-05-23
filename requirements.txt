@@ -9,3 +9,4 @@ google-generativeai
 streamlit-autorefresh
 youtube-transcript-api
 finance-datareader
+gspread
