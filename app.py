@@ -750,11 +750,11 @@ try:
     with c_guide: 
         st.markdown('<p class="guide-header">💡 예측 지수 활용 가이드 (1주일 선행)</p>', unsafe_allow_html=True)
         st.markdown("""
-        <div class="guide-text">
-        0-40 (Growth): <b>수익 극대화 구간</b>. 다음 주 상방 압력이 높습니다. 주도주 위주의 공격적 포트폴리오 운용이 유효합니다.<br><br>
-        40-60 (Ready): <b>변동성 대비 구간</b>. 다음 주 중립 국면이 예상됩니다. 과도한 추가 매수는 지양하고 현금을 일부 확보하세요.<br><br>
-        60-80 (Caution): <b>선제적 방어 구간</b>. 1주일 내 하락 경보가 감지됩니다. 주식 비중을 50% 이하로 축소하고 리스크 관리에 집중하세요.<br><br>
-        80-100 (Panic): <b>비상 탈출 구간</b>. 다음 주 강력한 시장 충격이 예견됩니다. 주식 비중을 최소화하고 자산 보존을 최우선으로 하세요.
+        <div class="guide-text" style="line-height: 1.5;">
+        <p style="margin-bottom: 10px;">0-40 (Growth): <b>수익 극대화 구간</b>. 다음 주 상방 압력이 높습니다. 주도주 위주의 공격적 포트폴리오 운용이 유효합니다.</p>
+        <p style="margin-bottom: 10px;">40-60 (Ready): <b>변동성 대비 구간</b>. 다음 주 중립 국면이 예상됩니다. 과도한 추가 매수는 지양하고 현금을 일부 확보하세요.</p>
+        <p style="margin-bottom: 10px;">60-80 (Caution): <b>선제적 방어 구간</b>. 1주일 내 하락 경보가 감지됩니다. 주식 비중을 50% 이하로 축소하고 리스크 관리에 집중하세요.</p>
+        <p style="margin-bottom: 0;">80-100 (Panic): <b>비상 탈출 구간</b>. 다음 주 강력한 시장 충격이 예견됩니다. 주식 비중을 최소화하고 자산 보존을 최우선으로 하세요.</p>
         </div>
         """, unsafe_allow_html=True)
         
