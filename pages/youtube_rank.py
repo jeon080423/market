@@ -26,12 +26,9 @@ def process_single_video(video: dict, stock_list: list[dict]) -> tuple[str, dict
     # 1. 자막 수집
     transcript = get_video_transcript(video_id)
     
-    # 2. 언급 카운트
-    if transcript:
-        mentions = count_stock_mentions(transcript, stock_list)
-    else:
-        # 폴백: 영상 제목 검색
-        mentions = count_stock_mentions(video["title"], stock_list)
+    # 2. 언급 카운트 (제목과 자막을 병합하여 분석)
+    combined_text = video.get("title", "") + " " + (transcript if transcript else "")
+    mentions = count_stock_mentions(combined_text, stock_list)
         
     return video_id, mentions
 
@@ -121,10 +118,10 @@ def load_and_process_youtube_data():
     all_videos = []
     video_ids_seen = set()
     
-    # KR 채널 검색 (max_results=5로 쿼터 절약)
+    # KR 채널 검색 (max_results=50으로 여유 있게 확보)
     progress_text.text("📺 한국 유튜브 채널 검색 중...")
     for idx, query in enumerate(kr_queries):
-        v_list = search_youtube_videos(query, published_after, region_code="KR", max_results=5)
+        v_list = search_youtube_videos(query, published_after, region_code="KR", max_results=50)
         for v in v_list:
             if v["video_id"] not in video_ids_seen:
                 video_ids_seen.add(v["video_id"])
@@ -135,7 +132,7 @@ def load_and_process_youtube_data():
     # US 채널 검색
     progress_text.text("📺 미국 유튜브 채널 검색 중...")
     for idx, query in enumerate(us_queries):
-        v_list = search_youtube_videos(query, published_after, region_code="US", max_results=5)
+        v_list = search_youtube_videos(query, published_after, region_code="US", max_results=50)
         for v in v_list:
             if v["video_id"] not in video_ids_seen:
                 video_ids_seen.add(v["video_id"])
@@ -152,6 +149,14 @@ def load_and_process_youtube_data():
     progress_text.text("📈 채널 구독자 수 정보 조회 중...")
     channel_ids_tuple = tuple(set(v["channel_id"] for v in all_videos))
     subscriber_map = get_channel_subscribers(channel_ids_tuple)
+    
+    # 2.5 가입자(구독자) 기준 Top 20 채널 필터링
+    sorted_channels = sorted(subscriber_map.items(), key=lambda x: x[1], reverse=True)
+    top_20_channel_ids = set([cid for cid, sub_count in sorted_channels[:20]])
+    
+    # Top 20 채널에 속한 영상만 필터링하여 분석 대상 최소화 (API 최적화)
+    filtered_videos = [v for v in all_videos if v["channel_id"] in top_20_channel_ids]
+    
     progress_bar.progress(0.3)
     
     # 3. 자막 분석 및 종목 언급 카운팅 (병렬 실행)
@@ -159,11 +164,11 @@ def load_and_process_youtube_data():
     mention_counts = {}
     video_channel_map = {}
     
-    total_v = len(all_videos)
+    total_v = len(filtered_videos)
     processed_count = 0
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(process_single_video, v, stock_list): v for v in all_videos}
+        futures = {executor.submit(process_single_video, v, stock_list): v for v in filtered_videos}
         
         for future in concurrent.futures.as_completed(futures):
             processed_count += 1
