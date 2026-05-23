@@ -1070,22 +1070,14 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 if news_data and ai_news_container:
     with ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
-            prompt = f"""다음 영어 뉴스 헤드라인들을 전문적인 한국어로 번역해 주세요.
+            prompt = f"""다음 영어 뉴스 헤드라인들을 전문적인 한국어로 번역하세요. 번역문만 번호와 함께 출력하세요. 설명이나 원문 반복은 금지입니다. 고유명사는 영어 가능.
 
-규칙:
-- 각 헤드라인을 번호 순서대로 한 줄씩 번역하세요.
-- 번역문 외의 설명, 부연, 영어 원문 반복은 절대 하지 마세요.
-- 고유명사(기업명, 지수명 등)는 영어를 그대로 써도 됩니다.
-
-번역할 헤드라인:
 {all_titles}
 
+반드시 아래 형식으로만 출력:
 <result>
-1. 첫 번째 번역
-2. 두 번째 번역
-...
-</result>
-형식으로만 출력하세요."""
+(각 헤드라인의 한국어 번역을 번호 순으로)
+</result>"""
             summary_text = get_ai_analysis(prompt)
             clean_summary = clean_ai_output(summary_text)
             
@@ -1111,25 +1103,14 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
             ])
             
             if all_t_text:
-                t_translate_prompt = f"""
-                다음은 도널드 트럼프의 소셜 미디어(Truth Social) 게시물입니다.
-                아래 내용을 **자연스러운 한국어**로 번역하여 하나의 완성된 요약 단락으로 작성해 주세요.
-                
-                절대 금지 사항:
-                - 영어 원문을 그대로 복사하거나 인용(따옴표 포함)하는 것
-                - "Draft", "Literal", "Self-Correction" 등의 메타 텍스트 출력
-                - 번역 과정이나 설명 출력
-                - 화살표(->) 사용
-                - 불릿 기호(-, *) 사용
-                
-                원문:
-                {all_t_text}
-                
-                출력 형식:
-                <result>
-                한국어로 번역된 내용을 자연스럽게 연결한 하나의 단락
-                </result>
-                """
+                t_translate_prompt = f"""다음 영어 게시물을 자연스러운 한국어 단락으로 번역하세요. 영어 원문 인용, 설명, 메타 텍스트는 일절 금지. 번역 결과만 출력.
+
+{all_t_text}
+
+반드시 아래 형식으로만 출력:
+<result>
+(한국어 번역 단락)
+</result>"""
                 t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
                 
@@ -1176,18 +1157,15 @@ if ai_indicator_container:
     with ai_indicator_container:
         with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
             with st.spinner("지표 데이터를 분석 중..."):
-                ai_desc_prompt = f"""
-                Task: 분석용 지표 데이터를 바탕으로 현재 한국 증시(KOSPI) 상황을 진단하세요.\n\n데이터: {latest_data_summary}
-                
-                CRITICAL RULES:
-                1. Output ONLY the final Korean analysis.
-                2. You MUST NOT include any conversational text, explanations, or thinking processes.
-                3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
-                
-                Output format:
-                <result>
-                첫 번째 문단: 주어진 데이터의 현재 상태와 움직임을 요약한 2문장.\n\n두 번째 문단: 이를 종합한 현재 시장 진단 및 투자자 주의사항을 담은 2문장.\n\n</result>
-                """
+                ai_desc_prompt = f"""아래 시장 지표 데이터를 분석하여 현재 한국 증시(KOSPI) 상황을 한국어로 진단하세요. 영단어, 한자, 마크다운 기호 사용 금지. 설명 없이 분석 결과만 출력.
+
+데이터:
+{latest_data_summary}
+
+반드시 아래 형식으로만 출력:
+<result>
+(현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
+</result>"""
                 analysis_output = get_ai_analysis(ai_desc_prompt)
                 clean_indicator = clean_ai_output(analysis_output)
                 st.markdown(f"""
