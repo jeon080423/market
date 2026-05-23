@@ -188,18 +188,16 @@ def load_and_process_youtube_data():
 def render_youtube_rank_page():
     st.title("📺 유튜브 기반 증시 종목 언급량 탐색")
     st.markdown("""
-    이 탭은 한국/미국 주식 관련 유튜브 채널의 최근 업로드된 영상 자막(및 제목)을 분석하여 **가장 많이 언급된 종목 순위**를 표시합니다.
-    * **가중치 점수**: 각 종목 언급 횟수 $\times \log_{10}(\text{채널 구독자 수} + 1)$ 의 합산 점수입니다 (대형 채널의 독점을 방지하고, 영향력을 합리적으로 반영).
+    이 탭은 한국/미국 주식 관련 유튜브 채널의 최근 업로드된 영상 자막(및 제목)을 분석하여 **가장 많이 언급된 종목 순위**를 표시합니다.\n\n* **가중치 점수**: 각 종목 언급 횟수 $\times \log_{10}(\text{채널 구독자 수} + 1)$ 의 합산 점수입니다 (대형 채널의 독점을 방지하고, 영향력을 합리적으로 반영).
     """)
     st.markdown("---")
     
     # API 키 체크
     if not get_youtube_api_key():
-        st.error("⚠️ YouTube API 키가 설정되지 않았습니다. `.streamlit/secrets.toml`에 `YOUTUBE_API_KEY`를 등록해주세요.")
+        st.error("⚠️ YouTube API 키가 설정되지 않았습니다.\n\n`.streamlit/secrets.toml`에 `YOUTUBE_API_KEY`를 등록해주세요.")
         st.info("""
         **설정 방법:**
-        `.streamlit/secrets.toml` 파일을 열고 다음과 같이 작성해주세요.
-        ```toml
+        `.streamlit/secrets.toml` 파일을 열고 다음과 같이 작성해주세요.\n\n```toml
         YOUTUBE_API_KEY = "발급받은_유튜브_데이터_API_키"
         ```
         """)
@@ -223,7 +221,7 @@ def render_youtube_rank_page():
         
     # API Quota Exceeded handling
     if st.session_state.get("youtube_quota_exceeded", False):
-        st.warning("⚠️ 유튜브 API 일일 호출 할당량이 초과되었습니다. 현재 화면에는 캐시된 기존 데이터가 표시됩니다.")
+        st.warning("⚠️ 유튜브 API 일일 호출 할당량이 초과되었습니다.\n\n현재 화면에는 캐시된 기존 데이터가 표시됩니다.")
 
     # 1시간 TTL 캐싱 데이터 로딩
     if "youtube_data" not in st.session_state:

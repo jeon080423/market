@@ -83,8 +83,7 @@ def check_secrets():
             (대소문자 오타나 `[section]` 형식이 맞지 않을 수 있습니다.)
             
             ### 해결 방법
-            1.  **Streamlit Cloud** 대시보드의 **Settings > Secrets**에서 아래 내용을 참고하여 설정을 수정해 보세요.
-            """)
+            1.  **Streamlit Cloud** 대시보드의 **Settings > Secrets**에서 아래 내용을 참고하여 설정을 수정해 보세요.\n\n""")
             
             st.code(f"""
 [news_api]
@@ -152,7 +151,7 @@ def get_ai_analysis(prompt):
                     # 다음 모델로 넘어감
                     break
     
-    return "⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다. 잠시 후 다시 시도해 주세요."
+    return "⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다.\n\n잠시 후 다시 시도해 주세요."
 
 # AI 응답 정제 함수 (메타 텍스트 및 영문 노이즈 제거)
 def clean_ai_output(text):
@@ -171,8 +170,7 @@ def clean_ai_output(text):
         # 한글이 포함되어 있지 않으면 제외
         if not re.search('[가-힣]', l): continue
         # 어휘 설명 형태 ("단어": "뜻" 또는 "단어" - "뜻") 제외
-        # 문장이라면 보통 조사가 붙거나 길어짐. 짧은 단어:뜻 형태는 제거.
-        if re.search(r'^[*-]?\s*["\']?[a-zA-Z0-9\s]+["\']?\s*[:：-]\s*[가-힣\s]{1,15}$', l): continue
+        # 문장이라면 보통 조사가 붙거나 길어짐.\n\n짧은 단어:뜻 형태는 제거.\n\nif re.search(r'^[*-]?\s*["\']?[a-zA-Z0-9\s]+["\']?\s*[:：-]\s*[가-힣\s]{1,15}$', l): continue
         # 불필요한 레이블 제거
         l = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과|진단|분석|요약|핵심|Para\s*\d+|[*-])\s*[:：-]?\s*', '', l, flags=re.IGNORECASE)
         l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
@@ -277,8 +275,7 @@ elif st.session_state["active_tab"] == "overheat_signal":
 # 3. 제목 및 설명
 st.title("KOSPI 예측적 위험 모니터링 (1주일 선행)")
 st.markdown(f"""
-이 대시보드는 글로벌 거시 지표를 활용하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험을 예측합니다.
-(최종 분석 시각: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
+이 대시보드는 글로벌 거시 지표를 활용하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험을 예측합니다.\n\n(최종 분석 시각: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
 """)
 st.markdown("---")
 
@@ -286,34 +283,22 @@ st.markdown("---")
 with st.expander("📖 지수 가이드북"):
     st.subheader("1. 지수 산출 핵심 지표 (Core Indicators)")
     st.write("""
-    본 모델의 지표들은 KOSPI와의 **통계적 상관관계** 및 **하락 선행성**을 기준으로 선정되었습니다.
-    * **글로벌 리스크**: 미국 **S&P 500 지수**를 활용하며, 한국 증시와의 강력한 동조화 경향을 반영합니다.
-    * **통화 및 유동성**: **원/달러 환율** 및 **달러 인덱스(DXY)** 를 통해 외국인 자본 유출 압력을 측정합니다.
-    * **시장 심리**: **VIX(공포 지수)** 를 통해 투자자의 불안 심리와 변동성 전조를 파악합니다.
-    * **실물 경제**: 경기 선행 지표인 **구리 가격(Copper)** 과 **장단기 금리차**를 포함합니다.
-    """)
+    본 모델의 지표들은 KOSPI와의 **통계적 상관관계** 및 **하락 선행성**을 기준으로 선정되었습니다.\n\n* **글로벌 리스크**: 미국 **S&P 500 지수**를 활용하며, 한국 증시와의 강력한 동조화 경향을 반영합니다.\n\n* **통화 및 유동성**: **원/달러 환율** 및 **달러 인덱스(DXY)** 를 통해 외국인 자본 유출 압력을 측정합니다.\n\n* **시장 심리**: **VIX(공포 지수)** 를 통해 투자자의 불안 심리와 변동성 전조를 파악합니다.\n\n* **실물 경제**: 경기 선행 지표인 **구리 가격(Copper)** 과 **장단기 금리차**를 포함합니다.\n\n""")
     
     st.divider()
 
     st.subheader("2. 예측적 선행 알고리즘 (Predictive Lead Intelligence)")
     st.markdown("#### **① 1주일 선행 상관 분석 (5-10 Days Predictive Lead)**")
     st.write("""
-    * **선행성 강제화**: 본 모델은 모든 지표와 KOSPI 간의 시차를 **최소 5일에서 최대 12일** 범위에서 탐색합니다. 이는 현재의 지표 변화가 최소 1주일 뒤의 증시에 미치는 영향을 추정하기 위함입니다.
-    * **동시성 배제**: 당일의 시장 등락에 의한 '사후 설명'을 배제하고, 순수하게 미래의 리스크 전조를 포착하는 데 집중합니다.
-    """)
+    * **선행성 강제화**: 본 모델은 모든 지표와 KOSPI 간의 시차를 **최소 5일에서 최대 12일** 범위에서 탐색합니다.\n\n이는 현재의 지표 변화가 최소 1주일 뒤의 증시에 미치는 영향을 추정하기 위함입니다.\n\n* **동시성 배제**: 당일의 시장 등락에 의한 '사후 설명'을 배제하고, 순수하게 미래의 리스크 전조를 포착하는 데 집중합니다.\n\n""")
     
     st.markdown("#### **② 하이브리드 정규화 및 볼록성 (Hybrid Normalization & Convexity)**")
     st.write("""
-    * **시그모이드 정규화**: Z-Score(표준점수)를 시그모이드 함수에 통과시켜 0~100 사이로 변환합니다. 이는 극단적인 이상치(Black Swan) 발생 시 지수가 상한선에 막혀 변동을 포착하지 못하는 문제를 해결합니다.
-    * **위험 볼록성(Convexity)**: 시장의 공포는 선형적으로 증가하지 않습니다. 본 모델은 지수함수적 가중치를 적용하여, 위험 지수가 70점을 넘어서는 국면에서 더욱 민감하고 빠르게 반응하도록 설계되었습니다.
-    """)
+    * **시그모이드 정규화**: Z-Score(표준점수)를 시그모이드 함수에 통과시켜 0~100 사이로 변환합니다.\n\n이는 극단적인 이상치(Black Swan) 발생 시 지수가 상한선에 막혀 변동을 포착하지 못하는 문제를 해결합니다.\n\n* **위험 볼록성(Convexity)**: 시장의 공포는 선형적으로 증가하지 않습니다.\n\n본 모델은 지수함수적 가중치를 적용하여, 위험 지수가 70점을 넘어서는 국면에서 더욱 민감하고 빠르게 반응하도록 설계되었습니다.\n\n""")
     
     st.markdown("#### **③ 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)**")
     st.write("""
-    * **안전자산 및 공포 심리 급등 감지**: 전쟁, 금융위기 등 블랙스완 발생 시 가장 먼저 반응하는 **금(Gold), 스위스 프랑(CHF), 엔/원 환율, VVIX(공포 변동성)** 지표의 최근 5일 이상 급등세를 모니터링합니다.
-    * **뉴스 공포 키워드 밀집도**: 글로벌 뉴스 헤드라인에서 'War', 'Bankrupt', 'Default' 등 치명적 키워드 발생 빈도를 실시간으로 추적합니다.
-    * **위험 지수 강제 오버라이딩**: 위 지표들이 동시다발적으로 임계치를 돌파하면, 기존 거시 지표 기반의 위험 점수를 무시하고 **최종 위험 지수를 강제로 상향(Panic Override)** 시켜 즉각적인 경보를 발송합니다.
-    """)
+    * **안전자산 및 공포 심리 급등 감지**: 전쟁, 금융위기 등 블랙스완 발생 시 가장 먼저 반응하는 **금(Gold), 스위스 프랑(CHF), 엔/원 환율, VVIX(공포 변동성)** 지표의 최근 5일 이상 급등세를 모니터링합니다.\n\n* **뉴스 공포 키워드 밀집도**: 글로벌 뉴스 헤드라인에서 'War', 'Bankrupt', 'Default' 등 치명적 키워드 발생 빈도를 실시간으로 추적합니다.\n\n* **위험 지수 강제 오버라이딩**: 위 지표들이 동시다발적으로 임계치를 돌파하면, 기존 거시 지표 기반의 위험 점수를 무시하고 **최종 위험 지수를 강제로 상향(Panic Override)** 시켜 즉각적인 경보를 발송합니다.\n\n""")
     
     st.markdown("#### **④ 요약**")
     st.info("본 모델은 통계적 정상성을 확보한 수익률 기반 분석과 이상치에 강건한 시그모이드 정규화를 통해 **구조적 위험**을 선행 포착하며, 동시에 실시간 패닉 감지 모듈을 통해 **돌발적 블랙스완**에도 즉각 대응할 수 있는 **하이브리드 조기 경보 시스템**입니다.")
@@ -673,15 +658,10 @@ try:
 
     with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
         st.caption("""
-        본 모델은 **1주일 선행 수익률 분석(Lagged Return Forecasting)** 기법을 사용합니다.
-        
-        1. **미래 예측성 강제 (Lead Time Enforcement)**:
-            모든 지표에 대해 **5~12거래일 전**의 선행 데이터만 사용하여 KOSPI 수익률과의 관계를 정의합니다.
-        2. **수익률 기반 상관 관계**:
-            지수 수준(Level)이 아닌 변동성(Return)을 분석하여 지표의 '전조 현상'을 통계적으로 입증합니다.
-        3. **실시간 미래 위험 투사**:
-            오늘의 지표값을 위에서 도출된 '미래 전조 가중치'에 대입하여, **다음 주 시장의 잠재적 리스크**를 산출합니다.
-        """)
+        본 모델은 **1주일 선행 수익률 분석(Lagged Return Forecasting)** 기법을 사용합니다.\n\n1. **미래 예측성 강제 (Lead Time Enforcement)**:
+            모든 지표에 대해 **5~12거래일 전**의 선행 데이터만 사용하여 KOSPI 수익률과의 관계를 정의합니다.\n\n2. **수익률 기반 상관 관계**:
+            지수 수준(Level)이 아닌 변동성(Return)을 분석하여 지표의 '전조 현상'을 통계적으로 입증합니다.\n\n3. **실시간 미래 위험 투사**:
+            오늘의 지표값을 위에서 도출된 '미래 전조 가중치'에 대입하여, **다음 주 시장의 잠재적 리스크**를 산출합니다.\n\n""")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔒 관리자 모드")
@@ -771,19 +751,15 @@ try:
         st.markdown('<p class="guide-header">💡 예측 지수 활용 가이드 (1주일 선행)</p>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="guide-text">
-        0-40 (Growth): <b>수익 극대화 구간</b>. 다음 주 상방 압력이 높습니다. 주도주 위주의 공격적 포트폴리오 운용이 유효합니다.
-        <br>
-        40-60 (Ready): <b>변동성 대비 구간</b>. 다음 주 중립 국면이 예상됩니다. 과도한 추가 매수는 지양하고 현금을 일부 확보하세요.
-        <br>
-        60-80 (Caution): <b>선제적 방어 구간</b>. 1주일 내 하락 경보가 감지됩니다. 주식 비중을 50% 이하로 축소하고 리스크 관리에 집중하세요.
-        <br>
-        80-100 (Panic): <b>비상 탈출 구간</b>. 다음 주 강력한 시장 충격이 예견됩니다. 주식 비중을 최소화하고 자산 보존을 최우선으로 하세요.
-        </div>
+        0-40 (Growth): <b>수익 극대화 구간</b>. 다음 주 상방 압력이 높습니다.\n\n주도주 위주의 공격적 포트폴리오 운용이 유효합니다.\n\n<br>
+        40-60 (Ready): <b>변동성 대비 구간</b>. 다음 주 중립 국면이 예상됩니다.\n\n과도한 추가 매수는 지양하고 현금을 일부 확보하세요.\n\n<br>
+        60-80 (Caution): <b>선제적 방어 구간</b>. 1주일 내 하락 경보가 감지됩니다.\n\n주식 비중을 50% 이하로 축소하고 리스크 관리에 집중하세요.\n\n<br>
+        80-100 (Panic): <b>비상 탈출 구간</b>. 다음 주 강력한 시장 충격이 예견됩니다.\n\n주식 비중을 최소화하고 자산 보존을 최우선으로 하세요.\n\n</div>
         """, unsafe_allow_html=True)
         
         # [신규] 패닉 경보 배너 표시
         if final_panic_score > 60 and final_panic_score > base_risk:
-            st.error(f"🚨 **[긴급: 실시간 패닉 이벤트 확률 상승]** 🚨\n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다. (기초 위험 점수: {base_risk:.1f} ➔ **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
+            st.error(f"🚨 **[긴급: 실시간 패닉 이벤트 확률 상승]** 🚨\n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다.\n\n(기초 위험 점수: {base_risk:.1f} ➔ **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
 
         # 좋아요 기능 레이아웃 개선
         if 'likes' not in st.session_state:
@@ -840,7 +816,7 @@ try:
         
         # 뉴스 기반 공포 심리 경보
         if 'news_panic_count' in locals() and news_panic_count >= 2:
-            st.error(f"🚨 **[주의] 뉴스 공포 심리 확산 감지**\n\n최근 24시간 내 시장 헤드라인에서 치명적 위험 키워드(War, Default 등)가 **{news_panic_count}회** 감지되었습니다. 투자 심리 악화에 대비하세요.")
+            st.error(f"🚨 **[주의] 뉴스 공포 심리 확산 감지**\n\n최근 24시간 내 시장 헤드라인에서 치명적 위험 키워드(War, Default 등)가 **{news_panic_count}회** 감지되었습니다.\n\n투자 심리 악화에 대비하세요.")
 
     st.markdown("---")
     c_trump_left, c_trump_right = st.columns(2)
@@ -1037,11 +1013,7 @@ try:
     fig_norm.update_layout(title="Z-Score 동조화 추세"); st.plotly_chart(fig_norm, use_container_width=True)
     st.info("""
 **[현재 상황 상세 해석 가이드]**
-* **KOSPI(Red) vs S&P 500(Blue) 디커플링**: S&P 500 지수가 KOSPI보다 확연히 높이 위치할 경우, 글로벌 증시 상승에서 한국이 소외되는 현상(외자 이탈, 구조적 우려 등)을 시사할 수 있습니다. 반대의 경우는 KOSPI의 단기 과열이나 강한 독자 모멘텀을 뜻합니다.
-* **주가지수(Red, Blue)가 물동량(Orange)보다 위에 있을 때**: 실물 경기 뒷받침 없이 기대감만으로 지수가 과열된 상태일 수 있습니다. 하락 가능성이 높습니다.
-* **지표들이 비슷한 위치일 때**: KOSPI, 글로벌 증시, 실물 경기가 동조화되어 움직이는 매우 안정적인 추세입니다.
-* **글로벌 물동량(Orange)이 주가지수보다 위에 있을 때**: 실물 경기는 회복되었으나 주가가 저평가된 상태입니다. 우상향 가능성을 시사합니다.
-""")
+* **KOSPI(Red) vs S&P 500(Blue) 디커플링**: S&P 500 지수가 KOSPI보다 확연히 높이 위치할 경우, 글로벌 증시 상승에서 한국이 소외되는 현상(외자 이탈, 구조적 우려 등)을 시사할 수 있습니다.\n\n반대의 경우는 KOSPI의 단기 과열이나 강한 독자 모멘텀을 뜻합니다.\n\n* **주가지수(Red, Blue)가 물동량(Orange)보다 위에 있을 때**: 실물 경기 뒷받침 없이 기대감만으로 지수가 과열된 상태일 수 있습니다.\n\n하락 가능성이 높습니다.\n\n* **지표들이 비슷한 위치일 때**: KOSPI, 글로벌 증시, 실물 경기가 동조화되어 움직이는 매우 안정적인 추세입니다.\n\n* **글로벌 물동량(Orange)이 주가지수보다 위에 있을 때**: 실물 경기는 회복되었으나 주가가 저평가된 상태입니다.\n\n우상향 가능성을 시사합니다.\n\n""")
 
     st.markdown("---")
     sc1, sc2 = st.columns(2)
@@ -1163,9 +1135,7 @@ if bt_analysis_container:
     with bt_analysis_container:
         with st.spinner("AI가 추세를 분석 중..."):
             bt_prompt = f"""
-            Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.
-            
-            데이터:
+            Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.\n\n데이터:
             - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
             - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
             - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
@@ -1173,8 +1143,7 @@ if bt_analysis_container:
             CRITICAL RULES:
             1. Output ONLY the final Korean analysis.
             2. You MUST NOT include any conversational text, explanations, or thinking processes.
-            3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요. 마크다운 기호 절대 금지.
-            4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
+            3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
             
             Output format:
             <result>
@@ -1195,21 +1164,16 @@ if ai_indicator_container:
         with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
             with st.spinner("지표 데이터를 분석 중..."):
                 ai_desc_prompt = f"""
-                Task: 분석용 지표 데이터를 바탕으로 현재 한국 증시(KOSPI) 상황을 진단하세요.
-                
-                데이터: {latest_data_summary}
+                Task: 분석용 지표 데이터를 바탕으로 현재 한국 증시(KOSPI) 상황을 진단하세요.\n\n데이터: {latest_data_summary}
                 
                 CRITICAL RULES:
                 1. Output ONLY the final Korean analysis.
                 2. You MUST NOT include any conversational text, explanations, or thinking processes.
-                3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요. 마크다운 기호 절대 금지.
-                4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
+                3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
                 
                 Output format:
                 <result>
-                첫 번째 문단: 주어진 데이터의 현재 상태와 움직임을 요약한 2문장.
-                두 번째 문단: 이를 종합한 현재 시장 진단 및 투자자 주의사항을 담은 2문장.
-                </result>
+                첫 번째 문단: 주어진 데이터의 현재 상태와 움직임을 요약한 2문장.\n\n두 번째 문단: 이를 종합한 현재 시장 진단 및 투자자 주의사항을 담은 2문장.\n\n</result>
                 """
                 analysis_output = get_ai_analysis(ai_desc_prompt)
                 clean_indicator = clean_ai_output(analysis_output)
