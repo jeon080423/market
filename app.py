@@ -967,7 +967,7 @@ try:
         
         fig.update_layout(
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis_title="폭락일 기준 (Days)",
+            xaxis=dict(title="폭락일 기준 (Days)", range=[-120, 120]),
             yaxis_title="위험 지수",
             margin=dict(l=0, r=0, t=30, b=30)
         )
