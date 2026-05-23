@@ -1397,7 +1397,52 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 # --- [AI 분석: 맨 마지막에 처리] ---
 if st.session_state.get("run_ai_trigger"):
     with st.spinner("AI 분석 엔진을 가동하여 데이터를 통합 분석하고 있습니다..."):
-        # ── [통합 AI 분석: 4개 작업을 1회 API 호출로 처리] ──────────────
+        import concurrent.futures
+        import re as _re
+
+        # ── 각 섹션별 독립 프롬프트 정의 ─────────────────────────────────
+        def _run_news():
+            if not news_data:
+                return ""
+            p = f"""아래 영어 뉴스 헤드라인들을 한국어로 번역하세요.
+규칙: 번역문만 번호와 함께 출력. 원문 반복·설명·태그 출력 금지. 고유명사는 영어 유지.
+
+{all_titles}
+
+출력 예시 형식:
+1. 번역된 첫 번째 헤드라인
+2. 번역된 두 번째 헤드라인
+..."""
+            return get_ai_analysis(p)
+
+        def _run_trump():
+            if not trump_raw:
+                return ""
+            p = f"""아래 영어 소셜 게시물을 자연스러운 한국어 단락으로 번역하세요.
+규칙: 번역 결과만 출력. 원문 인용·설명·태그 출력 절대 금지.
+
+{trump_raw}"""
+            return get_ai_analysis(p)
+
+        def _run_bt():
+            if not bt_data_text:
+                return ""
+            p = f"""아래 데이터를 바탕으로 시장 위험 지수의 유효성을 진단하는 3~4문장의 한국어 문단을 작성하세요.
+규칙: 마크다운·영단어·한자 사용 금지. 분석 문단만 출력.
+
+데이터: {bt_data_text}"""
+            return get_ai_analysis(p)
+
+        def _run_indicator():
+            if 'latest_data_summary' not in locals() and 'latest_data_summary' not in globals():
+                return ""
+            p = f"""아래 시장 지표를 분석하여 현재 한국 증시(코스피) 상황을 진단하는 4문장의 한국어 문단을 작성하세요.
+규칙: 마크다운·영단어·한자 사용 금지. 분석 문단만 출력.
+
+{latest_data_summary}"""
+            return get_ai_analysis(p)
+
+        # 트럼프 raw 텍스트 준비
         trump_raw = ""
         if 'trump_data' in locals() and trump_data:
             trump_raw = "\n\n---\n\n".join([
@@ -1410,45 +1455,17 @@ if st.session_state.get("run_ai_trigger"):
         if 'corr_val' in locals() and 'hist_risks' in locals():
             bt_data_text = f"상관계수: {corr_val:.2f}, 현재 위험지수: {hist_risks[-1]:.1f}, 최근7일: {[round(r,1) for r in hist_risks[-7:]]}"
 
-        unified_prompt = f"""당신은 한국 금융시장 전문 AI 분석가입니다. 아래 4가지 작업을 한 번에 수행하고, 반드시 지정된 XML 태그 형식으로만 출력하세요. 태그 바깥에는 아무것도 쓰지 마세요.
+        # ── 병렬 실행 (속도 유지) ──────────────────────────────────────────
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            f_news      = executor.submit(_run_news)
+            f_trump     = executor.submit(_run_trump)
+            f_bt        = executor.submit(_run_bt)
+            f_indicator = executor.submit(_run_indicator)
 
-[작업1] 뉴스 헤드라인 번역 (영어→한국어, 번호 유지, 원문 반복 금지):
-{all_titles if news_data else "뉴스 없음"}
-
-[작업2] 트럼프 소셜 번역 (영어→자연스러운 한국어 단락, 원문 인용 금지):
-{trump_raw if trump_raw else "데이터 없음"}
-
-[작업3] 시장 위험 지수 진단 (마크다운/영단어/한자 금지, 3~4문장):
-{bt_data_text if bt_data_text else "데이터 없음"}
-
-[작업4] 시장 지표 종합 진단 (마크다운/영단어/한자 금지, 4문장):
-{latest_data_summary if 'latest_data_summary' in locals() else "데이터 없음"}
-
-출력 형식 (태그 안에만 실제 내용 작성):
-<news>
-번역된 뉴스 헤드라인 목록
-</news>
-<trump>
-번역된 트럼프 소셜 단락
-</trump>
-<bt>
-위험 지수 진단 문단
-</bt>
-<indicator>
-시장 지표 종합 진단 문단
-</indicator>"""
-
-        unified_result = get_ai_analysis(unified_prompt)
-
-        import re as _re
-        def _extract(tag, text):
-            m = _re.search(rf'<{tag}>(.*?)</{tag}>', text, _re.DOTALL | _re.IGNORECASE)
-            return m.group(1).strip() if m else ""
-
-        news_result    = _extract("news", unified_result)
-        trump_result   = _extract("trump", unified_result)
-        bt_result      = _extract("bt", unified_result)
-        indicator_result = _extract("indicator", unified_result)
+        news_result      = f_news.result().strip()
+        trump_result     = f_trump.result().strip()
+        bt_result        = f_bt.result().strip()
+        indicator_result = f_indicator.result().strip()
 
         # Save to session state and reset trigger
         st.session_state["ai_analysis_results"] = {
