@@ -177,7 +177,12 @@ def clean_ai_output(text):
         l = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과|진단|분석|요약|핵심|Para\s*\d+|[*-])\s*[:：-]?\s*', '', l, flags=re.IGNORECASE)
         l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
         if l: filtered.append(l)
-    return '<br><br>'.join(filtered)
+        
+    final_text = '<br><br>'.join(filtered)
+    # 만약 필터링 후 아무것도 남지 않았다면, 차라리 원본을 반환하여 에러 원인을 파악할 수 있도록 함
+    if not final_text.strip():
+        return text.strip().replace('\n', '<br>')
+    return final_text
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -1116,8 +1121,8 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
                 
                 CRITICAL RULES:
                 1. 당신의 응답은 **무조건** 번역된 한국어 문장으로만 시작하고 끝나야 합니다.
-                2. 영어 원문 복사, 번역 과정에 대한 설명(Self-Correction 등), 부연 설명은 일절 금지합니다.
-                3. 반드시 한국어로만 작성하세요. (단, 고유명사는 영어 허용)
+                2. 영어 원문 복사, 한 줄씩 번역하는 방식(English -> Korean 형태 등), 부연 설명은 일절 금지합니다.
+                3. 원문에 있는 영어 문장 자체를 절대로 출력하지 마세요. 오직 번역된 결과만 제공하세요.
                 4. 리스트 기호(-, *) 없이 순수 텍스트 문단 1개만 출력하세요.
                 
                 Input: {t_text}
@@ -1129,6 +1134,18 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
                 """
                 t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
+                
+                # 만약 AI가 지시를 어기고 영어 문장과 화살표(->)를 함께 뱉었다면, 한글만 남기고 강제로 잘라냄
+                if '->' in t_clean or '" ->' in t_clean:
+                    parts = t_clean.split('<br><br>')
+                    new_parts = []
+                    for p in parts:
+                        if '->' in p:
+                            new_parts.append(p.split('->')[-1].strip())
+                        else:
+                            new_parts.append(p)
+                    t_clean = '<br><br>'.join(new_parts)
+                    
                 # 에러 메시지가 섞여들어가는 것 방지
                 if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean:
                     all_trump_translated.append(f"- {t_clean}")
