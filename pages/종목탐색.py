@@ -166,37 +166,43 @@ def crawl_naver_price_surge(sosok: int) -> pd.DataFrame:
 def crawl_naver_foreigner_top() -> pd.DataFrame:
     """
     네이버 금융 실시간 외국인 순매수 상위 종목 크롤링
-    - 반환: DataFrame [순위, 종목명, 티커, 현재가, 등락]
+    URL: sise_trans_style.naver?sosok=0 (KOSPI 투자자별 매매동향)
+    - Table[0]: 외국인 순매수 상위 / Table[1]: 기관 순매수 상위
+    - 반환: DataFrame [순위, 종목명, 티커, 현재가]
     """
-    url = "https://finance.naver.com/sise/sise_deal_rank.naver?investor_gubun=1000"
+    url = "https://finance.naver.com/sise/sise_trans_style.naver?sosok=0"
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
         res.raise_for_status()
         soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
         
-        table = soup.find('table', {'class': 'type_r1'})
-        if not table: return pd.DataFrame()
+        # Table[0] = 외국인 순매수 상위
+        tables = soup.find_all('table', {'class': 'type_r1'})
+        if not tables: return pd.DataFrame()
+        table = tables[0]  # 외국인 순매수
             
         rows = table.find_all('tr')
         stocks = []
         rank_counter = 1
         for row in rows:
             cols = row.find_all('td')
+            # cols[0]=빈셀, cols[1]=종목명(링크포함), cols[2]=현재가, cols[3]=등락 이미지
             if len(cols) >= 3:
                 name_a = cols[1].find('a')
                 if name_a:
                     name = name_a.get_text(strip=True)
-                    ticker = name_a['href'].split('code=')[-1]
+                    href = name_a.get('href', '')
+                    ticker = href.split('code=')[-1] if 'code=' in href else ''
                     price = cols[2].get_text(strip=True)
                     
                     change_dir = ""
                     if len(cols) >= 4:
                         change_img = cols[3].find('img')
                         if change_img:
-                            alt_val = change_img.get('alt', '')
-                            if 'up' in alt_val:
+                            alt_val = change_img.get('alt', '').lower()
+                            if 'up' in alt_val or '상승' in alt_val:
                                 change_dir = "▲"
-                            elif 'down' in alt_val:
+                            elif 'down' in alt_val or '하락' in alt_val:
                                 change_dir = "▼"
                                 
                     stocks.append({
@@ -212,58 +218,150 @@ def crawl_naver_foreigner_top() -> pd.DataFrame:
         st.warning(f"외국인 순매수 상위 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=300)  # 리포트는 업데이트 주기가 길어 5분 캐싱
-def crawl_naver_analyst_reports() -> pd.DataFrame:
+@st.cache_data(ttl=60)
+def crawl_naver_institution_top() -> pd.DataFrame:
     """
-    네이버 금융 리서치 종목분석 리포트 크롤링
-    - 반환: DataFrame [순위, 종목명, 티커, 리포트 제목, 증권사, 작성일]
+    네이버 금융 실시간 기관 순매수 상위 종목 크롤링
+    URL: sise_trans_style.naver?sosok=0 (KOSPI 투자자별 매매동향)
+    - Table[1]: 기관 순매수 상위
+    - 반환: DataFrame [순위, 종목명, 티커, 현재가]
     """
-    url = "https://finance.naver.com/research/company_list.naver"
+    url = "https://finance.naver.com/sise/sise_trans_style.naver?sosok=0"
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
         res.raise_for_status()
         soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
         
-        table = soup.find('table', {'class': 'type_1'})
-        if not table: return pd.DataFrame()
+        # Table[1] = 기관 순매수 상위
+        tables = soup.find_all('table', {'class': 'type_r1'})
+        if len(tables) < 2: return pd.DataFrame()
+        table = tables[1]  # 기관 순매수
             
         rows = table.find_all('tr')
-        reports = []
+        stocks = []
         rank_counter = 1
         for row in rows:
             cols = row.find_all('td')
-            if len(cols) >= 5:
-                stock_td = cols[0]
-                stock_a = stock_td.find('a')
-                stock_name = stock_a.get_text(strip=True) if stock_a else stock_td.get_text(strip=True)
-                
-                ticker = ""
-                if stock_a and 'code=' in stock_a.get('href', ''):
-                    ticker = stock_a['href'].split('code=')[-1]
-                
-                title_td = cols[1]
-                title_a = title_td.find('a')
-                title = title_a.get_text(strip=True) if title_a else title_td.get_text(strip=True)
-                
-                brokerage = cols[2].get_text(strip=True)
-                date = cols[4].get_text(strip=True)
-                
-                if stock_name and title:
-                    reports.append({
+            if len(cols) >= 3:
+                name_a = cols[1].find('a')
+                if name_a:
+                    name = name_a.get_text(strip=True)
+                    href = name_a.get('href', '')
+                    ticker = href.split('code=')[-1] if 'code=' in href else ''
+                    price = cols[2].get_text(strip=True)
+                    
+                    change_dir = ""
+                    if len(cols) >= 4:
+                        change_img = cols[3].find('img')
+                        if change_img:
+                            alt_val = change_img.get('alt', '').lower()
+                            if 'up' in alt_val or '상승' in alt_val:
+                                change_dir = "▲"
+                            elif 'down' in alt_val or '하락' in alt_val:
+                                change_dir = "▼"
+                                
+                    stocks.append({
                         '순위': str(rank_counter),
-                        '종목명': f"{stock_name} ({ticker})" if ticker else stock_name,
+                        '종목명': name,
                         '티커': ticker,
-                        '리포트 제목': title,
-                        '증권사': brokerage,
-                        '작성일': date
+                        '현재가': price,
+                        '등락': change_dir
                     })
                     rank_counter += 1
-                    if rank_counter > 10:  # 최대 10개
-                        break
-        return pd.DataFrame(reports)
+        return pd.DataFrame(stocks)
     except Exception as e:
-        st.warning(f"애널리스트 리포트 크롤링 중 오류가 발생했습니다: {e}")
+        st.warning(f"기관 순매수 상위 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
+
+@st.cache_data(ttl=300)  # 리포트는 업데이트 주기가 길어 5분 캐싱
+def crawl_naver_analyst_reports() -> pd.DataFrame:
+    """
+    네이버 금융 리서치 종목분석 리포트 크롤링 (언급 빈도 순 정렬)
+    - 반환: DataFrame [순위, 종목명, 티커, 언급 빈도, 최근 리포트 제목, 발행 증권사, 최근 발행일]
+    """
+    reports = []
+    # 2개 페이지(60개 리포트) 수집하여 빈도 집계의 정확성 향상
+    for page in [1, 2]:
+        url = f"https://finance.naver.com/research/company_list.naver?page={page}"
+        try:
+            res = requests.get(url, headers=HEADERS, timeout=10)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
+            
+            table = soup.find('table', {'class': 'type_1'})
+            if not table: continue
+                
+            rows = table.find_all('tr')
+            for row in rows:
+                cols = row.find_all('td')
+                if len(cols) >= 5:
+                    stock_td = cols[0]
+                    stock_a = stock_td.find('a')
+                    stock_name = stock_a.get_text(strip=True) if stock_a else stock_td.get_text(strip=True)
+                    
+                    ticker = ""
+                    if stock_a and 'code=' in stock_a.get('href', ''):
+                        ticker = stock_a['href'].split('code=')[-1]
+                    
+                    title_td = cols[1]
+                    title_a = title_td.find('a')
+                    title = title_a.get_text(strip=True) if title_a else title_td.get_text(strip=True)
+                    
+                    brokerage = cols[2].get_text(strip=True)
+                    date = cols[4].get_text(strip=True)
+                    
+                    if stock_name and title:
+                        reports.append({
+                            'stock_name': stock_name,
+                            'ticker': ticker,
+                            'title': title,
+                            'brokerage': brokerage,
+                            'date': date
+                        })
+        except Exception as e:
+            st.warning(f"애널리스트 리포트 크롤링(페이지 {page}) 중 오류가 발생했습니다: {e}")
+            
+    if not reports:
+        return pd.DataFrame()
+        
+    # 종목별 그룹화 및 빈도 집계
+    from collections import defaultdict
+    stock_groups = defaultdict(list)
+    for rep in reports:
+        stock_groups[rep['stock_name']].append(rep)
+        
+    freq_list = []
+    for stock_name, reps in stock_groups.items():
+        # reps[0]은 스크래핑 순서상 가장 최신 리포트
+        latest_rep = reps[0]
+        freq_list.append({
+            'stock_name': stock_name,
+            'ticker': latest_rep['ticker'],
+            'count': len(reps),
+            'latest_title': latest_rep['title'],
+            'latest_brokerage': latest_rep['brokerage'],
+            'latest_date': latest_rep['date']
+        })
+        
+    # 빈도(count) 내림차순, 동일 빈도 시 최신 발행일(latest_date) 내림차순 정렬
+    freq_list.sort(key=lambda x: (x['count'], x['latest_date']), reverse=True)
+    
+    # 상위 10개 종목 구성
+    sorted_reports = []
+    rank_counter = 1
+    for item in freq_list[:10]:
+        sorted_reports.append({
+            '순위': str(rank_counter),
+            '종목명': f"{item['stock_name']} ({item['ticker']})" if item['ticker'] else item['stock_name'],
+            '티커': item['ticker'],
+            '언급 빈도': f"{item['count']}회",
+            '최근 리포트 제목': item['latest_title'],
+            '발행 증권사': item['latest_brokerage'],
+            '최근 발행일': item['latest_date']
+        })
+        rank_counter += 1
+        
+    return pd.DataFrame(sorted_reports)
 
 def render_naver_sise_table(df: pd.DataFrame):
     """
@@ -322,6 +420,14 @@ def render_naver_sise_table(df: pd.DataFrame):
         cols_config["증권사"] = st.column_config.TextColumn("증권사", width="medium")
     if "작성일" in df_display.columns:
         cols_config["작성일"] = st.column_config.TextColumn("작성일", width="small")
+    if "최근 리포트 제목" in df_display.columns:
+        cols_config["최근 리포트 제목"] = st.column_config.TextColumn("최근 리포트 제목", width="large")
+    if "발행 증권사" in df_display.columns:
+        cols_config["발행 증권사"] = st.column_config.TextColumn("발행 증권사", width="medium")
+    if "최근 발행일" in df_display.columns:
+        cols_config["최근 발행일"] = st.column_config.TextColumn("최근 발행일", width="small")
+    if "언급 빈도" in df_display.columns:
+        cols_config["언급 빈도"] = st.column_config.TextColumn("언급 빈도", width="small")
         
     st.dataframe(
         styled_df,
@@ -353,11 +459,14 @@ def render_youtube_rank_page():
         #### 2. 외국인 관심도: 외국인 실시간 순매수 상위 종목
         * 당일 외국인 투자자들의 자금이 집중 유입되는 순매수 상위 종목입니다. 외국인 메이저 자금의 매수 트렌드와 장기 관심도를 직접적으로 나타냅니다.
         
-        #### 3. 유동성 (선행 지표): 실시간 거래량 상위 종목
+        #### 3. 기관 관심도: 기관 실시간 순매수 상위 종목
+        * 당일 기관 투자자들의 순매수 상위 종목입니다. **외국인 + 기관이 동시에 순매수하는 '더블 수급'** 종목은 특히 높은 단기 상승력을 보여줍니다.
+        
+        #### 4. 유동성 (선행 지표): 실시간 거래량 상위 종목
         * 기술적 분석에서 **"거래량은 주가에 선행한다"**는 절대 원칙에 기반합니다.
         * KOSPI 및 KOSDAQ 각 시장의 실시간 총 거래량 상위 종목을 추출하여 기관/외국인 자금(Smart Money)이 유입되는 시장 유동성 병목 지점을 포착합니다.
         
-        #### 4. 모멘텀: 실시간 주가 급등 종목
+        #### 5. 모멘텀: 실시간 주가 급등 종목
         * 당일 강한 상승 돌파 거래량과 함께 가격 상승 변동폭이 극대화되는 상방 모멘텀 종목을 추출합니다. 당일 주도 테마의 대장주 및 변동성 돌파 거래 타겟을 신속하게 식별할 수 있습니다.
         """)
         
@@ -379,24 +488,27 @@ def render_youtube_rank_page():
     st.markdown("---")
     
     # 60초 TTL 캐싱 데이터 로딩
-    if "market_data" not in st.session_state or "foreigner" not in st.session_state["market_data"] or "reports" not in st.session_state["market_data"]:
-        with st.spinner("실시간 시장 데이터(인기검색/외인순매수/리포트/거래상위/급등)를 크롤링 중입니다..."):
+    if "market_data" not in st.session_state or "foreigner" not in st.session_state["market_data"] or "reports" not in st.session_state["market_data"] or "institution" not in st.session_state["market_data"]:
+        with st.spinner("실시간 시장 데이터(인기검색/외인순매수/기관순매수/리포트/거래상위/급등)를 크롤링 중입니다..."):
             # 1. 인기검색
             df_popular = crawl_naver_popular_stocks()
             # 2. 외국인 순매수 상위
             df_foreigner = crawl_naver_foreigner_top()
-            # 3. 애널리스트 리포트 언급 종목
+            # 3. 기관 순매수 상위
+            df_institution = crawl_naver_institution_top()
+            # 4. 애널리스트 리포트 언급 종목
             df_reports = crawl_naver_analyst_reports()
-            # 4. 거래상위 (KOSPI & KOSDAQ)
+            # 5. 거래상위 (KOSPI & KOSDAQ)
             df_vol_kospi = crawl_naver_volume_top(0)
             df_vol_kosdaq = crawl_naver_volume_top(1)
-            # 5. 주가급등 (KOSPI & KOSDAQ)
+            # 6. 주가급등 (KOSPI & KOSDAQ)
             df_surge_kospi = crawl_naver_price_surge(0)
             df_surge_kosdaq = crawl_naver_price_surge(1)
             
             st.session_state["market_data"] = {
                 "popular": df_popular,
                 "foreigner": df_foreigner,
+                "institution": df_institution,
                 "reports": df_reports,
                 "vol_kospi": df_vol_kospi,
                 "vol_kosdaq": df_vol_kosdaq,
@@ -409,6 +521,7 @@ def render_youtube_rank_page():
     m_data = st.session_state["market_data"]
     df_popular = m_data["popular"]
     df_foreigner = m_data.get("foreigner", pd.DataFrame())
+    df_institution = m_data.get("institution", pd.DataFrame())
     df_reports = m_data.get("reports", pd.DataFrame())
     df_vol_kospi = m_data["vol_kospi"]
     df_vol_kosdaq = m_data["vol_kosdaq"]
@@ -429,8 +542,19 @@ def render_youtube_rank_page():
         
     st.markdown("---")
 
+    # --- 1.5행: 기관 순매수 상위 종목 ---
+    st.subheader("🏦 3. 기관 실시간 순매수 상위 종목 (기관 관심도)")
+    st.caption("당일 기관 투자자들이 순매수하는 상위 종목입니다. 외국인과 함께 시장을 주도하는 스마트머니의 흐름을 파악할 수 있습니다.")
+    col_inst, col_inst_fill = st.columns([1, 1])
+    with col_inst:
+        render_naver_sise_table(df_institution)
+    with col_inst_fill:
+        st.info("💡 **기관 순매수 해석 가이드**\n\n기관과 외국인이 동시에 순매수하는 종목은 **'더블 수급 호재'** 신호로, 단기 상승 모멘텀이 발생할 가능성이 높습니다. 두 리스트의 공통 종목을 우선 주목하세요.")
+    
+    st.markdown("---")
+
     # --- 2행: 실시간 거래량 상위 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("📊 3. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
+    st.subheader("📊 4. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
     st.caption("KOSPI 및 KOSDAQ 시장에서 대량 거래가 유입되어 유동성 쏠림이 극대화된 종목 리스트입니다. 거래량은 수급의 선행 시그널입니다.")
     
     col1, col2 = st.columns(2)
@@ -443,7 +567,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- 3행: 실시간 주가 급등 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("⚡ 4. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
+    st.subheader("⚡ 5. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
     st.caption("당일 거래량 증가를 수반하며 가격 등락 변동률이 가장 높은 상방 돌파 주도 테마 종목 리스트입니다.")
     
     col3, col4 = st.columns(2)
@@ -457,7 +581,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- 4행: 최근 증권사 애널리스트 리포트 언급 종목 ---
-    st.subheader("📑 5. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
+    st.subheader("📑 6. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
     st.caption("국내 주요 증권사 리서치 센터에서 발행한 최신 종목 분석 리포트 현황입니다. 애널리스트의 분석 대상이 된 최신 관심 종목 흐름을 나타냅니다.")
     render_naver_sise_table(df_reports)
 

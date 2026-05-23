@@ -1,0 +1,12 @@
+
+
+==================================================sosok=0 -> Table 0 rows:
+  (['', '삼성전자우', '187,500', ''], ['/item/main.naver?code=005935'])
+  (['', 'TIGER MSCI Korea TR', '54,545', ''], ['/item/main.naver?code=310970'])
+  (['', '알테오젠', '364,500', ''], ['/item/main.naver?code=196170'])
+  (['', '에코프로비엠', '216,000', ''], ['/item/main.naver?code=247540'])
+  (['', 'SK', '642,000', ''], ['/item/main.naver?code=034730'])
+  (['', '파두', '128,300', ''], ['/item/main.naver?code=440110'])
+  (['', 'LIG디펜스앤에어로스페이스', '925,000', ''], ['/item/main.naver?code=079550'])
+
+sosok=1 -> Table 0 rows:

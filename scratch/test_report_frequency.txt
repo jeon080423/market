@@ -1,0 +1,83 @@
+Total reports analyzed: 60
+Unique stocks mentioned: 53
+
+Rank 1: 삼성전기 (009150) - Mentioned 4 times
+  Latest Report: 대체불가
+  Brokerage: 메리츠증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 2: 한올바이오파마 (009420) - Mentioned 3 times
+  Latest Report: 1402, 성공의 신호탄
+  Brokerage: 교보증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 3: 리노공업 (058470) - Mentioned 2 times
+  Latest Report: AI시대 소켓은 필수
+  Brokerage: 신한투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 4: 삼성전자 (005930) - Mentioned 2 times
+  Latest Report: 초호황 속 조정 구간 = 매수 타이밍
+  Brokerage: 신한투자증권 | Date: 26.05.21
+--------------------------------------------------
+Rank 5: STX엔진 (077970) - Mentioned 1 times
+  Latest Report: 유암코 PEF 청산 관련 코멘트: 사업 분리 매..
+  Brokerage: 한국투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 6: 대웅제약 (069620) - Mentioned 1 times
+  Latest Report: 1Q26 Re: 하반기를 기대해보자
+  Brokerage: DS투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 7: 비나텍 (126340) - Mentioned 1 times
+  Latest Report: 지속되는 사세 확장
+  Brokerage: DS투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 8: 솔브레인 (357780) - Mentioned 1 times
+  Latest Report: 원재료 부담도 상쇄할 소재 역량
+  Brokerage: 교보증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 9: 덕산네오룩스 (213420) - Mentioned 1 times
+  Latest Report: 전방 우려 속 두드러질 추이
+  Brokerage: 교보증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 10: 오이솔루션 (138080) - Mentioned 1 times
+  Latest Report: 저는 “무선통신장비주” 입니다
+  Brokerage: 하나증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 11: 아이에스동서 (010780) - Mentioned 1 times
+  Latest Report: 6월 경산 펜타힐즈W 분양 확정
+  Brokerage: 하나증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 12: GKL (114090) - Mentioned 1 times
+  Latest Report: 점진적 실적 개선세는 지속 중
+  Brokerage: 유안타증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 13: HL D&I (014790) - Mentioned 1 times
+  Latest Report: 2026, 2027, 2028년 영업이익 >>> 현재 시가..
+  Brokerage: IBK투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 14: 더블유게임즈 (192080) - Mentioned 1 times
+  Latest Report: AI 게임 개발과 지배구조 개선, Top Pick
+  Brokerage: 신한투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 15: 오스코텍 (039200) - Mentioned 1 times
+  Latest Report: NDR 후기: 기술수출 선순환 진입
+  Brokerage: 신한투자증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 16: LS (006260) - Mentioned 1 times
+  Latest Report: 실적이 끌고 정책은 밀고!
+  Brokerage: 키움증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 17: 토모큐브 (475960) - Mentioned 1 times
+  Latest Report: 낭중지추(囊中之錐)
+  Brokerage: 키움증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 18: 엘에이티 (311060) - Mentioned 1 times
+  Latest Report: 차세대 에너지 인프라 장비사로의 도약
+  Brokerage: 한국IR협의회 | Date: 26.05.22
+--------------------------------------------------
+Rank 19: 카페24 (042000) - Mentioned 1 times
+  Latest Report: 기다림의 시기
+  Brokerage: 미래에셋증권 | Date: 26.05.22
+--------------------------------------------------
+Rank 20: 삼성에스디에스 (018260) - Mentioned 1 times
+  Latest Report: AI 시대의 확실한 수혜주
+  Brokerage: 미래에셋증권 | Date: 26.05.22
+--------------------------------------------------
