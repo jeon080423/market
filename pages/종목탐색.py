@@ -306,7 +306,18 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
                     title_td = cols[1]
                     title_a = title_td.find('a')
                     title = title_a.get_text(strip=True) if title_a else title_td.get_text(strip=True)
-                    
+
+                    # 리포트 페이지 URL (company_read.naver?nid=XXXXX)
+                    report_href = title_a.get('href', '') if title_a else ''
+                    report_url = f"https://finance.naver.com/research/{report_href}" if report_href and not report_href.startswith('http') else report_href
+
+                    # PDF 직접 링크 (cols[3]에 있음)
+                    pdf_url = ""
+                    if len(cols) > 3:
+                        pdf_a = cols[3].find('a')
+                        if pdf_a:
+                            pdf_url = pdf_a.get('href', '')
+
                     brokerage = cols[2].get_text(strip=True)
                     date = cols[4].get_text(strip=True)
                     
@@ -315,6 +326,8 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
                             'stock_name': stock_name,
                             'ticker': ticker,
                             'title': title,
+                            'report_url': report_url,
+                            'pdf_url': pdf_url,
                             'brokerage': brokerage,
                             'date': date
                         })
@@ -339,6 +352,8 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
             'ticker': latest_rep['ticker'],
             'count': len(reps),
             'latest_title': latest_rep['title'],
+            'latest_report_url': latest_rep['report_url'],
+            'latest_pdf_url': latest_rep['pdf_url'],
             'latest_brokerage': latest_rep['brokerage'],
             'latest_date': latest_rep['date']
         })
@@ -350,6 +365,8 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
     sorted_reports = []
     rank_counter = 1
     for item in freq_list[:10]:
+        # 리포트 페이지 URL 우선, 없으면 PDF URL 사용
+        link_url = item['latest_report_url'] or item['latest_pdf_url'] or ""
         sorted_reports.append({
             '순위': str(rank_counter),
             '종목명': f"{item['stock_name']} ({item['ticker']})" if item['ticker'] else item['stock_name'],
@@ -357,7 +374,8 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
             '언급 빈도': f"{item['count']}회",
             '최근 리포트 제목': item['latest_title'],
             '발행 증권사': item['latest_brokerage'],
-            '최근 발행일': item['latest_date']
+            '최근 발행일': item['latest_date'],
+            '리포트 링크': link_url
         })
         rank_counter += 1
         
@@ -435,6 +453,64 @@ def render_naver_sise_table(df: pd.DataFrame):
         height=388,
         hide_index=True,
         column_config=cols_config
+    )
+
+def render_analyst_reports_table(df: pd.DataFrame):
+    """
+    애널리스트 리포트 전용 렌더링 테이블
+    - '리포트 링크' 커럼을 LinkColumn으로 만들어 켜릭 시 최신 리포트를 새 브라우저 탭에서 열도록 구현
+    """
+    if df.empty:
+        st.info("📊 리포트 데이터를 불러올 수 없습니다.")
+        return
+
+    df_display = df.head(10).copy()
+
+    # 순위 이모지화
+    def make_rank_label(rank):
+        r = str(rank).strip()
+        if r == "1": return "🥇 1"
+        elif r == "2": return "🥈 2"
+        elif r == "3": return "🥉 3"
+        return r
+    df_display["순위"] = df_display["순위"].apply(make_rank_label)
+    df_display = df_display.reset_index(drop=True)
+
+    # 1~3위 행 강조 스타일
+    def row_style(row):
+        rank_val = row["순위"]
+        if "🥇" in str(rank_val):
+            return ["background-color: rgba(255, 215, 0, 0.15); font-weight: bold;"] * len(row)
+        elif "🥈" in str(rank_val):
+            return ["background-color: rgba(192, 192, 192, 0.15); font-weight: bold;"] * len(row)
+        elif "🥉" in str(rank_val):
+            return ["background-color: rgba(205, 127, 50, 0.15); font-weight: bold;"] * len(row)
+        return [""] * len(row)
+    styled_df = df_display.style.apply(row_style, axis=1)
+
+    # 커럼 설정: '리포트 링크'를 LinkColumn으로 설정하여 켜릭 시 네이버 리포트 페이지가 새 탭에서 열림
+    cols_config = {
+        "순위": st.column_config.TextColumn("순위", width="small"),
+        "티커": None,  # 숨김
+        "리포트 링크": st.column_config.LinkColumn(
+            "리포트 열기 ↗1︎️",
+            display_text="최신 리포트 보기",
+            width="medium"
+        ),
+        "종목명": st.column_config.TextColumn("종목명", width="medium"),
+        "언급 빈도": st.column_config.TextColumn("언급 빈도", width="small"),
+        "최근 리포트 제목": st.column_config.TextColumn("최근 리포트 제목", width="large"),
+        "발행 증권사": st.column_config.TextColumn("발행 증권사", width="medium"),
+        "최근 발행일": st.column_config.TextColumn("최근 발행일", width="small"),
+    }
+
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=420,
+        hide_index=True,
+        column_config=cols_config,
+        column_order=["순위", "종목명", "언급 빈도", "최근 리포트 제목", "발행 증권사", "최근 발행일", "리포트 링크"]
     )
 
 def render_youtube_rank_page():
@@ -583,7 +659,7 @@ def render_youtube_rank_page():
     # --- 4행: 최근 증권사 애널리스트 리포트 언급 종목 ---
     st.subheader("📑 6. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
     st.caption("국내 주요 증권사 리서치 센터에서 발행한 최신 종목 분석 리포트 현황입니다. 애널리스트의 분석 대상이 된 최신 관심 종목 흐름을 나타냅니다.")
-    render_naver_sise_table(df_reports)
+    render_analyst_reports_table(df_reports)
 
 if __name__ == "__main__":
     render_youtube_rank_page()
