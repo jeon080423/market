@@ -127,8 +127,19 @@ except Exception as e:
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=86400) # cache for 1 day
 def get_supported_gemini_models():
-    # gemini-2.0-flash 우선 (2.5-flash는 Thinking 모드로 느려서 제외)
-    default_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+    # 최신 Gemini 3 및 2.5 지원 모델 목록으로 구성 (구버전 1.5 제외)
+    default_models = [
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-pro-latest"
+    ]
     try:
         api_models = []
         for m in genai.list_models():
@@ -136,7 +147,18 @@ def get_supported_gemini_models():
                 model_name = m.name.replace('models/', '')
                 api_models.append(model_name)
         if api_models:
-            priority_list = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+            priority_list = [
+                "gemini-3.5-flash",
+                "gemini-3.1-pro-preview",
+                "gemini-3-flash-preview",
+                "gemini-3.1-flash-lite",
+                "gemini-2.5-flash",
+                "gemini-2.5-pro",
+                "gemini-2.5-flash-lite",
+                "gemini-2.0-flash",
+                "gemini-2.0-flash-lite",
+                "gemini-pro-latest"
+            ]
             supported = [m for m in priority_list if m in api_models]
             supported += [m for m in api_models if m not in supported and ('vision' not in m.lower())]
             if supported:
@@ -206,6 +228,31 @@ def clean_ai_output(text):
     # 줄바꿈을 <br>로 변환하고 반환
     lines = [l.strip() for l in text.split('\n') if l.strip()]
     return '<br>'.join(lines)
+
+# AI 뉴스 번역 정제 함수 (번호가 매겨진 번역 결과만 추출)
+def clean_news_translation(text):
+    if not text: return ""
+    import re
+    
+    # <result> 태그가 있으면 안의 내용만 추출
+    match = re.search(r'<result>(.*?)</result>', text, re.DOTALL | re.IGNORECASE)
+    if match:
+        text = match.group(1).strip()
+        
+    lines = text.split('\n')
+    numbered_lines = []
+    for line in lines:
+        # 마크다운 기호 제거 후 공백 제거
+        line_clean = line.strip().replace('**', '').replace('*', '').strip()
+        # "1. ", "2. " 등 숫자로 시작하고 한글을 포함하는 행만 필터링 (영어 프롬프트 설명글 제거)
+        if re.match(r'^\d+\.\s+', line_clean) and re.search(r'[ㄱ-ㅎㅏ-ㅣ가-힣]', line_clean):
+            numbered_lines.append(line_clean)
+            
+    if numbered_lines:
+        return '<br>'.join(numbered_lines)
+        
+    # 번호가 매겨진 행을 찾지 못한 경우 일반 정제 로직으로 대체
+    return clean_ai_output(text)
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -1404,15 +1451,15 @@ if st.session_state.get("run_ai_trigger"):
         def _run_news():
             if not news_data:
                 return ""
+            titles_list = "\n".join([f"- {a['title']}" for a in news_data])
             p = f"""아래 영어 뉴스 헤드라인들을 한국어로 번역하세요.
-규칙: 번역문만 번호와 함께 출력. 원문 반복·설명·태그 출력 금지. 고유명사는 영어 유지.
+규칙: 다른 설명 없이 번호와 번역문만 출력하세요. 고유명사는 영어로 유지하세요.
 
-{all_titles}
+{titles_list}
 
-출력 예시 형식:
+출력 형식 예시:
 1. 번역된 첫 번째 헤드라인
-2. 번역된 두 번째 헤드라인
-..."""
+2. 번역된 두 번째 헤드라인"""
             return get_ai_analysis(p)
 
         def _run_trump():
@@ -1462,10 +1509,10 @@ if st.session_state.get("run_ai_trigger"):
             f_bt        = executor.submit(_run_bt)
             f_indicator = executor.submit(_run_indicator)
 
-        news_result      = f_news.result().strip()
-        trump_result     = f_trump.result().strip()
-        bt_result        = f_bt.result().strip()
-        indicator_result = f_indicator.result().strip()
+        news_result      = clean_news_translation(f_news.result().strip())
+        trump_result     = clean_ai_output(f_trump.result().strip())
+        bt_result        = clean_ai_output(f_bt.result().strip())
+        indicator_result = clean_ai_output(f_indicator.result().strip())
 
         # Save to session state and reset trigger
         st.session_state["ai_analysis_results"] = {
@@ -1490,7 +1537,7 @@ if news_data and ai_news_container:
         if st.session_state.get("ai_analysis_results") is None:
             st.info("💡 AI 뉴스 번역/분석을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
         else:
-            clean_summary = st.session_state["ai_analysis_results"].get("news", "")
+            clean_summary = clean_news_translation(st.session_state["ai_analysis_results"].get("news", ""))
             if clean_summary:
                 st.markdown(f"""
                 <div class="ai-analysis-box">
@@ -1507,7 +1554,7 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
         if st.session_state.get("ai_analysis_results") is None:
             st.info("💡 트럼프 소셜 최신 브리핑 번역을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
         else:
-            t_clean = st.session_state["ai_analysis_results"].get("trump", "")
+            t_clean = clean_ai_output(st.session_state["ai_analysis_results"].get("trump", ""))
             if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean and t_clean != "번역된 내용이 없습니다.":
                 st.markdown(f"""
                 <div class="ai-analysis-box">
@@ -1524,7 +1571,7 @@ if bt_analysis_container:
         if st.session_state.get("ai_analysis_results") is None:
             st.info("💡 AI 모델 유효성 상세 진단을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
         else:
-            clean_bt = st.session_state["ai_analysis_results"].get("bt", "")
+            clean_bt = clean_ai_output(st.session_state["ai_analysis_results"].get("bt", ""))
             st.markdown(f"""
             <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
                 <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
@@ -1538,7 +1585,7 @@ if ai_indicator_container:
             if st.session_state.get("ai_analysis_results") is None:
                 st.info("💡 AI 지표 종합 진단을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
             else:
-                clean_indicator = st.session_state["ai_analysis_results"].get("indicator", "")
+                clean_indicator = clean_ai_output(st.session_state["ai_analysis_results"].get("indicator", ""))
                 st.markdown(f"""
                 <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
                     {clean_indicator}

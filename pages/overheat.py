@@ -345,7 +345,19 @@ def render_overheat_page():
 
     @st.cache_data(ttl=86400)
     def get_supported_gemini_models_overheat():
-        default_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+        # 최신 Gemini 3 및 2.5 지원 모델 목록으로 구성 (구버전 1.5 제외)
+        default_models = [
+            "gemini-3.5-flash",
+            "gemini-3.1-pro-preview",
+            "gemini-3-flash-preview",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-pro-latest"
+        ]
         try:
             api_models = []
             for m in genai.list_models():
@@ -353,7 +365,18 @@ def render_overheat_page():
                     model_name = m.name.replace('models/', '')
                     api_models.append(model_name)
             if api_models:
-                priority_list = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+                priority_list = [
+                    "gemini-3.5-flash",
+                    "gemini-3.1-pro-preview",
+                    "gemini-3-flash-preview",
+                    "gemini-3.1-flash-lite",
+                    "gemini-2.5-flash",
+                    "gemini-2.5-pro",
+                    "gemini-2.5-flash-lite",
+                    "gemini-2.0-flash",
+                    "gemini-2.0-flash-lite",
+                    "gemini-pro-latest"
+                ]
                 supported = [m for m in priority_list if m in api_models]
                 supported += [m for m in api_models if m not in supported and ('vision' not in m.lower())]
                 if supported:
