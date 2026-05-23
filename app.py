@@ -157,32 +157,47 @@ def get_ai_analysis(prompt):
 def clean_ai_output(text):
     if not text: return ""
     import re
-    # <result> 태그가 있으면 태그 안의 내용만 추출하여 Chain-of-Thought(사고 과정) 방지
+    
+    # 1단계: <result> 태그가 있으면 안의 내용만 추출
     match = re.search(r'<result>(.*?)</result>', text, re.DOTALL | re.IGNORECASE)
     if match:
-        text = match.group(1)
-
+        text = match.group(1).strip()
+    
+    # 2단계: "Draft N (Literal/Formal):", "Self-Correction:", "Here is" 등
+    #         AI의 사고 과정 헤더가 붙은 단락을 통째로 제거
+    text = re.sub(
+        r'(Draft\s*\d+\s*[\(\[].*?[\)\]]?\s*:.*?)(?=Draft\s*\d+|$)',
+        '', text, flags=re.DOTALL | re.IGNORECASE
+    )
+    text = re.sub(
+        r'(Self-Correction.*?)(?=\n[A-Z]|\Z)', '', text, flags=re.DOTALL | re.IGNORECASE
+    )
+    
+    # 3단계: 줄 단위 필터링
     lines = text.strip().split('\n')
     filtered = []
     for line in lines:
         l = line.strip()
-        if not l: continue
-        # 한글이 포함되어 있지 않으면 제외
-        if not re.search('[가-힣]', l): continue
-        # "Self-Correction" 등 AI의 메타 인지 문장 제외
-        if "self-correction" in l.lower() or "here is" in l.lower() or "translation:" in l.lower(): continue
-        # 어휘 설명 형태 ("단어": "뜻" 또는 "단어" - "뜻") 제외 (짧은 단어:뜻 형태는 제거)
-        if re.search(r'^[*-]?\s*["\']?[a-zA-Z0-9\s]+["\']?\s*[:：-]\s*[가-힣\s]{1,15}$', l): continue
-        # 불필요한 레이블 제거
-        l = re.sub(r'^(Headline|Korean|Translation|Meaning|Result|번역문|결과|진단|분석|요약|핵심|Para\s*\d+|[*-])\s*[:：-]?\s*', '', l, flags=re.IGNORECASE)
+        if not l:
+            continue
+        # 순수 영문만 있는 줄 제거 (영어 + 기호만, 한글 없음)
+        # 단, "1. 번역문" 형태처럼 숫자+점+한글은 통과
+        if not re.search('[가-힣]', l):
+            continue
+        # "Draft", "Literal", "Self-Correction", "Here is", "Note:" 로 시작하는 줄 제거
+        if re.match(r'^\s*(Draft|Literal|Self-Correction|Here is|Note:|Translation note)', l, re.IGNORECASE):
+            continue
+        # 마크다운 기호 제거
         l = l.replace('**', '').replace('##', '').replace('`', '').strip('*').strip()
-        if l: filtered.append(l)
-        
-    final_text = '<br><br>'.join(filtered)
-    # 만약 필터링 후 아무것도 남지 않았다면, 차라리 원본을 반환하여 에러 원인을 파악할 수 있도록 함
-    if not final_text.strip():
-        return text.strip().replace('\n', '<br>')
-    return final_text
+        if l:
+            filtered.append(l)
+    
+    result = '<br>'.join(filtered)
+    # 필터 후 완전히 비었으면 원본의 한글 문장이라도 추출해서 반환
+    if not result.strip():
+        korean_sentences = re.findall(r'[가-힣][^.!?\n]*[.!?]?', text)
+        result = ' '.join(korean_sentences).strip()
+    return result
 
 # 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
 COVID_EVENT_DATE = "2020-02-19"
@@ -1110,56 +1125,45 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
     with ai_trump_container:
         with st.spinner("트럼프 트윗 번역 중..."):
             all_trump_translated = []
-            for t in trump_data:
-                # 불필요한 공백이나 빈 텍스트 무시
-                t_text = f"{t.get('title', '')} {t.get('description', '')}".strip()
-                if len(t_text) < 10:
-                    continue
-                    
+            # 모든 트럼프 포스트를 하나로 합쳐서 단 한 번의 AI 호출로 처리
+            all_t_text = "\n\n---\n\n".join([
+                f"{t.get('title', '')} {t.get('description', '')}".strip()
+                for t in trump_data
+                if len(f"{t.get('title', '')} {t.get('description', '')}".strip()) >= 10
+            ])
+            
+            if all_t_text:
                 t_translate_prompt = f"""
-                Task: Translate the following social media post into ONE single natural Korean paragraph.
+                다음은 도널드 트럼프의 소셜 미디어(Truth Social) 게시물입니다.
+                아래 내용을 **자연스러운 한국어**로 번역하여 하나의 완성된 요약 단락으로 작성해 주세요.
                 
-                CRITICAL RULES:
-                1. 당신의 응답은 **무조건** 번역된 한국어 문장으로만 시작하고 끝나야 합니다.
-                2. 영어 원문 복사, 한 줄씩 번역하는 방식(English -> Korean 형태 등), 부연 설명은 일절 금지합니다.
-                3. 원문에 있는 영어 문장 자체를 절대로 출력하지 마세요. 오직 번역된 결과만 제공하세요.
-                4. 리스트 기호(-, *) 없이 순수 텍스트 문단 1개만 출력하세요.
+                절대 금지 사항:
+                - 영어 원문을 그대로 복사하거나 인용(따옴표 포함)하는 것
+                - "Draft", "Literal", "Self-Correction" 등의 메타 텍스트 출력
+                - 번역 과정이나 설명 출력
+                - 화살표(->) 사용
+                - 불릿 기호(-, *) 사용
                 
-                Input: {t_text}
+                원문:
+                {all_t_text}
                 
-                Output format:
+                출력 형식:
                 <result>
-                단일 한국어 번역 문단
+                한국어로 번역된 내용을 자연스럽게 연결한 하나의 단락
                 </result>
                 """
                 t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
                 
-                # 만약 AI가 지시를 어기고 영어 문장과 화살표(->)를 함께 뱉었다면, 한글만 남기고 강제로 잘라냄
-                if '->' in t_clean or '" ->' in t_clean:
-                    parts = t_clean.split('<br><br>')
-                    new_parts = []
-                    for p in parts:
-                        if '->' in p:
-                            new_parts.append(p.split('->')[-1].strip())
-                        else:
-                            new_parts.append(p)
-                    t_clean = '<br><br>'.join(new_parts)
-                    
-                # 에러 메시지가 섞여들어가는 것 방지
                 if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean:
-                    all_trump_translated.append(f"- {t_clean}")
-            
-            if all_trump_translated:
-                formatted_trump = '<br>'.join(all_trump_translated)
-                st.markdown(f"""
-                <div class="ai-analysis-box">
-                    <strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
-                    {formatted_trump}
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.write("번역된 내용이 없습니다.")
+                    st.markdown(f"""
+                    <div class="ai-analysis-box">
+                        <strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
+                        {t_clean}
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.write("번역된 내용이 없습니다.")
 
 # 2. 모델 유효성 진단
 if bt_analysis_container:
