@@ -80,49 +80,6 @@ def render_overheat_page():
 
     st.markdown("---")
 
-    # 1. 주도주와 비주도주 간의 극단적인 수익률 격차
-    st.header("1. 주도주와 비주도주 간의 극단적인 수익률 격차")
-    st.markdown("과거 닷컴 버블 당시의 사례처럼, 시장 전체의 지수는 상승하지만 주도주를 제외한 대다수 종목들의 수익률이 마이너스로 돌아설 때입니다. 이는 시장에 새로운 유동성이 유입되는 것이 아니라, 기존 자금이 힘없는 종목을 팔아 주도주로만 몰리는 상황임을 의미하며, 이는 상승 사이클의 고점이 다가왔다는 강력한 신호로 해석될 수 있습니다.")
-    
-    fig1 = go.Figure()
-    if '005930.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
-    if '000660.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
-    if '069500.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (시총가중)", line=dict(color='#1f77b4', width=2)))
-    if '252650.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['252650.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
-    fig1.update_layout(title="최근 6개월 주도주 vs 시장 지수 수익률 변화 (Base 100)", height=450, hovermode="x unified")
-    st.plotly_chart(fig1, use_container_width=True)
-
-    # 2. 동일 가중 지수의 하락 또는 정체
-    st.header("2. 동일 가중 지수(Equal-Weighted Index)의 하락 또는 정체")
-    st.markdown("시가총액 가중 지수는 주도주의 비중이 커서 시장의 건강성을 왜곡할 수 있습니다. 반면, 모든 종목을 동일한 비중(1/n)으로 계산하는 동일 가중 지수가 하락하거나 전고점을 회복하지 못하고 있다면, 이는 주도주 이외의 나머지 종목들이 힘을 잃고 있다는 징후입니다.")
-    
-    if '069500.KS' in df_norm.columns and '252650.KS' in df_norm.columns:
-        spread = df_norm['069500.KS'] - df_norm['252650.KS']
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=spread.index, y=spread, name="시총가중 - 동일가중 격차", fill='tozeroy', line=dict(color='#9467bd', width=2)))
-        fig2.update_layout(title="KODEX 200 (시총가중) vs KODEX 200 동일가중 수익률 격차 (격차가 클수록 쏠림 심화)", height=400, hovermode="x unified")
-        st.plotly_chart(fig2, use_container_width=True)
-
-    # 3. 확산의 부재
-    st.header("3. '확산'의 부재")
-    st.markdown("주도주 외의 후발 주자들이 함께 성장하는 '확산'의 모습이 나타나지 않고, 오직 주도주만 독식하는 구조가 지속될 때 경계심을 가져야 합니다.")
-    
-    fig3 = go.Figure()
-    if '069500.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
-    if '005930.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
-    if '000660.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
-    if '091180.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (후발주)", line=dict(color='#2ca02c', width=2, dash='dash')))
-    fig3.update_layout(title="확산 여부 확인: 주도주(반도체) vs 후발주(자동차) 동향 (Base 100)", height=450, hovermode="x unified")
-    st.plotly_chart(fig3, use_container_width=True)
-
     st.markdown("---")
     st.header("🤖 실시간 AI 진단 (김효진 박사 관점)")
     
@@ -192,3 +149,48 @@ def render_overheat_page():
             st.success("분석 완료")
             with st.container(border=True):
                 st.markdown(analysis_result)
+
+    st.markdown("---")
+    # 1. 주도주와 비주도주 간의 극단적인 수익률 격차
+    st.header("1. 주도주와 비주도주 간의 극단적인 수익률 격차")
+    st.markdown("과거 닷컴 버블 당시의 사례처럼, 시장 전체의 지수는 상승하지만 주도주를 제외한 대다수 종목들의 수익률이 마이너스로 돌아설 때입니다. 이는 시장에 새로운 유동성이 유입되는 것이 아니라, 기존 자금이 힘없는 종목을 팔아 주도주로만 몰리는 상황임을 의미하며, 이는 상승 사이클의 고점이 다가왔다는 강력한 신호로 해석될 수 있습니다.")
+    
+    fig1 = go.Figure()
+    if '005930.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
+    if '000660.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
+    if '069500.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (시총가중)", line=dict(color='#1f77b4', width=2)))
+    if '252650.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['252650.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
+    fig1.update_layout(title="최근 6개월 주도주 vs 시장 지수 수익률 변화 (Base 100)", height=450, hovermode="x unified")
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # 2. 동일 가중 지수의 하락 또는 정체
+    st.header("2. 동일 가중 지수(Equal-Weighted Index)의 하락 또는 정체")
+    st.markdown("시가총액 가중 지수는 주도주의 비중이 커서 시장의 건강성을 왜곡할 수 있습니다. 반면, 모든 종목을 동일한 비중(1/n)으로 계산하는 동일 가중 지수가 하락하거나 전고점을 회복하지 못하고 있다면, 이는 주도주 이외의 나머지 종목들이 힘을 잃고 있다는 징후입니다.")
+    
+    if '069500.KS' in df_norm.columns and '252650.KS' in df_norm.columns:
+        spread = df_norm['069500.KS'] - df_norm['252650.KS']
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=spread.index, y=spread, name="시총가중 - 동일가중 격차", fill='tozeroy', line=dict(color='#9467bd', width=2)))
+        fig2.update_layout(title="KODEX 200 (시총가중) vs KODEX 200 동일가중 수익률 격차 (격차가 클수록 쏠림 심화)", height=400, hovermode="x unified")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # 3. 확산의 부재
+    st.header("3. '확산'의 부재")
+    st.markdown("주도주 외의 후발 주자들이 함께 성장하는 '확산'의 모습이 나타나지 않고, 오직 주도주만 독식하는 구조가 지속될 때 경계심을 가져야 합니다.")
+    
+    fig3 = go.Figure()
+    if '069500.KS' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
+    if '005930.KS' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
+    if '000660.KS' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
+    if '091180.KS' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (후발주)", line=dict(color='#2ca02c', width=2, dash='dash')))
+    fig3.update_layout(title="확산 여부 확인: 주도주(반도체) vs 후발주(자동차) 동향 (Base 100)", height=450, hovermode="x unified")
+    st.plotly_chart(fig3, use_container_width=True)
+
