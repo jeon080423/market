@@ -24,7 +24,7 @@ def render_overheat_page():
         # 반도체 주도주 (삼성전자, SK하이닉스) vs 타 섹터 (KODEX 자동차)
         tickers_map = {
             '069500.KS': '069500',
-            '201590.KS': '201590',
+            '252650.KS': '252650',
             '005930.KS': '005930',
             '000660.KS': '000660',
             '091180.KS': '091180'
@@ -91,8 +91,8 @@ def render_overheat_page():
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
     if '069500.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (시총가중)", line=dict(color='#1f77b4', width=2)))
-    if '201590.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['201590.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
+    if '252650.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['252650.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
     fig1.update_layout(title="최근 6개월 주도주 vs 시장 지수 수익률 변화 (Base 100)", height=450, hovermode="x unified")
     st.plotly_chart(fig1, use_container_width=True)
 
@@ -100,8 +100,8 @@ def render_overheat_page():
     st.header("2. 동일 가중 지수(Equal-Weighted Index)의 하락 또는 정체")
     st.markdown("시가총액 가중 지수는 주도주의 비중이 커서 시장의 건강성을 왜곡할 수 있습니다. 반면, 모든 종목을 동일한 비중(1/n)으로 계산하는 동일 가중 지수가 하락하거나 전고점을 회복하지 못하고 있다면, 이는 주도주 이외의 나머지 종목들이 힘을 잃고 있다는 징후입니다.")
     
-    if '069500.KS' in df_norm.columns and '201590.KS' in df_norm.columns:
-        spread = df_norm['069500.KS'] - df_norm['201590.KS']
+    if '069500.KS' in df_norm.columns and '252650.KS' in df_norm.columns:
+        spread = df_norm['069500.KS'] - df_norm['252650.KS']
         fig2 = go.Figure()
         fig2.add_trace(go.Scatter(x=spread.index, y=spread, name="시총가중 - 동일가중 격차", fill='tozeroy', line=dict(color='#9467bd', width=2)))
         fig2.update_layout(title="KODEX 200 (시총가중) vs KODEX 200 동일가중 수익률 격차 (격차가 클수록 쏠림 심화)", height=400, hovermode="x unified")
@@ -179,7 +179,7 @@ def render_overheat_page():
         with st.spinner("AI가 최근 6개월 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
             # 데이터 추출
             recent_data = {}
-            ticker_names = {'069500.KS': 'KODEX 200(시총가중)', '201590.KS': 'KODEX 200 동일가중', '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)'}
+            ticker_names = {'069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)'}
             for col, name in ticker_names.items():
                 if col in df_norm.columns:
                     recent_data[name] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
@@ -188,8 +188,5 @@ def render_overheat_page():
             analysis_result = get_ai_overheat_analysis(data_text)
             
             st.success("분석 완료")
-            st.markdown(f"""
-            <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; border-left:5px solid #ff4b4b;">
-            {analysis_result}
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown(analysis_result)
