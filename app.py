@@ -1466,7 +1466,7 @@ if st.session_state.get("run_ai_trigger"):
             "indicator": indicator_result
         }
         st.session_state["ai_last_data_hash"] = current_data_hash
-        st.session_state["ai_last_saved_at"] = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
+        st.session_state["ai_last_saved_at"] = get_kst_now().strftime("%Y-%m-%d %H:%M:%S")
         
         save_ai_cache(SHEET_ID, "main_risk", current_data_hash, json.dumps(st.session_state["ai_analysis_results"], ensure_ascii=False))
         
