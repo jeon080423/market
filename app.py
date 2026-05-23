@@ -1387,76 +1387,58 @@ st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsA
 # --- [AI 분석: 맨 마지막에 처리] ---
 if st.session_state.get("run_ai_trigger"):
     with st.spinner("AI 분석 엔진을 가동하여 데이터를 통합 분석하고 있습니다..."):
-        # 1. AI 뉴스 통합 분석
-        news_result = ""
-        if news_data:
-            prompt = f"""다음 영어 뉴스 헤드라인들을 전문적인 한국어로 번역하세요. 번역문만 번호와 함께 출력하세요. 설명이나 원문 반복은 금지입니다. 고유명사는 영어 가능.
-
-{all_titles}
-
-반드시 아래 형식으로만 출력하세요. (괄호 안의 내용은 실제 번역문으로 대체할 것):
-<result>
-[이곳에 번역된 텍스트 전체를 작성하세요]
-</result>"""
-            summary_text = get_ai_analysis(prompt)
-            news_result = clean_ai_output(summary_text)
-
-        # 1.5 트럼프 트윗 통합 번역
-        trump_result = ""
+        # ── [통합 AI 분석: 4개 작업을 1회 API 호출로 처리] ──────────────
+        trump_raw = ""
         if 'trump_data' in locals() and trump_data:
-            all_t_text = "\n\n---\n\n".join([
+            trump_raw = "\n\n---\n\n".join([
                 f"{t.get('title', '')} {t.get('description', '')}".strip()
                 for t in trump_data
                 if len(f"{t.get('title', '')} {t.get('description', '')}".strip()) >= 10
             ])
-            if all_t_text:
-                t_translate_prompt = f"""다음 영어 게시물을 자연스러운 한국어 단락으로 번역하세요. 영어 원문 인용, 설명, 메타 텍스트는 일절 금지. 번역 결과만 출력.
 
-{all_t_text}
-
-반드시 아래 형식으로만 출력하세요. (괄호 안의 내용은 실제 번역문으로 대체할 것):
-<result>
-[이곳에 번역된 단락을 작성하세요]
-</result>"""
-                t_translated = get_ai_analysis(t_translate_prompt)
-                trump_result = clean_ai_output(t_translated)
-
-        # 2. 모델 유효성 진단
-        bt_result = ""
+        bt_data_text = ""
         if 'corr_val' in locals() and 'hist_risks' in locals():
-            bt_prompt = f"""
-            Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.\n\n데이터:
-            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
-            - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
-            - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
-            
-            CRITICAL RULES:
-            1. Output ONLY the final Korean analysis.
-            2. You MUST NOT include any conversational text, explanations, or thinking processes.
-            3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
-            
-            Output format:
-            <result>
-            [상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 실제 단일 문단을 작성하세요]
-            </result>
-            """
-            bt_analysis = get_ai_analysis(bt_prompt)
-            bt_result = clean_ai_output(bt_analysis)
+            bt_data_text = f"상관계수: {corr_val:.2f}, 현재 위험지수: {hist_risks[-1]:.1f}, 최근7일: {[round(r,1) for r in hist_risks[-7:]]}"
 
-        # 3. 현재 시장 지표 종합 진단
-        indicator_result = ""
-        if 'latest_data_summary' in locals():
-            ai_desc_prompt = f"""아래 시장 지표 데이터를 분석하여 현재 한국 증시(KOSPI) 상황을 한국어로 진단하세요. 영단어, 한자, 마크다운 기호 사용 금지. 설명 없이 분석 결과만 출력.
+        unified_prompt = f"""당신은 한국 금융시장 전문 AI 분석가입니다. 아래 4가지 작업을 한 번에 수행하고, 반드시 지정된 XML 태그 형식으로만 출력하세요. 태그 바깥에는 아무것도 쓰지 마세요.
 
-데이터:
-{latest_data_summary}
+[작업1] 뉴스 헤드라인 번역 (영어→한국어, 번호 유지, 원문 반복 금지):
+{all_titles if news_data else "뉴스 없음"}
 
-반드시 아래 형식으로만 출력하세요. (괄호 안의 내용은 실제 분석 텍스트로 대체할 것):
-<result>
-[현재 지표 상태 요약 2문장과 시장 진단 및 투자자 주의사항 2문장, 총 4문장의 실제 텍스트를 작성하세요]
-</result>"""
-            analysis_output = get_ai_analysis(ai_desc_prompt)
-            indicator_result = clean_ai_output(analysis_output)
+[작업2] 트럼프 소셜 번역 (영어→자연스러운 한국어 단락, 원문 인용 금지):
+{trump_raw if trump_raw else "데이터 없음"}
+
+[작업3] 시장 위험 지수 진단 (마크다운/영단어/한자 금지, 3~4문장):
+{bt_data_text if bt_data_text else "데이터 없음"}
+
+[작업4] 시장 지표 종합 진단 (마크다운/영단어/한자 금지, 4문장):
+{latest_data_summary if 'latest_data_summary' in locals() else "데이터 없음"}
+
+출력 형식 (태그 안에만 실제 내용 작성):
+<news>
+번역된 뉴스 헤드라인 목록
+</news>
+<trump>
+번역된 트럼프 소셜 단락
+</trump>
+<bt>
+위험 지수 진단 문단
+</bt>
+<indicator>
+시장 지표 종합 진단 문단
+</indicator>"""
+
+        unified_result = get_ai_analysis(unified_prompt)
+
+        import re as _re
+        def _extract(tag, text):
+            m = _re.search(rf'<{tag}>(.*?)</{tag}>', text, _re.DOTALL | _re.IGNORECASE)
+            return m.group(1).strip() if m else ""
+
+        news_result    = _extract("news", unified_result)
+        trump_result   = _extract("trump", unified_result)
+        bt_result      = _extract("bt", unified_result)
+        indicator_result = _extract("indicator", unified_result)
 
         # Save to session state and reset trigger
         st.session_state["ai_analysis_results"] = {
