@@ -895,26 +895,24 @@ try:
         # 2. X축 재정렬 (폭락 시점 = 0)
         hist_x = np.arange(len(hist_series)) - crash_idx
         
-        # 3. 최적 정렬(상관관계 슬라이딩 윈도우) 찾기
+        # 3. 현재 궤적의 마지막 날이 D-Day(0)가 되도록 강제 정렬
         M = len(current_series)
         N = len(hist_series)
-        best_corr = -1
-        best_offset = 0
+        curr_x = np.arange(M) - (M - 1)
         
-        if N > M:
-            for offset in range(N - M + 1):
-                window = hist_series.values[offset:offset+M]
-                if np.std(window) > 0 and np.std(current_series.values) > 0:
-                    corr = np.corrcoef(window, current_series.values)[0, 1]
-                    if corr > best_corr:
-                        best_corr = corr
-                        best_offset = offset
+        # 4. 과거 궤적 중 현재 궤적과 겹치는 구간의 상관계수 계산
+        best_corr = 0
+        if crash_idx - (M - 1) >= 0:
+            window = hist_series.values[crash_idx - (M - 1) : crash_idx + 1]
+            if len(window) == M and np.std(window) > 0 and np.std(current_series.values) > 0:
+                best_corr = np.corrcoef(window, current_series.values)[0, 1]
         else:
-            best_corr = 0
-            best_offset = 0
-            
-        # 4. 현재 궤적의 X축 계산
-        curr_x = np.arange(M) + best_offset - crash_idx
+            overlap_len = crash_idx + 1
+            if overlap_len > 1:
+                window = hist_series.values[:overlap_len]
+                curr_overlap = current_series.values[-overlap_len:]
+                if np.std(window) > 0 and np.std(curr_overlap) > 0:
+                    best_corr = np.corrcoef(window, curr_overlap)[0, 1]
         
         fig = go.Figure()
         
@@ -939,25 +937,17 @@ try:
         fig.add_vline(x=curr_last_x, line_width=2, line_dash="dash", line_color="gray")
         
         # 현재 위치 텍스트
-        days_to_crash = -curr_last_x
-        if days_to_crash > 0:
-            status_text = f"현재 위치 (D-{int(days_to_crash)})"
-        elif days_to_crash == 0:
-            status_text = f"현재 위치 (D-Day)"
-        else:
-            status_text = f"현재 위치 (D+{int(-days_to_crash)})"
-            
         fig.add_annotation(
-            x=curr_last_x, y=current_series.values[-1], text=status_text, 
+            x=curr_last_x, y=current_series.values[-1], text="현재 위치 (D-Day 가정)", 
             showarrow=True, arrowhead=1, arrowsize=1, arrowcolor="gray",
-            font=dict(color="black", size=11, weight="bold"), ax=40, ay=0
+            font=dict(color="black", size=11, weight="bold"), ax=50, ay=0
         )
         
         # 유사도 점수 표시 (우측 상단)
         sim_score = max(0, best_corr * 100)
         fig.add_annotation(
             x=0.02, y=0.98, xref="paper", yref="paper",
-            text=f"🚨 과거 패턴 일치율: {sim_score:.1f}%",
+            text=f"🚨 폭락 직전 패턴 일치율: {sim_score:.1f}%",
             showarrow=False,
             font=dict(color="red" if sim_score > 70 else "black", size=13, weight="bold"),
             bgcolor="rgba(255, 255, 255, 0.8)", bordercolor="red" if sim_score > 70 else "gray", borderwidth=1
@@ -969,7 +959,7 @@ try:
             yaxis_title="위험 지수",
             margin=dict(l=0, r=0, t=30, b=30)
         )
-        return fig, sim_score, days_to_crash
+        return fig, sim_score, 0
 
     col_bs1, col_bs2 = st.columns(2)
     avg_current_risk = np.mean(hist_df['Risk'].iloc[-30:])
