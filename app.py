@@ -1087,11 +1087,12 @@ if news_data and ai_news_container:
         with st.spinner("AI가 뉴스를 분석 중입니다..."):
             prompt = f"""
             Task: Translate the following English news headlines into professional Korean.
-            Rules:
-            - Provide EXACTLY one translated Korean headline for each English headline.
-            - Output ONLY the Korean translations.
-            - NO keywords, NO drafting, NO thinking process, NO English words.
-            - MUST enclose your final answer inside <result> and </result> tags!
+            
+            CRITICAL RULES:
+            1. Provide EXACTLY one translated Korean headline for each English headline.
+            2. You MUST NOT include any conversational text, explanations, or thinking processes. 
+            3. You MUST output ONLY the final translated text inside <result>...</result> tags. NO preamble, NO postamble.
+            4. It is okay to use English for proper nouns (e.g., S&P 500, KOSPI) if they are more natural.
             
             Input Headlines:
             {all_titles}
@@ -1126,10 +1127,12 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
                     
                 t_translate_prompt = f"""
                 Task: Translate the following social media post into ONE single natural Korean paragraph.
-                Rules:
-                - Output ONLY the Korean translation.
-                - NEVER output the original English text.
-                - MUST enclose your final answer inside <result> and </result> tags!
+                
+                CRITICAL RULES:
+                1. Output ONLY the Korean translation.
+                2. NEVER output the original English text.
+                3. You MUST NOT include any conversational text, explanations, or thinking processes.
+                4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
                 
                 Input: {t_text}
                 
@@ -1167,10 +1170,11 @@ if bt_analysis_container:
             - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
             - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
             
-            Rules:
-            - Output ONLY the final Korean analysis. NO English, NO thinking process.
-            - 한자(漢字) 절대 금지. 마크다운 기호(*, # 등) 절대 금지.
-            - MUST enclose your final answer inside <result> and </result> tags!
+            CRITICAL RULES:
+            1. Output ONLY the final Korean analysis.
+            2. You MUST NOT include any conversational text, explanations, or thinking processes.
+            3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요. 마크다운 기호 절대 금지.
+            4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
             
             Output format:
             <result>
@@ -1195,10 +1199,11 @@ if ai_indicator_container:
                 
                 데이터: {latest_data_summary}
                 
-                Rules:
-                - Output ONLY the final Korean analysis. NO English.
-                - 한자(漢字) 절대 금지. 마크다운 기호(*, # 등) 절대 금지.
-                - MUST enclose your final answer inside <result> and </result> tags!
+                CRITICAL RULES:
+                1. Output ONLY the final Korean analysis.
+                2. You MUST NOT include any conversational text, explanations, or thinking processes.
+                3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요. 마크다운 기호 절대 금지.
+                4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
                 
                 Output format:
                 <result>
