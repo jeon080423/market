@@ -97,6 +97,16 @@ def render_overheat_page():
     st.header("🌡️ 시장 과열 지수 (Market Overheat Index, 0~100)")
     st.markdown("4가지 핵심 리스크 시그널을 **각각 0~100점으로 정규화(Z-Score + Sigmoid)**한 후 가중 평균하여 산출한 단일 복합 과열 지수입니다. 50점이 중립, 70점 이상이면 과열 경보, 85점 이상이면 위험 구간입니다.")
 
+    # 닷컴버블 분석 가중치 프리셋 선택부
+    col_preset, _ = st.columns([2.5, 1.5])
+    with col_preset:
+        overheat_model = st.selectbox(
+            "🎯 위기 가중치 분석 모델 선택",
+            ["2020 코로나 폭락 모델", "2000 닷컴버블 폭락 모델", "하이브리드 균형 모델 (권장)"],
+            index=2,
+            help="역사적 위기 데이터(2020 코로나 및 2000 닷컴버블)의 특성에 의거해 가중치를 조정합니다."
+        )
+
     # ─────────────────────────────────────────────────────────────────
     # [복합 과열 지수 계산 엔진] Z-Score + Sigmoid 0~100 정규화 방식
     # 각 시그널의 단위가 달라도 비교 가능한 0~100 스코어로 변환 후 가중 평균
@@ -153,8 +163,17 @@ def render_overheat_page():
         spread_spec = pd.Series(0.0, index=df_norm.index)
     s4_raw = sigmoid_score(spread_spec)
 
-    # ── 가중 평균 합산 (2020년 폭락 데이터 기반 최적화 가중치) ──
-    W1, W2, W3, W4 = 0.35, 0.30, 0.15, 0.20
+    # ── 가중치 프리셋 분석 및 동적 매핑 ──
+    if overheat_model == "2020 코로나 폭락 모델":
+        W1, W2, W3, W4 = 0.35, 0.30, 0.15, 0.20
+        model_desc = "2020년 팬데믹 폭락 당시의 쏠림(35%) 및 채권 자경단(30%) 리스크에 특화된 모델"
+    elif overheat_model == "2000 닷컴버블 폭락 모델":
+        W1, W2, W3, W4 = 0.30, 0.15, 0.25, 0.30
+        model_desc = "2000년 닷컴버블 당시의 극단적 IPO 투기 광풍(30%) 및 회사채 크레딧 스프레드 선행 상승(25%) 리스크를 반영한 모델"
+    else:  # 하이브리드 균형 모델 (권장)
+        W1, W2, W3, W4 = 0.32, 0.23, 0.20, 0.25
+        model_desc = "2020년과 2000년 두 차례 역사적 위기의 특성을 고르게 반영한 하이브리드 균형 모델"
+
     df_overheat = pd.DataFrame({
         '쏠림_리스크':    s1_raw * W1,
         '채권자경단':     s2_raw * W2,
@@ -278,22 +297,22 @@ def render_overheat_page():
     # 컴포넌트 기여도 (스택 에리어)
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['쏠림_리스크'],
-        name='주도주 쏠림 (×0.35)', mode='lines',
+        name=f'주도주 쏠림 (×{W1:.2f})', mode='lines',
         line=dict(color='#3498db', width=1, dash='dot'), opacity=0.6
     ))
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['채권자경단'],
-        name='채권자경단 (×0.30)', mode='lines',
+        name=f'채권자경단 (×{W2:.2f})', mode='lines',
         line=dict(color='#e74c3c', width=1, dash='dot'), opacity=0.6
     ))
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['크레딧_스트레스'],
-        name='크레딧 스트레스 (×0.15)', mode='lines',
+        name=f'크레딧 스트레스 (×{W3:.2f})', mode='lines',
         line=dict(color='#9b59b6', width=1, dash='dot'), opacity=0.6
     ))
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['투기적_과열'],
-        name='투기적 과열 (×0.20)', mode='lines',
+        name=f'투기적 과열 (×{W4:.2f})', mode='lines',
         line=dict(color='#f39c12', width=1, dash='dot'), opacity=0.6
     ))
     # 종합 지수 (굵은 선)
@@ -321,7 +340,10 @@ def render_overheat_page():
     st.info(f"""💡 **과열 지수(MOI) 해석 가이드**
 {grade_emoji} **현재 {latest_idx:.1f}점 ({grade})** | 5일 전 대비 **{delta_5d:+.1f}점**
 
-각 시그널(주도주 쏠림·채권자경단·크레딧·투기자금)을 Z-Score+Sigmoid로 0~100점 정규화 후 역사적 폭락장(2020년 코로나 폭락) 데이터를 반영해 고도화된 가중치(쏠림 35%, 채권자경단 30%, 크레딧 15%, 투기 20%)로 가중합산합니다. 
+**적용 모델**: {model_desc}
+(가중치: 쏠림 {W1*100:.1f}%, 채권자경단 {W2*100:.1f}%, 크레딧 {W3*100:.1f}%, 투기적 과열 {W4*100:.1f}%)
+
+각 시그널을 Z-Score+Sigmoid로 0~100점 정규화한 후, 선택된 위기 가중치 모델 데이터를 반영하여 가중 평균하여 산출합니다. 
 50점 = 과거 평균 수준, 70점 이상이면 과열 경보, 85점 이상이면 강력한 매도 대기 신호입니다.""")
 
 
