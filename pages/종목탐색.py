@@ -162,6 +162,56 @@ def crawl_naver_price_surge(sosok: int) -> pd.DataFrame:
         st.warning(f"주가 급등 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
+@st.cache_data(ttl=60)
+def crawl_naver_foreigner_top() -> pd.DataFrame:
+    """
+    네이버 금융 실시간 외국인 순매수 상위 종목 크롤링
+    - 반환: DataFrame [순위, 종목명, 티커, 현재가, 등락]
+    """
+    url = "https://finance.naver.com/sise/sise_deal_rank.naver?investor_gubun=1000"
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        res.raise_for_status()
+        soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
+        
+        table = soup.find('table', {'class': 'type_r1'})
+        if not table: return pd.DataFrame()
+            
+        rows = table.find_all('tr')
+        stocks = []
+        rank_counter = 1
+        for row in rows:
+            cols = row.find_all('td')
+            if len(cols) >= 3:
+                name_a = cols[1].find('a')
+                if name_a:
+                    name = name_a.get_text(strip=True)
+                    ticker = name_a['href'].split('code=')[-1]
+                    price = cols[2].get_text(strip=True)
+                    
+                    change_dir = ""
+                    if len(cols) >= 4:
+                        change_img = cols[3].find('img')
+                        if change_img:
+                            alt_val = change_img.get('alt', '')
+                            if 'up' in alt_val:
+                                change_dir = "▲"
+                            elif 'down' in alt_val:
+                                change_dir = "▼"
+                                
+                    stocks.append({
+                        '순위': str(rank_counter),
+                        '종목명': name,
+                        '티커': ticker,
+                        '현재가': price,
+                        '등락': change_dir
+                    })
+                    rank_counter += 1
+        return pd.DataFrame(stocks)
+    except Exception as e:
+        st.warning(f"외국인 순매수 상위 크롤링 중 오류가 발생했습니다: {e}")
+        return pd.DataFrame()
+
 def render_naver_sise_table(df: pd.DataFrame):
     """
     KOSPI / KOSDAQ 공통 데이터 프레임 렌더링 테이블
@@ -200,7 +250,7 @@ def render_naver_sise_table(df: pd.DataFrame):
     cols_config = {
         "순위": st.column_config.TextColumn("순위", width="small"),
         "종목명": st.column_config.TextColumn("종목명", width="medium"),
-        "티커": None,  # 다중 열 레이아웃에서 가로 공간 확보를 위해 감춤
+        "티커": None,  # 가로 공간 확보를 위해 감춤
     }
     
     if "검색 비율" in df_display.columns:
@@ -209,6 +259,8 @@ def render_naver_sise_table(df: pd.DataFrame):
         cols_config["현재가"] = st.column_config.TextColumn("현재가", width="small")
     if "등락률" in df_display.columns:
         cols_config["등락률"] = st.column_config.TextColumn("등락률", width="medium")
+    if "등락" in df_display.columns:
+        cols_config["등락"] = st.column_config.TextColumn("등락", width="small")
     if "거래량" in df_display.columns:
         cols_config["거래량"] = st.column_config.TextColumn("거래량", width="small")
         
@@ -224,27 +276,29 @@ def render_youtube_rank_page():
     """
     실시간 수급 및 가격 지표 기반 선행 종목 탐색 엔진 (app.py 호환 진입점)
     """
-    # 타이틀 및 헤더 영역 SEO 키워드 튜닝 (신영증권, 김효진 박사 관점)
-    st.title("📊 신영증권 김효진 박사 관점 실시간 코스피(KOSPI) 거래량 급증 및 주가 급등 종목 탐색")
+    st.title("📊 실시간 코스피(KOSPI) 거래량 급증 및 주가 급등 종목 탐색")
     
     st.markdown("""
-    이 대시보드는 **신영증권 김효진 박사**의 선행 리스크 분석 및 매크로 지표 방법론을 지원하기 위해 주식 시장의 실시간 가격, 수급, 거래량 정보를 모니터링합니다.
+    이 대시보드는 주식 시장의 실시간 가격, 수급, 거래량 정보를 모니터링합니다.
     작성 속도가 느리고 과거 사실만 기록하는 일반 뉴스보다 훨씬 선행하여 자금의 이동을 알려주는 **'거래량 및 주가 돌파 데이터(Market Trinity)'**를 네이버 금융에서 60초 간격으로 초고속 추적합니다.
     """)
     
     # 아코디언 가이드 최적화
     with st.expander("💡 실시간 거래량 및 가격 선행 지표 탐색기 작동 원리 자세히 보기", expanded=False):
         st.markdown("""
-        이 탐색기는 뉴스 미디어의 정보 지연 문제를 완벽히 해결하기 위해 주식 트레이딩의 가장 근원적인 3대 요소인 **'관심도(Search)', '유동성(Volume)', '모멘텀(Price)'**을 결합하여 시장보다 한발 앞서 주도 테마를 포착하도록 돕습니다.
+        이 탐색기는 뉴스 미디어의 정보 지연 문제를 완벽히 해결하기 위해 주식 트레이딩의 핵심 요소인 **'개인 관심도(Search)', '외국인 관심도(Foreigner Net Buy)', '유동성(Volume)', '모멘텀(Price)'**을 결합하여 시장의 자금 흐름을 선제적으로 포착합니다.
         
-        #### 1. 관심도: 실시간 포털 인기 검색 종목
+        #### 1. 개인 관심도: 실시간 인기 검색 종목
         * 포털 사이트 내 투자자들의 실시간 개별 종목 검색 볼륨 트렌드를 포착합니다. 개인 투자자들의 투자 심리 쏠림 및 시장의 단기 이슈를 가장 즉각적으로 반영합니다.
         
-        #### 2. 유동성 (선행 지표): 실시간 거래량 상위 종목
-        * 기술적 분석에서 **"거래량은 주가에 선행한다"**는 절대 원칙에 기반합니다.
-        * KOSPI 및 KOSDAQ 각 시장의 실시간 총 거래량 상위 종목을 추출하여 메이저 기관/외국인 자금(Smart Money)이 유입되는 시장 유동성 병목 지점을 포착합니다.
+        #### 2. 외국인 관심도: 외국인 실시간 순매수 상위 종목
+        * 당일 외국인 투자자들의 자금이 집중 유입되는 순매수 상위 종목입니다. 외국인 메이저 자금의 매수 트렌드와 장기 관심도를 직접적으로 나타냅니다.
         
-        #### 3. 모멘텀: 실시간 주가 급등 종목
+        #### 3. 유동성 (선행 지표): 실시간 거래량 상위 종목
+        * 기술적 분석에서 **"거래량은 주가에 선행한다"**는 절대 원칙에 기반합니다.
+        * KOSPI 및 KOSDAQ 각 시장의 실시간 총 거래량 상위 종목을 추출하여 기관/외국인 자금(Smart Money)이 유입되는 시장 유동성 병목 지점을 포착합니다.
+        
+        #### 4. 모멘텀: 실시간 주가 급등 종목
         * 당일 강한 상승 돌파 거래량과 함께 가격 상승 변동폭이 극대화되는 상방 모멘텀 종목을 추출합니다. 당일 주도 테마의 대장주 및 변동성 돌파 거래 타겟을 신속하게 식별할 수 있습니다.
         """)
         
@@ -265,20 +319,23 @@ def render_youtube_rank_page():
         
     st.markdown("---")
     
-    # 1시간 TTL 캐싱 데이터 로딩
+    # 60초 TTL 캐싱 데이터 로딩
     if "market_data" not in st.session_state:
-        with st.spinner("실시간 시장 데이터(인기검색/거래상위/급등)를 크롤링 중입니다..."):
+        with st.spinner("실시간 시장 데이터(인기검색/외인순매수/거래상위/급등)를 크롤링 중입니다..."):
             # 1. 인기검색
             df_popular = crawl_naver_popular_stocks()
-            # 2. 거래상위 (KOSPI & KOSDAQ)
+            # 2. 외국인 순매수 상위
+            df_foreigner = crawl_naver_foreigner_top()
+            # 3. 거래상위 (KOSPI & KOSDAQ)
             df_vol_kospi = crawl_naver_volume_top(0)
             df_vol_kosdaq = crawl_naver_volume_top(1)
-            # 3. 주가급등 (KOSPI & KOSDAQ)
+            # 4. 주가급등 (KOSPI & KOSDAQ)
             df_surge_kospi = crawl_naver_price_surge(0)
             df_surge_kosdaq = crawl_naver_price_surge(1)
             
             st.session_state["market_data"] = {
                 "popular": df_popular,
+                "foreigner": df_foreigner,
                 "vol_kospi": df_vol_kospi,
                 "vol_kosdaq": df_vol_kosdaq,
                 "surge_kospi": df_surge_kospi,
@@ -289,19 +346,28 @@ def render_youtube_rank_page():
     # Load from session state
     m_data = st.session_state["market_data"]
     df_popular = m_data["popular"]
+    df_foreigner = m_data["foreigner"]
     df_vol_kospi = m_data["vol_kospi"]
     df_vol_kosdaq = m_data["vol_kosdaq"]
     df_surge_kospi = m_data["surge_kospi"]
     df_surge_kosdaq = m_data["surge_kosdaq"]
 
-    # --- 1행: 실시간 인기 검색 종목 ---
-    st.subheader("🔥 1. 실시간 포털 인기 검색 종목 (개인 관심도)")
-    st.caption("네이버 금융에서 현재 개인/기관 투자자들이 가장 집중적으로 검색하고 토론하는 실시간 관심 종목 리스트입니다.")
-    render_naver_sise_table(df_popular)
+    # --- 1행: 실시간 인기 검색 종목 (개인 관심도) & 외국인 순매수 상위 종목 (외국인 관심도) ---
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader("🔥 1. 실시간 포털 인기 검색 종목 (개인 관심도)")
+        st.caption("네이버 금융에서 현재 개인 투자자들이 가장 집중적으로 검색하고 토론하는 실시간 관심 종목 리스트입니다.")
+        render_naver_sise_table(df_popular)
+        
+    with col_b:
+        st.subheader("🌍 2. 외국인 실시간 순매수 상위 종목 (외국인 관심도)")
+        st.caption("당일 외국인 투자자들의 자금이 유입되며 순매수 강세를 보이는 시장 주도 종목 리스트입니다.")
+        render_naver_sise_table(df_foreigner)
+        
     st.markdown("---")
 
     # --- 2행: 실시간 거래량 상위 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("📊 2. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
+    st.subheader("📊 3. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
     st.caption("KOSPI 및 KOSDAQ 시장에서 대량 거래가 유입되어 유동성 쏠림이 극대화된 종목 리스트입니다. 거래량은 수급의 선행 시그널입니다.")
     
     col1, col2 = st.columns(2)
@@ -314,7 +380,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- 3행: 실시간 주가 급등 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("⚡ 3. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
+    st.subheader("⚡ 4. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
     st.caption("당일 거래량 증가를 수반하며 가격 등락 변동률이 가장 높은 상방 돌파 주도 테마 종목 리스트입니다.")
     
     col3, col4 = st.columns(2)

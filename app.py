@@ -25,7 +25,7 @@ from pages.종목탐색 import render_youtube_rank_page
 from pages.overheat import render_overheat_page
 
 # 1. 페이지 설정
-st.set_page_config(page_title="신영증권 김효진 박사 관점 코스피(KOSPI) 전망 및 시장 과열 위험 모니터링 대시보드", layout="wide")
+st.set_page_config(page_title="코스피(KOSPI) 전망 및 시장 과열 위험 모니터링 대시보드", layout="wide")
 
 # 자동 새로고침 설정 (10분 간격)
 try:
@@ -270,13 +270,13 @@ st.markdown("""
         // Add description meta tag
         var metaDesc = window.parent.document.createElement('meta');
         metaDesc.name = 'description';
-        metaDesc.content = '신영증권 김효진 박사의 관점과 글로벌 거시 지표(환율, 금리, 물동량 등), AI 모델을 활용한 코스피(KOSPI) 전망 및 시장 과열 위험(MOI) 모니터링 대시보드입니다. 실시간 AI 진단과 시나리오별 백테스팅을 제공합니다.';
+        metaDesc.content = '글로벌 거시 지표(환율, 금리, 물동량 등)와 AI 모델을 활용한 코스피(KOSPI) 전망 및 시장 과열 위험(MOI) 모니터링 대시보드입니다. 실시간 AI 진단과 시나리오별 백테스팅을 제공합니다.';
         parentHead.appendChild(metaDesc);
         
         // Add keywords meta tag
         var metaKeywords = window.parent.document.createElement('meta');
         metaKeywords.name = 'keywords';
-        metaKeywords.content = '신영증권, 김효진, 김효진 박사, 코스피 전망, KOSPI 전망, 주식 시장 과열, 시장 위험 지수, AI 주식 분석, 주식 분석 대시보드';
+        metaKeywords.content = '코스피 전망, KOSPI 전망, 주식 시장 과열, 시장 위험 지수, AI 주식 분석, 주식 분석 대시보드';
         parentHead.appendChild(metaKeywords);
     </script>
     """, unsafe_allow_html=True)
@@ -302,7 +302,7 @@ with st.sidebar:
     if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
         st.rerun()
-    if st.button("📺 실시간 종목 탐색 (인기/뉴스)", use_container_width=True):
+    if st.button("📺 실시간 종목 탐색 (인기/수급)", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
     if st.button("🔥 과열 국면 시그널", use_container_width=True):
@@ -318,9 +318,9 @@ elif st.session_state["active_tab"] == "overheat_signal":
     st.stop()
 
 # 3. 제목 및 설명
-st.title("📊 신영증권 김효진 박사 관점 코스피(KOSPI) 전망 및 시장 과열 위험 모니터링")
+st.title("📊 코스피(KOSPI) 전망 및 시장 과열 위험 모니터링")
 st.markdown(f"""
-이 대시보드는 **신영증권 김효진 박사**의 시장 분석 관점과 글로벌 거시 지표를 융합하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험 및 시장 과열 지수(MOI)를 예측하고 모니터링합니다. 
+이 대시보드는 글로벌 거시 지표와 AI 모델을 융합하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험 및 시장 과열 지수(MOI)를 예측하고 모니터링합니다. 
 실시간 금융 데이터와 Gemini AI 엔진을 결합한 지능형 마켓 분석 툴킷입니다.
 
 (최종 분석 시각: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
