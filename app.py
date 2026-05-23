@@ -428,6 +428,22 @@ def load_data():
     except:
         sp500_sector_raw = pd.DataFrame(columns=list(sp500_sector_tickers.values()))
     
+    # BDRY 데이터가 비정상적일 경우 FinanceDataReader로 폴백
+    try:
+        if tickers["freight"] not in data.columns or data[tickers["freight"]].dropna().empty:
+            import FinanceDataReader as fdr
+            bdry_data = fdr.DataReader(tickers["freight"], start_date, end_date)
+            if not bdry_data.empty:
+                bdry_data = bdry_data[['Close']]
+                bdry_data.columns = [tickers["freight"]]
+                if hasattr(bdry_data.index, 'tz') and bdry_data.index.tz is not None:
+                    bdry_data.index = bdry_data.index.tz_localize(None)
+                if tickers["freight"] in data.columns:
+                    data = data.drop(columns=[tickers["freight"]])
+                data = data.join(bdry_data, how='outer')
+    except:
+        pass
+
     return (
         data[[tickers["kospi"]]] if tickers["kospi"] in data.columns else pd.DataFrame(columns=[tickers["kospi"]]), 
         data[[tickers["sp500"]]] if tickers["sp500"] in data.columns else pd.DataFrame(columns=[tickers["sp500"]]), 
