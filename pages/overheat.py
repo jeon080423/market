@@ -187,8 +187,15 @@ def render_overheat_page():
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
     if '252650.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['252650.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
-    fig1.update_layout(title="주도주 압착 현상: AI 주도주 vs 후발주 및 동일가중 지수 (Base 100)", height=450, hovermode="x unified")
+    fig1.update_layout(
+        title="주도주 압착 현상: AI 주도주 vs 후발주 및 동일가중 지수 (Base 100)", 
+        height=450, 
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(tickformat="%m월")
+    )
     st.plotly_chart(fig1, use_container_width=True)
+    st.info("💡 **차트 읽는 법:** 주도주(삼성전자, SK하이닉스) 선과 나머지 비주도 섹터/동일가중 선의 위아래 격차가 무섭게 벌어질수록 극소수 종목으로 자금이 몰리는 '압착(Compression)'이 극심함을 의미합니다.")
 
     # 2. 채권 자경단의 출현
     st.header("2. 채권 자경단의 출현")
@@ -201,8 +208,15 @@ def render_overheat_page():
         fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['CL=F'], name="WTI 유가", line=dict(color='#8c564b', width=2)))
     if '069500.KS' in df_norm.columns:
         fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
-    fig2.update_layout(title="채권 자경단 모니터링: 10년물 국채 금리 및 유가 상승 압력 (Base 100)", height=400, hovermode="x unified")
+    fig2.update_layout(
+        title="채권 자경단 모니터링: 10년물 국채 금리 및 유가 상승 압력 (Base 100)", 
+        height=400, 
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(tickformat="%m월")
+    )
     st.plotly_chart(fig2, use_container_width=True)
+    st.info("💡 **차트 읽는 법:** KODEX 200이 고점을 높이는데도 불구하고, 유가(WTI)와 미 국채 10년물 금리가 동반 급등한다면 인플레이션 우려로 인한 '채권 자경단'의 출현을 암시하는 위험 신호입니다.")
 
     # 3. 사모 크레딧 환매 리스크
     st.header("3. 사모 크레딧 환매 리스크")
@@ -213,8 +227,15 @@ def render_overheat_page():
         fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['HYG'], name="하이일드 ETF (HYG)", line=dict(color='#e377c2', width=2)))
     if '069500.KS' in df_norm.columns:
         fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
-    fig3.update_layout(title="크레딧 리스크 대용 지표: 하이일드 ETF 추이 (Base 100)", height=400, hovermode="x unified")
+    fig3.update_layout(
+        title="크레딧 리스크 대용 지표: 하이일드 ETF 추이 (Base 100)", 
+        height=400, 
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(tickformat="%m월")
+    )
     st.plotly_chart(fig3, use_container_width=True)
+    st.info("💡 **차트 읽는 법:** 증시는 평온해 보여도, 하이일드 ETF(HYG)가 하락하거나 크게 출렁인다면 수면 아래 사모 크레딧 등 비우량 신용 시장에서 자금이 이탈하고 있다는 숨은 경고등입니다.")
 
     # 4. 대형 IPO와 위험 선호도
     st.header("4. 대형 IPO와 위험 선호도")
@@ -225,6 +246,13 @@ def render_overheat_page():
         fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['IPO'], name="미국 IPO ETF", line=dict(color='#bcbd22', width=2)))
     if '069500.KS' in df_norm.columns:
         fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
-    fig4.update_layout(title="위험 선호도 정점 징후: 대형 IPO ETF 추이 (Base 100)", height=400, hovermode="x unified")
+    fig4.update_layout(
+        title="위험 선호도 정점 징후: 대형 IPO ETF 추이 (Base 100)", 
+        height=400, 
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(tickformat="%m월")
+    )
     st.plotly_chart(fig4, use_container_width=True)
+    st.info("💡 **차트 읽는 법:** 스페이스X 등 대형 IPO 이슈와 맞물려 미국 IPO ETF가 가파르게 급등한다면, 시장의 투기적 과열과 위험 선호도가 극단에 달한 단기 정점일 가능성이 높습니다.")
 
