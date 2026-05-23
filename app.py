@@ -18,6 +18,9 @@ import os
 try:
     if os.path.exists("pages/youtube_rank.py"):
         os.remove("pages/youtube_rank.py")
+except Exception:
+    pass
+
 from pages.종목탐색 import render_youtube_rank_page
 from pages.overheat import render_overheat_page
 
