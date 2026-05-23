@@ -1394,9 +1394,9 @@ if st.session_state.get("run_ai_trigger"):
 
 {all_titles}
 
-반드시 아래 형식으로만 출력:
+반드시 아래 형식으로만 출력하세요. (괄호 안의 내용은 실제 번역문으로 대체할 것):
 <result>
-(각 헤드라인의 한국어 번역을 번호 순으로)
+[이곳에 번역된 텍스트 전체를 작성하세요]
 </result>"""
             summary_text = get_ai_analysis(prompt)
             news_result = clean_ai_output(summary_text)
@@ -1414,9 +1414,9 @@ if st.session_state.get("run_ai_trigger"):
 
 {all_t_text}
 
-반드시 아래 형식으로만 출력:
+반드시 아래 형식으로만 출력하세요. (괄호 안의 내용은 실제 번역문으로 대체할 것):
 <result>
-(한국어 번역 단락)
+[이곳에 번역된 단락을 작성하세요]
 </result>"""
                 t_translated = get_ai_analysis(t_translate_prompt)
                 trump_result = clean_ai_output(t_translated)
@@ -1437,7 +1437,7 @@ if st.session_state.get("run_ai_trigger"):
             
             Output format:
             <result>
-            상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
+            [상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 실제 단일 문단을 작성하세요]
             </result>
             """
             bt_analysis = get_ai_analysis(bt_prompt)
@@ -1451,9 +1451,9 @@ if st.session_state.get("run_ai_trigger"):
 데이터:
 {latest_data_summary}
 
-반드시 아래 형식으로만 출력:
+반드시 아래 형식으로만 출력하세요. (괄호 안의 내용은 실제 분석 텍스트로 대체할 것):
 <result>
-(현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
+[현재 지표 상태 요약 2문장과 시장 진단 및 투자자 주의사항 2문장, 총 4문장의 실제 텍스트를 작성하세요]
 </result>"""
             analysis_output = get_ai_analysis(ai_desc_prompt)
             indicator_result = clean_ai_output(analysis_output)
