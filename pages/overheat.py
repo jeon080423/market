@@ -29,7 +29,10 @@ def render_overheat_page():
             '000660.KS': '000660', # SK하이닉스
             '091180.KS': '091180', # KODEX 자동차
             '091220.KS': '091220', # KODEX 은행
-            '261240.KS': '261240'  # KODEX 바이오
+            '261240.KS': '261240', # KODEX 바이오
+            '091210.KS': '091210', # KODEX 건설
+            '228790.KS': '228790', # TIGER 화장품
+            '450320.KS': '450320'  # PLUS K방산
         }
         
         try:
@@ -148,6 +151,7 @@ def render_overheat_page():
                 '069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', 
                 '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', 
                 '091180.KS': 'KODEX 자동차(비주도주)', '091220.KS': 'KODEX 은행(비주도주)', '261240.KS': 'KODEX 바이오(비주도주)',
+                '091210.KS': 'KODEX 건설(비주도주)', '228790.KS': 'TIGER 화장품(비주도주)', '450320.KS': 'PLUS K방산(비주도주)',
                 '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)', '^GSPC': 'S&P 500'
             }
             for col, name in ticker_names.items():
@@ -188,6 +192,12 @@ def render_overheat_page():
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091220.KS'], name="KODEX 은행 (비주도주)", line=dict(color='#9467bd', width=2, dash='dash')))
     if '261240.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['261240.KS'], name="KODEX 바이오 (비주도주)", line=dict(color='#e377c2', width=2, dash='dash')))
+    if '091210.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091210.KS'], name="KODEX 건설 (비주도주)", line=dict(color='#8c564b', width=2, dash='dash')))
+    if '228790.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['228790.KS'], name="TIGER 화장품 (비주도주)", line=dict(color='#bcbd22', width=2, dash='dash')))
+    if '450320.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['450320.KS'], name="PLUS K방산 (비주도주)", line=dict(color='#17becf', width=2, dash='dash')))
     if '069500.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
     if '252650.KS' in df_norm.columns:
