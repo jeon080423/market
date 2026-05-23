@@ -216,22 +216,54 @@ def render_overheat_page():
     st.header("2. 채권 자경단의 출현")
     st.markdown("미 재정부채 누적, 인플레이션 통제력 약화, 중앙은행 독립성 훼손이라는 세 가지 조건이 충족된 상황에서 미국 국채 시장으로 불똥이 튈 위험을 모니터링합니다.\n\n유가 상승과 함께 국채 금리가 급등하는 현상은 채권 자경단의 활동을 암시합니다.")
     
-    fig2 = go.Figure()
-    if '^TNX' in df_norm.columns:
-        fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^TNX'], name="미 국채 10년물 금리", line=dict(color='#d62728', width=2)))
+    from plotly.subplots import make_subplots
+    fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    df_raw = df_6m if not df_6m.empty else df
+    
+    if '^TNX' in df_raw.columns:
+        fig2.add_trace(
+            go.Scatter(
+                x=df_raw.index, 
+                y=df_raw['^TNX'], 
+                name="미 국채 10년물 금리 (실제 %, 우축)", 
+                line=dict(color='#d62728', width=2.5)
+            ),
+            secondary_y=True
+        )
     if 'CL=F' in df_norm.columns:
-        fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['CL=F'], name="WTI 유가", line=dict(color='#8c564b', width=2)))
+        fig2.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['CL=F'], 
+                name="WTI 유가 (Base 100, 좌축)", 
+                line=dict(color='#8c564b', width=2)
+            ),
+            secondary_y=False
+        )
     if '069500.KS' in df_norm.columns:
-        fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
+        fig2.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['069500.KS'], 
+                name="KODEX 200 (Base 100, 좌축)", 
+                line=dict(color='#1f77b4', dash='dash', width=2)
+            ),
+            secondary_y=False
+        )
+        
     fig2.update_layout(
-        title="채권 자경단 모니터링: 10년물 국채 금리 및 유가 상승 압력 (Base 100)", 
+        title="채권 자경단 모니터링: 10년물 국채 금리(실제 %) vs 유가 및 주가 (Base 100)", 
         height=400, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(tickformat="%m월")
     )
+    fig2.update_yaxes(title_text="누적 수익률 (Base 100)", secondary_y=False)
+    fig2.update_yaxes(title_text="국채 금리 (%)", secondary_y=True)
+    
     st.plotly_chart(fig2, use_container_width=True)
-    st.info("💡 **차트 읽는 법:** KODEX 200이 고점을 높이는데도 불구하고, 유가(WTI)와 미 국채 10년물 금리가 동반 급등한다면 인플레이션 우려로 인한 '채권 자경단'의 출현을 암시하는 위험 신호입니다.\n\n📊 **데이터 가공 기준:** 주가지수, 국채 금리(%), 유가($) 등 단위가 완전히 다른 지표들을 1:1로 비교하기 위해, 6개월 전 수치를 100으로 두고 누적 변동률(%)을 추적합니다.")
+    st.info("💡 **차트 읽는 법:** KODEX 200이 고점을 높이는데도 불구하고, 유가(WTI)와 미 국채 10년물 금리가 동반 급등한다면 인플레이션 우려로 인한 '채권 자경단'의 출현을 암시하는 위험 신호입니다. 금리 변동성(수십 bp 수준)을 한눈에 포착할 수 있도록 **미 국채 10년물 금리는 오른쪽 Y축(실제 % 수치)**에, **유가와 주가지수는 왼쪽 Y축(Base 100 누적 수익률)**에 배치했습니다.\n\n📊 **데이터 가공 기준:** 주가와 유가는 6개월 전 첫 날을 100으로 두고 누적 등락률(%)을 좌측 축에 그리며, 미 국채 10년물 금리는 시장 금리의 절대적 영향력을 왜곡 없이 모니터링하기 위해 실제 만기수익률(%) 자체를 우측 축에 직접 매핑했습니다.")
 
     # 3. 사모 크레딧 환매 리스크
     st.header("3. 사모 크레딧 환매 리스크")
