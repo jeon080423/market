@@ -3,6 +3,8 @@ import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import google.generativeai as genai
+import time
 
 def render_overheat_page():
     st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
@@ -104,8 +106,68 @@ def render_overheat_page():
     st.plotly_chart(fig3, use_container_width=True)
 
     st.markdown("---")
-    st.info("""
-    💡 **결론**: 
-    김효진 박사는 이러한 시그널들을 종합할 때, 단순히 한두 달의 짧은 이격만으로 시장을 과열로 단정 짓기는 어려우며, 
-    과거의 경험상 이러한 쏠림 현상이 사이클의 종결을 의미하기까지는 상당한 시간(약 1년 이상)이 소요될 수 있다고 분석했습니다.
-    """)
+    st.header("🤖 실시간 AI 진단 (김효진 박사 관점)")
+    
+    # AI API 설정
+    gemini_key = None
+    try:
+        if "gemini" in st.secrets and "api_key" in st.secrets["gemini"]:
+            gemini_key = st.secrets["gemini"]["api_key"]
+        elif "gemini_api_key" in st.secrets:
+            gemini_key = st.secrets["gemini_api_key"]
+        elif "google_api_key" in st.secrets:
+            gemini_key = st.secrets["google_api_key"]
+            
+        if gemini_key:
+            genai.configure(api_key=gemini_key)
+    except Exception:
+        pass
+
+    @st.cache_data(ttl=3600)
+    def get_ai_overheat_analysis(data_text):
+        if not gemini_key:
+            return "⚠️ Gemini API 키가 설정되지 않아 AI 분석을 수행할 수 없습니다. Secrets 설정을 확인해주세요."
+        
+        prompt = f"""
+당신은 신영증권 김효진 박사의 관점을 가진 수석 시장 분석가입니다.
+김효진 박사는 시장이 '주도주 상승 국면'을 넘어 '주도주만 좋은 극단화된 과열 국면'에 진입했는지 판단하기 위해 3가지 시그널을 중시합니다.
+1. 주도주와 비주도주 간의 극단적인 수익률 격차 (시장 전체 지수는 오르나 나머지 종목은 하락하는지)
+2. 시가총액 가중 지수(SPY) 대비 동일 가중 지수(RSP)의 하락 또는 정체 
+3. 확산의 부재 (반도체 외 후발 주자들이 동참하는지)
+
+최근 6개월(180일) 수익률 데이터 요약(최초일을 Base 100으로 환산한 현재값):
+{data_text}
+
+위 데이터를 바탕으로 현재 시장이 건강한 상승 국면인지, 아니면 과열 징후가 뚜렷한 쏠림 국면인지 김효진 박사의 어조로 분석해주세요.
+단, 한두 달의 짧은 이격만으로 시장을 섣불리 과열로 단정 짓지 말고 균형 잡힌 시각을 유지하며, 결론을 3~4문장으로 요약해주세요.
+마크다운 포맷을 사용하여 핵심 내용을 강조해주세요.
+"""
+        models = ["gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it"]
+        for model_name in models:
+            for attempt in range(2):
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    res = model.generate_content(prompt)
+                    if res and hasattr(res, 'text'):
+                        return res.text
+                except Exception:
+                    time.sleep(1)
+        return "AI 분석을 가져오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        
+    if st.button("실시간 AI 진단 실행", use_container_width=True):
+        with st.spinner("AI가 최근 6개월 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
+            # 데이터 추출
+            recent_data = {}
+            for col in ['NVDA', 'SPY', 'RSP', '^KS11', '005930.KS', '000660.KS']:
+                if col in df_norm.columns:
+                    recent_data[col] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
+            
+            data_text = "\n".join([f"- {k}: {v}" for k, v in recent_data.items()])
+            analysis_result = get_ai_overheat_analysis(data_text)
+            
+            st.success("분석 완료")
+            st.markdown(f"""
+            <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; border-left:5px solid #ff4b4b;">
+            {analysis_result}
+            </div>
+            """, unsafe_allow_html=True)
