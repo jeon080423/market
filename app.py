@@ -127,8 +127,11 @@ except Exception as e:
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
-    # 우선순위 모델 리스트 (Gemma 4 31B, Gemini 3.1 Flash fallback)
-    models = ["gemma-4-31b-it", "gemini-3.1-flash", "gemini-3.1-pro"]
+    # 우선순위 모델 리스트 (가장 빠르고 안정적인 최신 모델 위주로 배치)
+    models = [
+        "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash",
+        "gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it", "gemini-pro"
+    ]
     
     for model_name in models:
         max_retries = 2
