@@ -126,13 +126,13 @@ except Exception as e:
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
 def get_ai_analysis(prompt):
-    # 우선순위 모델 리스트 (가장 빠르고 안정적인 최신 모델 위주로 배치)
-    # 최신 사용 가능한 모델 리스트로 업데이트 (2026년 기준)
+    # 우선순위 모델 리스트 (속도와 안정성을 갖춘 모델 리스트)
     models = [
         "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", 
-        "gemini-pro-latest", "gemini-3.5-flash", "gemma-4-31b-it"
+        "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"
     ]
     
+    last_error_msg = ""
     for model_name in models:
         max_retries = 2
         for attempt in range(max_retries):
@@ -141,21 +141,20 @@ def get_ai_analysis(prompt):
                 response = model.generate_content(prompt)
                 if response and hasattr(response, 'text'):
                     return response.text
-                return "AI 응답 형식이 올바르지 않습니다."
+                break
             except Exception as e:
-                err_msg = str(e).lower()
-                if "quota" in err_msg or "429" in err_msg or "exhausted" in err_msg:
-                    return "⚠️ Gemini API 무료 사용량(Quota)을 모두 소진했습니다.\n\n내일 다시 시도하시거나, 구글 클라우드에서 결제 정보를 등록해 한도를 늘려주세요."
-                
-                # 500(Internal Server Error) 등의 경우 다음 모델로 전환 시도
+                last_error_msg = str(e)
+                err_msg = last_error_msg.lower()
                 if attempt < max_retries - 1:
                     time.sleep(1)
                     continue
                 else:
-                    # 다음 모델로 넘어감
-                    break
-    
-    return "⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다.\n\n잠시 후 다시 시도해 주세요."
+                    break # try next model
+                    
+    err_msg_lower = last_error_msg.lower()
+    if "quota" in err_msg_lower or "429" in err_msg_lower or "exhausted" in err_msg_lower:
+        return "⚠️ Gemini API 무료 사용량(Quota)을 모두 소진했습니다.\n\n내일 다시 시도하시거나, 구글 클라우드에서 결제 정보를 등록해 한도를 늘려주세요."
+    return f"⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다.\n\n잠시 후 다시 시도해 주세요. (에러: {last_error_msg})"
 
 # AI 응답 정제 함수 (최소한의 안전 필터만 적용)
 def clean_ai_output(text):
@@ -1343,49 +1342,51 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
 # 2. 모델 유효성 진단
 if bt_analysis_container:
     with bt_analysis_container:
-        with st.spinner("AI가 추세를 분석 중..."):
-            bt_prompt = f"""
-            Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.\n\n데이터:
-            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
-            - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
-            - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
-            
-            CRITICAL RULES:
-            1. Output ONLY the final Korean analysis.
-            2. You MUST NOT include any conversational text, explanations, or thinking processes.
-            3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
-            
-            Output format:
-            <result>
-            상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
-            </result>
-            """
-            bt_analysis = get_ai_analysis(bt_prompt)
-            clean_bt = clean_ai_output(bt_analysis)
-            st.markdown(f"""
-            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-                <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
-            </div>
-            """, unsafe_allow_html=True)
+        if st.button("🤖 AI 모델 유효성 상세 진단 실행", key="btn_bt_analysis", use_container_width=True):
+            with st.spinner("AI가 추세를 분석 중..."):
+                bt_prompt = f"""
+                Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.\n\n데이터:
+                - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
+                - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
+                - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
+                
+                CRITICAL RULES:
+                1. Output ONLY the final Korean analysis.
+                2. You MUST NOT include any conversational text, explanations, or thinking processes.
+                3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
+                
+                Output format:
+                <result>
+                상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
+                </result>
+                """
+                bt_analysis = get_ai_analysis(bt_prompt)
+                clean_bt = clean_ai_output(bt_analysis)
+                st.markdown(f"""
+                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
+                    <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
+                </div>
+                """, unsafe_allow_html=True)
 
 # 3. 현재 시장 지표 종합 진단
 if ai_indicator_container:
     with ai_indicator_container:
-        with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
-            with st.spinner("지표 데이터를 분석 중..."):
-                ai_desc_prompt = f"""아래 시장 지표 데이터를 분석하여 현재 한국 증시(KOSPI) 상황을 한국어로 진단하세요. 영단어, 한자, 마크다운 기호 사용 금지. 설명 없이 분석 결과만 출력.
-
-데이터:
-{latest_data_summary}
-
-반드시 아래 형식으로만 출력:
-<result>
-(현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
-</result>"""
-                analysis_output = get_ai_analysis(ai_desc_prompt)
-                clean_indicator = clean_ai_output(analysis_output)
-                st.markdown(f"""
-                <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
-                    {clean_indicator}
-                </div>
-                """, unsafe_allow_html=True)
+        with st.expander("🤖 현재 시장 지표 종합 진단 (클릭하여 펼치기)", expanded=False):
+            if st.button("🔍 AI 지표 종합 진단 실행", key="btn_indicator_analysis", use_container_width=True):
+                with st.spinner("지표 데이터를 분석 중..."):
+                    ai_desc_prompt = f"""아래 시장 지표 데이터를 분석하여 현재 한국 증시(KOSPI) 상황을 한국어로 진단하세요. 영단어, 한자, 마크다운 기호 사용 금지. 설명 없이 분석 결과만 출력.
+    
+    데이터:
+    {latest_data_summary}
+    
+    반드시 아래 형식으로만 출력:
+    <result>
+    (현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
+    </result>"""
+                    analysis_output = get_ai_analysis(ai_desc_prompt)
+                    clean_indicator = clean_ai_output(analysis_output)
+                    st.markdown(f"""
+                    <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
+                        {clean_indicator}
+                    </div>
+                    """, unsafe_allow_html=True)
