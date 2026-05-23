@@ -25,7 +25,9 @@ def render_overheat_page():
             '252650.KS': '252650', # KODEX 200 동일가중
             '005930.KS': '005930', # 삼성전자
             '000660.KS': '000660', # SK하이닉스
-            '091180.KS': '091180'  # KODEX 자동차
+            '091180.KS': '091180', # KODEX 자동차
+            '091220.KS': '091220', # KODEX 은행
+            '261240.KS': '261240'  # KODEX 바이오
         }
         
         try:
@@ -148,7 +150,8 @@ def render_overheat_page():
             recent_data = {}
             ticker_names = {
                 '069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', 
-                '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)', 
+                '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', 
+                '091180.KS': 'KODEX 자동차(비주도주)', '091220.KS': 'KODEX 은행(비주도주)', '261240.KS': 'KODEX 바이오(비주도주)',
                 '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)'
             }
             for col, name in ticker_names.items():
@@ -167,7 +170,7 @@ def render_overheat_page():
     
     # 1. 주도주의 압착 현상
     st.header("1. 주도주의 압착 현상")
-    st.markdown("소수 주도주로 자금이 지나치게 쏠리는 현상이 심화되는지 모니터링합니다. 시총가중 지수(KODEX 200) 대비 동일가중 지수가 하락하거나, AI 관련주 외 나머지 후발 종목들(자동차 등)이 마이너스로 가면서 주도주만 독주하는 상황이 더 심화될 가능성을 경계해야 합니다.")
+    st.markdown("소수 주도주로 자금이 지나치게 쏠리는 현상이 심화되는지 모니터링합니다. 시총가중 지수(KODEX 200) 대비 동일가중 지수가 하락하거나, AI 관련주 외 나머지 비주도 섹터 종목들(자동차, 은행, 바이오 등)이 전반적으로 하락하면서 주도주만 독주하는 압착(Compression) 상황이 더 심화될 가능성을 경계해야 합니다.")
     
     fig1 = go.Figure()
     if '005930.KS' in df_norm.columns:
@@ -175,7 +178,11 @@ def render_overheat_page():
     if '000660.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스", line=dict(color='#ff7f0e', width=2)))
     if '091180.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (후발주)", line=dict(color='#2ca02c', width=2, dash='dash')))
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (비주도주)", line=dict(color='#2ca02c', width=2, dash='dash')))
+    if '091220.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091220.KS'], name="KODEX 은행 (비주도주)", line=dict(color='#9467bd', width=2, dash='dash')))
+    if '261240.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['261240.KS'], name="KODEX 바이오 (비주도주)", line=dict(color='#e377c2', width=2, dash='dash')))
     if '069500.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
     if '252650.KS' in df_norm.columns:
