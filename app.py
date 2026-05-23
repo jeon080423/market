@@ -25,7 +25,7 @@ from pages.종목탐색 import render_youtube_rank_page
 from pages.overheat import render_overheat_page
 
 # 1. 페이지 설정
-st.set_page_config(page_title="주식 시장 하락 전조 신호 모니터링", layout="wide")
+st.set_page_config(page_title="신영증권 김효진 박사 관점 코스피(KOSPI) 전망 및 시장 과열 위험 모니터링 대시보드", layout="wide")
 
 # 자동 새로고침 설정 (10분 간격)
 try:
@@ -260,6 +260,25 @@ st.markdown("""
     /* 기본 사이드바 네비게이션 숨김 (중복 메뉴 방지) */
     [data-testid="stSidebarNav"] {display: none;}
     </style>
+    <script>
+        var parentHead = window.parent.document.head;
+        
+        // Remove existing description if any
+        var existingDesc = parentHead.querySelector('meta[name="description"]');
+        if (existingDesc) { parentHead.removeChild(existingDesc); }
+        
+        // Add description meta tag
+        var metaDesc = window.parent.document.createElement('meta');
+        metaDesc.name = 'description';
+        metaDesc.content = '신영증권 김효진 박사의 관점과 글로벌 거시 지표(환율, 금리, 물동량 등), AI 모델을 활용한 코스피(KOSPI) 전망 및 시장 과열 위험(MOI) 모니터링 대시보드입니다. 실시간 AI 진단과 시나리오별 백테스팅을 제공합니다.';
+        parentHead.appendChild(metaDesc);
+        
+        // Add keywords meta tag
+        var metaKeywords = window.parent.document.createElement('meta');
+        metaKeywords.name = 'keywords';
+        metaKeywords.content = '신영증권, 김효진, 김효진 박사, 코스피 전망, KOSPI 전망, 주식 시장 과열, 시장 위험 지수, AI 주식 분석, 주식 분석 대시보드';
+        parentHead.appendChild(metaKeywords);
+    </script>
     """, unsafe_allow_html=True)
 
 # 한국 시간(KST) 설정을 위한 함수
@@ -270,6 +289,12 @@ def get_kst_now():
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "risk_monitor"
 
+if "ai_analysis_results" not in st.session_state:
+    st.session_state["ai_analysis_results"] = None
+
+if "run_ai_trigger" not in st.session_state:
+    st.session_state["run_ai_trigger"] = False
+
 # 사이드바 공통 메뉴 추가
 # 사이드바 공통 메뉴 추가
 with st.sidebar:
@@ -277,7 +302,7 @@ with st.sidebar:
     if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
         st.rerun()
-    if st.button("📺 종목탐색", use_container_width=True):
+    if st.button("📺 실시간 종목 탐색 (인기/뉴스)", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
     if st.button("🔥 과열 국면 시그널", use_container_width=True):
@@ -293,9 +318,12 @@ elif st.session_state["active_tab"] == "overheat_signal":
     st.stop()
 
 # 3. 제목 및 설명
-st.title("KOSPI 예측적 위험 모니터링 (1주일 선행)")
+st.title("📊 신영증권 김효진 박사 관점 코스피(KOSPI) 전망 및 시장 과열 위험 모니터링")
 st.markdown(f"""
-이 대시보드는 글로벌 거시 지표를 활용하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험을 예측합니다.\n\n(최종 분석 시각: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
+이 대시보드는 **신영증권 김효진 박사**의 시장 분석 관점과 글로벌 거시 지표를 융합하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험 및 시장 과열 지수(MOI)를 예측하고 모니터링합니다. 
+실시간 금융 데이터와 Gemini AI 엔진을 결합한 지능형 마켓 분석 툴킷입니다.
+
+(최종 분석 시각: {get_kst_now().strftime('%m월 %d일 %H시 %M분')})
 """)
 st.markdown("---")
 
@@ -918,6 +946,34 @@ try:
             """, unsafe_allow_html=True)
 
     st.markdown("---")
+    
+    # --- [통합 AI 분석/번역 진단 제어부] ---
+    st.subheader("🚀 AI 통합 번역 및 시장 진단")
+    st.markdown("""
+    Gemini AI 모델을 사용하여 글로벌 경제 뉴스 헤드라인 번역, 트럼프 소셜 브리핑 번역, 
+    시장 위험 지수 모델 유효성 진단 및 핵심 시장 지표 종합 진단을 한 번에 수행합니다.
+    """)
+    
+    if st.session_state.get("ai_analysis_results") is not None:
+        col_btn1, col_btn2, _ = st.columns([1.5, 1.5, 5])
+        with col_btn1:
+            if st.button("🔄 AI 재분석 시작", key="btn_run_ai_analysis", use_container_width=True):
+                st.session_state["run_ai_trigger"] = True
+                st.session_state["ai_analysis_results"] = None
+                st.rerun()
+        with col_btn2:
+            if st.button("❌ 분석 결과 지우기", key="btn_clear_ai_analysis", use_container_width=True):
+                st.session_state["run_ai_trigger"] = False
+                st.session_state["ai_analysis_results"] = None
+                st.rerun()
+    else:
+        col_btn1, _ = st.columns([2, 6])
+        with col_btn1:
+            if st.button("🚀 AI 분석 시작", key="btn_run_ai_analysis", use_container_width=True):
+                st.session_state["run_ai_trigger"] = True
+                st.rerun()
+                
+    st.markdown("---")
     c_news_left, c_news_right = st.columns(2)
     with c_news_left:
         # 제목 텍스트 업데이트
@@ -1297,10 +1353,11 @@ except Exception as e:
 st.caption(f"Last updated: {get_kst_now().strftime('%d일 %H시 %M분')} | NewsAPI 및 Gemini AI 분석 엔진 가동 중")
 
 # --- [AI 분석: 맨 마지막에 처리] ---
-# 1. AI 뉴스 통합 분석
-if news_data and ai_news_container:
-    with ai_news_container:
-        with st.spinner("AI가 뉴스를 분석 중입니다..."):
+if st.session_state.get("run_ai_trigger"):
+    with st.spinner("AI 분석 엔진을 가동하여 데이터를 통합 분석하고 있습니다..."):
+        # 1. AI 뉴스 통합 분석
+        news_result = ""
+        if news_data:
             prompt = f"""다음 영어 뉴스 헤드라인들을 전문적인 한국어로 번역하세요. 번역문만 번호와 함께 출력하세요. 설명이나 원문 반복은 금지입니다. 고유명사는 영어 가능.
 
 {all_titles}
@@ -1310,29 +1367,16 @@ if news_data and ai_news_container:
 (각 헤드라인의 한국어 번역을 번호 순으로)
 </result>"""
             summary_text = get_ai_analysis(prompt)
-            clean_summary = clean_ai_output(summary_text)
-            
-            if clean_summary:
-                st.markdown(f"""
-                <div class="ai-analysis-box">
-                    <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
-                    {clean_summary}
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="ai-analysis-box">번역 결과를 불러오는 중 오류가 발생했습니다.</div>', unsafe_allow_html=True)
+            news_result = clean_ai_output(summary_text)
 
-# 1.5 트럼프 트윗 통합 번역
-if 'trump_data' in locals() and trump_data and ai_trump_container:
-    with ai_trump_container:
-        with st.spinner("트럼프 트윗 번역 중..."):
-            # 모든 트럼프 포스트를 하나로 합쳐서 단 한 번의 AI 호출로 처리
+        # 1.5 트럼프 트윗 통합 번역
+        trump_result = ""
+        if 'trump_data' in locals() and trump_data:
             all_t_text = "\n\n---\n\n".join([
                 f"{t.get('title', '')} {t.get('description', '')}".strip()
                 for t in trump_data
                 if len(f"{t.get('title', '')} {t.get('description', '')}".strip()) >= 10
             ])
-            
             if all_t_text:
                 t_translate_prompt = f"""다음 영어 게시물을 자연스러운 한국어 단락으로 번역하세요. 영어 원문 인용, 설명, 메타 텍스트는 일절 금지. 번역 결과만 출력.
 
@@ -1343,66 +1387,114 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
 (한국어 번역 단락)
 </result>"""
                 t_translated = get_ai_analysis(t_translate_prompt)
-                t_clean = clean_ai_output(t_translated)
-                
-                if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean:
-                    st.markdown(f"""
-                    <div class="ai-analysis-box">
-                        <strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
-                        {t_clean}
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.write("번역된 내용이 없습니다.")
+                trump_result = clean_ai_output(t_translated)
 
-# 2. 모델 유효성 진단
-if bt_analysis_container:
-    with bt_analysis_container:
-        if st.button("🤖 AI 모델 유효성 상세 진단 실행", key="btn_bt_analysis", use_container_width=True):
-            with st.spinner("AI가 추세를 분석 중..."):
-                bt_prompt = f"""
-                Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.\n\n데이터:
-                - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
-                - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
-                - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
-                
-                CRITICAL RULES:
-                1. Output ONLY the final Korean analysis.
-                2. You MUST NOT include any conversational text, explanations, or thinking processes.
-                3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
-                
-                Output format:
-                <result>
-                상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
-                </result>
-                """
-                bt_analysis = get_ai_analysis(bt_prompt)
-                clean_bt = clean_ai_output(bt_analysis)
+        # 2. 모델 유효성 진단
+        bt_result = ""
+        if 'corr_val' in locals() and 'hist_risks' in locals():
+            bt_prompt = f"""
+            Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.\n\n데이터:
+            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
+            - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
+            - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
+            
+            CRITICAL RULES:
+            1. Output ONLY the final Korean analysis.
+            2. You MUST NOT include any conversational text, explanations, or thinking processes.
+            3. 금융 전문 용어를 제외한 영단어 및 한자(漢字)는 피해주세요.\n\n마크다운 기호 절대 금지.\n\n4. You MUST output ONLY the final text inside <result>...</result> tags. NO preamble, NO postamble.
+            
+            Output format:
+            <result>
+            상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
+            </result>
+            """
+            bt_analysis = get_ai_analysis(bt_prompt)
+            bt_result = clean_ai_output(bt_analysis)
+
+        # 3. 현재 시장 지표 종합 진단
+        indicator_result = ""
+        if 'latest_data_summary' in locals():
+            ai_desc_prompt = f"""아래 시장 지표 데이터를 분석하여 현재 한국 증시(KOSPI) 상황을 한국어로 진단하세요. 영단어, 한자, 마크다운 기호 사용 금지. 설명 없이 분석 결과만 출력.
+
+데이터:
+{latest_data_summary}
+
+반드시 아래 형식으로만 출력:
+<result>
+(현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
+</result>"""
+            analysis_output = get_ai_analysis(ai_desc_prompt)
+            indicator_result = clean_ai_output(analysis_output)
+
+        # Save to session state and reset trigger
+        st.session_state["ai_analysis_results"] = {
+            "news": news_result,
+            "trump": trump_result,
+            "bt": bt_result,
+            "indicator": indicator_result
+        }
+        st.session_state["run_ai_trigger"] = False
+        st.success("AI 통합 분석 완료!")
+        st.rerun()
+
+# --- [컨테이너에 결과 또는 안내문 출력] ---
+# 1. AI 뉴스 통합 번역 출력
+if news_data and ai_news_container:
+    with ai_news_container:
+        if st.session_state.get("ai_analysis_results") is None:
+            st.info("💡 AI 뉴스 번역/분석을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+        else:
+            clean_summary = st.session_state["ai_analysis_results"].get("news", "")
+            if clean_summary:
                 st.markdown(f"""
-                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-                    <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
+                <div class="ai-analysis-box">
+                    <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
+                    {clean_summary}
                 </div>
                 """, unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="ai-analysis-box">번역 결과를 불러오는 중 오류가 발생했습니다.</div>', unsafe_allow_html=True)
 
-# 3. 현재 시장 지표 종합 진단
+# 1.5 트럼프 트윗 통합 번역 출력
+if 'trump_data' in locals() and trump_data and ai_trump_container:
+    with ai_trump_container:
+        if st.session_state.get("ai_analysis_results") is None:
+            st.info("💡 트럼프 소셜 최신 브리핑 번역을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+        else:
+            t_clean = st.session_state["ai_analysis_results"].get("trump", "")
+            if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean and t_clean != "번역된 내용이 없습니다.":
+                st.markdown(f"""
+                <div class="ai-analysis-box">
+                    <strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
+                    {t_clean}
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.write("번역된 내용이 없습니다.")
+
+# 2. 모델 유효성 진단 출력
+if bt_analysis_container:
+    with bt_analysis_container:
+        if st.session_state.get("ai_analysis_results") is None:
+            st.info("💡 AI 모델 유효성 상세 진단을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+        else:
+            clean_bt = st.session_state["ai_analysis_results"].get("bt", "")
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
+                <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
+            </div>
+            """, unsafe_allow_html=True)
+
+# 3. 현재 시장 지표 종합 진단 출력
 if ai_indicator_container:
     with ai_indicator_container:
         with st.expander("🤖 현재 시장 지표 종합 진단 (클릭하여 펼치기)", expanded=False):
-            if st.button("🔍 AI 지표 종합 진단 실행", key="btn_indicator_analysis", use_container_width=True):
-                with st.spinner("지표 데이터를 분석 중..."):
-                    ai_desc_prompt = f"""아래 시장 지표 데이터를 분석하여 현재 한국 증시(KOSPI) 상황을 한국어로 진단하세요. 영단어, 한자, 마크다운 기호 사용 금지. 설명 없이 분석 결과만 출력.
-    
-    데이터:
-    {latest_data_summary}
-    
-    반드시 아래 형식으로만 출력:
-    <result>
-    (현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
-    </result>"""
-                    analysis_output = get_ai_analysis(ai_desc_prompt)
-                    clean_indicator = clean_ai_output(analysis_output)
-                    st.markdown(f"""
-                    <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
-                        {clean_indicator}
-                    </div>
-                    """, unsafe_allow_html=True)
+            if st.session_state.get("ai_analysis_results") is None:
+                st.info("💡 AI 지표 종합 진단을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+            else:
+                clean_indicator = st.session_state["ai_analysis_results"].get("indicator", "")
+                st.markdown(f"""
+                <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
+                    {clean_indicator}
+                </div>
+                """, unsafe_allow_html=True)

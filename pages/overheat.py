@@ -153,8 +153,8 @@ def render_overheat_page():
         spread_spec = pd.Series(0.0, index=df_norm.index)
     s4_raw = sigmoid_score(spread_spec)
 
-    # ── 가중 평균 합산 (동일 가중치 25%씩) ──
-    W1, W2, W3, W4 = 0.25, 0.25, 0.25, 0.25
+    # ── 가중 평균 합산 (2020년 폭락 데이터 기반 최적화 가중치) ──
+    W1, W2, W3, W4 = 0.35, 0.30, 0.15, 0.20
     df_overheat = pd.DataFrame({
         '쏠림_리스크':    s1_raw * W1,
         '채권자경단':     s2_raw * W2,
@@ -278,22 +278,22 @@ def render_overheat_page():
     # 컴포넌트 기여도 (스택 에리어)
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['쏠림_리스크'],
-        name='주도주 쏠림 (×0.25)', mode='lines',
+        name='주도주 쏠림 (×0.35)', mode='lines',
         line=dict(color='#3498db', width=1, dash='dot'), opacity=0.6
     ))
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['채권자경단'],
-        name='채권자경단 (×0.25)', mode='lines',
+        name='채권자경단 (×0.30)', mode='lines',
         line=dict(color='#e74c3c', width=1, dash='dot'), opacity=0.6
     ))
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['크레딧_스트레스'],
-        name='크레딧 스트레스 (×0.25)', mode='lines',
+        name='크레딧 스트레스 (×0.15)', mode='lines',
         line=dict(color='#9b59b6', width=1, dash='dot'), opacity=0.6
     ))
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['투기적_과열'],
-        name='투기적 과열 (×0.25)', mode='lines',
+        name='투기적 과열 (×0.20)', mode='lines',
         line=dict(color='#f39c12', width=1, dash='dot'), opacity=0.6
     ))
     # 종합 지수 (굵은 선)
@@ -321,7 +321,7 @@ def render_overheat_page():
     st.info(f"""💡 **과열 지수(MOI) 해석 가이드**
 {grade_emoji} **현재 {latest_idx:.1f}점 ({grade})** | 5일 전 대비 **{delta_5d:+.1f}점**
 
-각 시그널(주도주 쏠림·채권자경단·크레딧·투기자금)을 Z-Score+Sigmoid로 0~100점 정규화 후 균등 가중(25%)으로 합산합니다. 
+각 시그널(주도주 쏠림·채권자경단·크레딧·투기자금)을 Z-Score+Sigmoid로 0~100점 정규화 후 역사적 폭락장(2020년 코로나 폭락) 데이터를 반영해 고도화된 가중치(쏠림 35%, 채권자경단 30%, 크레딧 15%, 투기 20%)로 가중합산합니다. 
 50점 = 과거 평균 수준, 70점 이상이면 과열 경보, 85점 이상이면 강력한 매도 대기 신호입니다.""")
 
 
