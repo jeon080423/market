@@ -312,22 +312,52 @@ def render_overheat_page():
     st.header("4. 대형 IPO와 위험 선호도")
     st.markdown("스페이스X, 앤트로픽, 오픈AI 등 대형 IPO의 성공은 시장 위험 선호도의 정점 신호가 될 수 있습니다.\n\n신규 상장 주식들의 성과를 대변하는 IPO ETF의 자금 유입 및 수익률 동향을 통해 시장의 투기적 과열 분위기가 어느 정도인지 가늠할 수 있습니다.")
     
-    fig4 = go.Figure()
+    from plotly.subplots import make_subplots
+    fig4 = make_subplots(specs=[[{"secondary_y": True}]])
+    
     if 'IPO' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['IPO'], name="미국 IPO ETF (투기적 자금)", line=dict(color='#bcbd22', width=2)))
+        fig4.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['IPO'], 
+                name="미국 IPO ETF (투기적 자금, 우축)", 
+                line=dict(color='#bcbd22', width=2.5)
+            ),
+            secondary_y=True
+        )
     if '^GSPC' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^GSPC'], name="S&P 500 (글로벌 증시)", line=dict(color='#ff7f0e', dash='dot')))
+        fig4.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['^GSPC'], 
+                name="S&P 500 (글로벌 증시, 우축)", 
+                line=dict(color='#ff7f0e', dash='dot', width=2)
+            ),
+            secondary_y=True
+        )
     if '069500.KS' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (한국 증시)", line=dict(color='#1f77b4', dash='dash')))
+        fig4.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['069500.KS'], 
+                name="KODEX 200 (한국 증시, 좌축)", 
+                line=dict(color='#1f77b4', dash='dash', width=2)
+            ),
+            secondary_y=False
+        )
+        
     fig4.update_layout(
-        title="위험 선호도 정점 징후: 대형 IPO ETF 추이 (Base 100)", 
+        title="위험 선호도 정점 징후: 미국 IPO ETF vs S&P 500(우축) 및 국내 증시(좌축) (Base 100)", 
         height=400, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(tickformat="%m월")
     )
+    fig4.update_yaxes(title_text="KODEX 200 (Base 100, 좌축)", secondary_y=False)
+    fig4.update_yaxes(title_text="미국 지표 (Base 100, 우축)", secondary_y=True)
+    
     st.plotly_chart(fig4, use_container_width=True)
-    st.info("💡 **차트 읽는 법:** 스페이스X 등 대형 IPO 이슈와 맞물려 미국 IPO ETF가 가파르게 급등한다면, 시장의 투기적 과열과 위험 선호도가 극단에 달한 단기 정점일 가능성이 높습니다.\n\n📊 **데이터 가공 기준:** 시장 평균(S&P 500) 대비 투기적 자금(IPO ETF)이 얼마나 가파르게 쏠렸는지 추적하기 위해, 6개월 전을 100으로 환산(Base 100)한 누적 수익률로 변환했습니다.")
+    st.info("💡 **차트 읽는 법:** 스페이스X 등 대형 IPO 이슈와 맞물려 미국 IPO ETF(연두색 실선)가 S&P 500(주황색 점선) 대비 가파르게 급등하며 격차를 벌린다면, 시장의 투기적 과열과 위험 선호도가 극단에 달했음을 뜻합니다. 국내 증시(KODEX 200)의 급격한 수익률 상승에 의한 시각적 왜곡을 방지하고 미국 시장 내의 투기적 에너지를 미세하게 비교할 수 있도록 **미국 지표들(IPO, S&P 500)은 오른쪽 Y축**에, **국내 증시(KODEX 200)는 왼쪽 Y축**에 각각 분리하여 배치했습니다.\n\n📊 **데이터 가공 기준:** 세 지표 모두 6개월 전 첫 날을 100으로 둔 누적 등락률(Base 100)을 추적하되, 국가 및 성격별 등락률 편차에 따른 스케일 찌그러짐을 방지하고자 한국 지수(좌축)와 미국 지수(우축)의 Y축을 이중화했습니다.")
 
     # 하단 여백 추가 (화면 잘림 방지)
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
