@@ -269,20 +269,44 @@ def render_overheat_page():
     st.header("3. 사모 크레딧 환매 리스크")
     st.markdown("데이터센터 대출 등에 집중된 사모 크레딧은 공시 의무가 없어 위험이 가려져 있습니다.\n\n시장 불안 시 환매가 도미노처럼 발생할 수 있으며, 하이일드 채권(HYG) 성과나 스프레드를 통해 비우량 신용 시장의 불안 조짐을 간접적으로 트래킹합니다.")
     
-    fig3 = go.Figure()
-    if 'HYG' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['HYG'], name="하이일드 ETF (HYG)", line=dict(color='#e377c2', width=2)))
+    from plotly.subplots import make_subplots
+    fig3 = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    df_raw = df_6m if not df_6m.empty else df
+    
+    if 'HYG' in df_raw.columns:
+        fig3.add_trace(
+            go.Scatter(
+                x=df_raw.index, 
+                y=df_raw['HYG'], 
+                name="하이일드 ETF (HYG, 실제 $, 우축)", 
+                line=dict(color='#e377c2', width=2.5)
+            ),
+            secondary_y=True
+        )
     if '069500.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
+        fig3.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['069500.KS'], 
+                name="KODEX 200 (Base 100, 좌축)", 
+                line=dict(color='#1f77b4', dash='dash', width=2)
+            ),
+            secondary_y=False
+        )
+        
     fig3.update_layout(
-        title="크레딧 리스크 대용 지표: 하이일드 ETF 추이 (Base 100)", 
+        title="크레딧 리스크 대용 지표: 하이일드 ETF 실제 가격(우축) vs 주가 지수(좌축)", 
         height=400, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(tickformat="%m월")
     )
+    fig3.update_yaxes(title_text="KODEX 200 (Base 100, 좌축)", secondary_y=False)
+    fig3.update_yaxes(title_text="하이일드 ETF 가격 (실제 $, 우축)", secondary_y=True)
+    
     st.plotly_chart(fig3, use_container_width=True)
-    st.info("💡 **차트 읽는 법:** 증시는 평온해 보여도, 하이일드 ETF(HYG)가 하락하거나 크게 출렁인다면 수면 아래 사모 크레딧 등 비우량 신용 시장에서 자금이 이탈하고 있다는 숨은 경고등입니다.\n\n📊 **데이터 가공 기준:** 주가지수와 신용 ETF 가격의 단위를 통일하기 위해, 6개월 전 가격을 100으로 환산하여 두 자산의 등락률 격차를 명확하게 비교합니다.")
+    st.info("💡 **차트 읽는 법:** 증시는 평온해 보여도, 하이일드 ETF(HYG)가 하락하거나 크게 출렁인다면 수면 아래 사모 크레딧 등 비우량 신용 시장에서 자금이 이탈하고 있다는 숨은 경고등입니다. 채권 가격의 미세한 리스크 신호(몇 %의 미세한 움직임)도 명확하게 인지할 수 있도록 **하이일드 ETF(HYG)는 오른쪽 Y축(실제 $ 수치)**에, **주가지수(KODEX 200)는 왼쪽 Y축(Base 100 누적 수익률)**에 배치했습니다.\n\n📊 **데이터 가공 기준:** 주가는 6개월 전 첫 날을 100으로 두고 누적 등락률(%)을 좌측 축에 그리며, 하이일드 ETF(HYG)는 글로벌 신용 시장의 미세한 환매 압력을 왜곡 없이 모니터링하기 위해 실제 달러 가격($) 자체를 우측 축에 직접 매핑했습니다.")
 
     # 4. 대형 IPO와 위험 선호도
     st.header("4. 대형 IPO와 위험 선호도")
