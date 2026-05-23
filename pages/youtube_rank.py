@@ -109,23 +109,22 @@ def load_and_process_youtube_data():
     stock_df = load_krx_stocks()
     stock_list = stock_df.to_dict("records")
     
-    # 키워드 전략
-    kr_queries = ["코스피 종목", "코스닥 주식 추천", "한국 증시 분석", "주식 투자 추천"]
-    us_queries = ["KOSPI stock", "Korean stock market", "Korea KOSDAQ investment"]
+    # 쿼터 절약을 위해 핵심 쿼리만 사용 (검색 1회 = 100 quota 소모)
+    kr_queries = ["코스피 주식 분석", "코스닥 종목 추천"]
+    us_queries = ["Korea stock KOSPI"]
     
     published_after = get_period_start(7)
     
     progress_text = st.empty()
     progress_bar = st.progress(0)
     
-    # 1. 유튜브 검색
     all_videos = []
     video_ids_seen = set()
     
-    # KR 채널 검색
+    # KR 채널 검색 (max_results=5로 쿼터 절약)
     progress_text.text("📺 한국 유튜브 채널 검색 중...")
     for idx, query in enumerate(kr_queries):
-        v_list = search_youtube_videos(query, published_after, region_code="KR", max_results=15)
+        v_list = search_youtube_videos(query, published_after, region_code="KR", max_results=5)
         for v in v_list:
             if v["video_id"] not in video_ids_seen:
                 video_ids_seen.add(v["video_id"])
@@ -136,7 +135,7 @@ def load_and_process_youtube_data():
     # US 채널 검색
     progress_text.text("📺 미국 유튜브 채널 검색 중...")
     for idx, query in enumerate(us_queries):
-        v_list = search_youtube_videos(query, published_after, region_code="US", max_results=15)
+        v_list = search_youtube_videos(query, published_after, region_code="US", max_results=5)
         for v in v_list:
             if v["video_id"] not in video_ids_seen:
                 video_ids_seen.add(v["video_id"])
@@ -149,10 +148,10 @@ def load_and_process_youtube_data():
         progress_text.empty()
         return [], {}, {}, {}
         
-    # 2. 채널 구독자 수 가져오기
+    # 2. 채널 구독자 수 가져오기 (tuple로 변환해야 캐시가 작동함)
     progress_text.text("📈 채널 구독자 수 정보 조회 중...")
-    channel_ids = [v["channel_id"] for v in all_videos]
-    subscriber_map = get_channel_subscribers(channel_ids)
+    channel_ids_tuple = tuple(set(v["channel_id"] for v in all_videos))
+    subscriber_map = get_channel_subscribers(channel_ids_tuple)
     progress_bar.progress(0.3)
     
     # 3. 자막 분석 및 종목 언급 카운팅 (병렬 실행)

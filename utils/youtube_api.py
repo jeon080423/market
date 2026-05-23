@@ -26,20 +26,18 @@ def get_youtube_api_key():
                         return section[s_key]
     return None
 
-def call_youtube_api_with_backoff(url: str, params: dict, max_retries: int = 3) -> dict:
+def call_youtube_api_with_backoff(url: str, params: dict, max_retries: int = 2) -> dict:
     """
     Helper function to make requests to the YouTube API.
     Handles 429 and temporary errors with exponential backoff.
     """
-    backoff = 2
+    backoff = 1
     for attempt in range(max_retries):
         try:
-            res = requests.get(url, params=params, timeout=15)
-            # Check for API-specific errors or HTTP errors
+            res = requests.get(url, params=params, timeout=10)
             if res.status_code == 200:
                 return res.json()
             elif res.status_code == 403:
-                # Quota exceeded or permission error
                 error_data = res.json()
                 error_reason = error_data.get("error", {}).get("errors", [{}])[0].get("reason", "")
                 if error_reason == "quotaExceeded":
@@ -48,7 +46,6 @@ def call_youtube_api_with_backoff(url: str, params: dict, max_retries: int = 3) 
                 else:
                     raise Exception(f"YouTube API returned 403: {res.text}")
             elif res.status_code in [429, 500, 503]:
-                # Temporary server error or rate limit
                 time.sleep(backoff)
                 backoff *= 2
                 continue
@@ -106,7 +103,8 @@ def search_youtube_videos(query: str, published_after: str, region_code: str = "
         return []
 
 @st.cache_data(ttl=86400)
-def get_channel_subscribers(channel_ids: list[str]) -> dict[str, int]:
+def get_channel_subscribers(channel_ids: tuple) -> dict:
+    # channel_ids must be a tuple (hashable) for Streamlit cache compatibility
     """
     YouTube Data API v3 channels.list 호출
     - channel_ids: 중복 제거된 채널 ID 리스트
@@ -154,13 +152,14 @@ def get_channel_subscribers(channel_ids: list[str]) -> dict[str, int]:
 
     return subscriber_map
 
-def get_video_transcript(video_id: str, lang_priority: list[str] = ["ko", "en"]) -> str:
+def get_video_transcript(video_id: str, lang_priority: list = ["ko", "en"]) -> str:
     """
     youtube-transcript-api 사용
     - 자동 생성 자막 포함 (auto-generated)
     - 언어 우선순위: ko → en 순
     - 실패 시 빈 문자열 반환 (예외 처리 필수)
     - 반환: 전체 자막 텍스트 (공백 구분)
+    - 타임아웃: 5초 (느린 자막 서버 대비)
     """
     # Check session state failed transcripts first to save api attempts
     if "failed_transcripts" in st.session_state:
@@ -168,10 +167,13 @@ def get_video_transcript(video_id: str, lang_priority: list[str] = ["ko", "en"])
             return ""
 
     try:
-        # Fetch transcript using the prioritization
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(YouTubeTranscriptApi.list_transcripts, video_id)
+            try:
+                transcript_list = future.result(timeout=5)
+            except concurrent.futures.TimeoutError:
+                return ""
         
-        # Try to find languages in order of preference
         transcript = None
         for lang in lang_priority:
             try:
@@ -180,12 +182,10 @@ def get_video_transcript(video_id: str, lang_priority: list[str] = ["ko", "en"])
             except:
                 continue
         
-        # If priority languages not found, try to fetch whatever is available or generated
         if not transcript:
             try:
                 transcript = transcript_list.find_generated_transcript(lang_priority)
             except:
-                # If everything fails, try to get the first available transcript
                 try:
                     transcript = next(iter(transcript_list))
                 except:
@@ -196,9 +196,9 @@ def get_video_transcript(video_id: str, lang_priority: list[str] = ["ko", "en"])
             text_lines = [item.get("text", "") for item in lines]
             return " ".join(text_lines)
     except Exception:
-        # Record failure to prevent repeated fetches in this session
         if "failed_transcripts" not in st.session_state:
             st.session_state["failed_transcripts"] = set()
         st.session_state["failed_transcripts"].add(video_id)
         
     return ""
+
