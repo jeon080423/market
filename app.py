@@ -157,6 +157,12 @@ def get_ai_analysis(prompt):
 # AI 응답 정제 함수 (메타 텍스트 및 영문 노이즈 제거)
 def clean_ai_output(text):
     if not text: return ""
+    import re
+    # <result> 태그가 있으면 태그 안의 내용만 추출하여 Chain-of-Thought(사고 과정) 방지
+    match = re.search(r'<result>(.*?)</result>', text, re.DOTALL | re.IGNORECASE)
+    if match:
+        text = match.group(1)
+
     lines = text.strip().split('\n')
     filtered = []
     for line in lines:
@@ -1083,15 +1089,18 @@ if news_data and ai_news_container:
             Task: Translate the following English news headlines into professional Korean.
             Rules:
             - Provide EXACTLY one translated Korean headline for each English headline.
-            - Output ONLY the Korean translations as a list starting with '- '.
+            - Output ONLY the Korean translations.
             - NO keywords, NO drafting, NO thinking process, NO English words.
-            - The number of output lines MUST exactly match the number of input headlines.
-            - Just output the final translated sentences.
+            - MUST enclose your final answer inside <result> and </result> tags!
             
             Input Headlines:
             {all_titles}
             
-            Output:
+            Output format:
+            <result>
+            1. 첫번째 번역문
+            2. 두번째 번역문
+            </result>
             """
             summary_text = get_ai_analysis(prompt)
             clean_summary = clean_ai_output(summary_text)
@@ -1120,11 +1129,14 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
                 Rules:
                 - Output ONLY the Korean translation.
                 - NEVER output the original English text.
-                - Do NOT translate line by line (e.g., no "English -> Korean" format).
-                - Combine all sentences into one smooth Korean paragraph.
+                - MUST enclose your final answer inside <result> and </result> tags!
                 
                 Input: {t_text}
-                Output:
+                
+                Output format:
+                <result>
+                단일 한국어 번역 문단
+                </result>
                 """
                 t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
@@ -1156,11 +1168,14 @@ if bt_analysis_container:
             - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
             
             Rules:
-            - Output ONLY the final Korean analysis. NO English, NO thinking process, NO keywords.
-            - 한자(漢字) 절대 금지.
-            - 마크다운 기호(*, # 등) 절대 금지.
-            - 프롬프트 지시사항이나 질문을 절대 반복하지 마세요.
-            - 상관계수의 의미, 최근 7일 흐름 평가, 그리고 현재 위험 수준에 따른 투자 전략을 3~4문장의 단일 문단으로 깔끔하게 작성하세요.
+            - Output ONLY the final Korean analysis. NO English, NO thinking process.
+            - 한자(漢字) 절대 금지. 마크다운 기호(*, # 등) 절대 금지.
+            - MUST enclose your final answer inside <result> and </result> tags!
+            
+            Output format:
+            <result>
+            상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
+            </result>
             """
             bt_analysis = get_ai_analysis(bt_prompt)
             clean_bt = clean_ai_output(bt_analysis)
@@ -1181,14 +1196,15 @@ if ai_indicator_container:
                 데이터: {latest_data_summary}
                 
                 Rules:
-                - Output ONLY the final Korean analysis. NO English, NO thinking process, NO keywords.
-                - 한자(漢字) 절대 금지.
-                - 마크다운 기호(*, # 등) 절대 금지.
-                - 불필요한 서론이나 프롬프트 지시사항을 반복하지 마세요.
-                - 다음 두 문단으로만 깔끔하게 출력하세요 (각 문단의 제목도 달지 말고 오직 내용만 출력하세요):
+                - Output ONLY the final Korean analysis. NO English.
+                - 한자(漢字) 절대 금지. 마크다운 기호(*, # 등) 절대 금지.
+                - MUST enclose your final answer inside <result> and </result> tags!
                 
-                (첫 번째 문단): 주어진 데이터의 현재 상태와 움직임을 요약한 2문장.
-                (두 번째 문단): 이를 종합한 현재 시장 진단 및 투자자 주의사항을 담은 2문장.
+                Output format:
+                <result>
+                첫 번째 문단: 주어진 데이터의 현재 상태와 움직임을 요약한 2문장.
+                두 번째 문단: 이를 종합한 현재 시장 진단 및 투자자 주의사항을 담은 2문장.
+                </result>
                 """
                 analysis_output = get_ai_analysis(ai_desc_prompt)
                 clean_indicator = clean_ai_output(analysis_output)
