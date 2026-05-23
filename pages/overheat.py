@@ -41,14 +41,28 @@ def render_overheat_page():
                 except Exception:
                     pass
                     
+            try:
+                tnx = yf.download('^TNX', start=start_date, end=end_date)['Close']
+                if isinstance(tnx, pd.DataFrame): tnx = tnx.iloc[:, 0]
+                df_list.append(pd.DataFrame({'^TNX': tnx}))
+                
+                cl = yf.download('CL=F', start=start_date, end=end_date)['Close']
+                if isinstance(cl, pd.DataFrame): cl = cl.iloc[:, 0]
+                df_list.append(pd.DataFrame({'CL=F': cl}))
+            except Exception:
+                pass
+
             if df_list:
                 df = pd.concat(df_list, axis=1)
                 for col in tickers_map.keys():
                     if col not in df.columns:
                         df[col] = pd.NA
+                if '^TNX' not in df.columns: df['^TNX'] = pd.NA
+                if 'CL=F' not in df.columns: df['CL=F'] = pd.NA
                 return df
             else:
-                return pd.DataFrame(columns=list(tickers_map.keys()))
+                cols = list(tickers_map.keys()) + ['^TNX', 'CL=F']
+                return pd.DataFrame(columns=cols)
         except Exception as e:
             st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
             return pd.DataFrame(columns=list(tickers_map.keys()))
@@ -105,15 +119,16 @@ def render_overheat_page():
         
         prompt = f"""
 당신은 신영증권 김효진 박사의 관점을 가진 수석 시장 분석가입니다.
-김효진 박사는 시장이 '주도주 상승 국면'을 넘어 '주도주만 좋은 극단화된 과열 국면'에 진입했는지 판단하기 위해 3가지 시그널을 중시합니다.
-1. 주도주와 비주도주 간의 극단적인 수익률 격차 (시장 전체 지수는 오르나 나머지 종목은 하락하는지)
-2. 시가총액 가중 지수(KODEX 200 등) 대비 동일 가중 지수의 하락 또는 정체 
-3. 확산의 부재 (반도체 외 자동차 등 후발 주자들이 동참하는지)
+김효진 박사는 시장이 '주도주 상승 국면'을 넘어 '과열 및 쏠림 국면'에 진입했는지, 그리고 '채권 자경단(Bond Vigilantes)'이 출현하여 증시에 부담을 주고 있는지 판단하기 위해 4가지 시그널을 중시합니다.
+1. 주도주와 비주도주 간의 극단적인 수익률 격차 
+2. 시가총액 가중 지수 대비 동일 가중 지수의 하락 또는 정체 
+3. 확산의 부재 (반도체 외 후발 주자들이 동참하는지)
+4. 채권 자경단의 귀환 (미 국채 10년물 금리와 유가의 동반 상승 여부, 인플레이션 및 재정 적자 우려)
 
 최근 6개월(180일) 수익률 데이터 요약(최초일을 Base 100으로 환산한 현재값):
 {data_text}
 
-위 데이터를 바탕으로 현재 시장이 건강한 상승 국면인지, 아니면 과열 징후가 뚜렷한 쏠림 국면인지 김효진 박사의 어조로 분석해주세요.
+위 데이터를 바탕으로 현재 시장이 건강한 상승 국면인지, 아니면 과열 징후가 뚜렷한 쏠림 국면인지, 그리고 채권 자경단의 활동(금리 급등)이 증시의 발목을 잡을 위험이 있는지 김효진 박사의 어조로 분석해주세요.
 단, 한두 달의 짧은 이격만으로 시장을 섣불리 과열로 단정 짓지 말고 균형 잡힌 시각을 유지하며, 결론을 3~4문장으로 요약해주세요.
 마크다운 포맷을 사용하여 핵심 내용을 강조하되, 불필요한 인사말이나 서론은 생략하고 곧바로 분석 결과만 제시해주세요.
 절대로 코드 블록(```)이나 표(Table)를 사용하지 마세요. (화면 레이아웃이 깨집니다)
@@ -137,7 +152,7 @@ def render_overheat_page():
         with st.spinner("AI가 최근 6개월 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
             # 데이터 추출
             recent_data = {}
-            ticker_names = {'069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)'}
+            ticker_names = {'069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)', '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가'}
             for col, name in ticker_names.items():
                 if col in df_norm.columns:
                     recent_data[name] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
@@ -194,3 +209,16 @@ def render_overheat_page():
     fig3.update_layout(title="확산 여부 확인: 주도주(반도체) vs 후발주(자동차) 동향 (Base 100)", height=450, hovermode="x unified")
     st.plotly_chart(fig3, use_container_width=True)
 
+    # 4. 채권 자경단의 귀환 (미 국채 금리 및 유가)
+    st.header("4. 채권 자경단(Bond Vigilantes)의 출현 여부")
+    st.markdown("정부의 재정 적자나 인플레이션 우려로 인해 채권 투자자들이 국채를 매도하며 금리가 급등하는 현상을 모니터링합니다. 국채 10년물 금리의 가파른 상승세와 인플레이션의 선행 지표인 유가(WTI)의 동반 상승은 증시의 밸류에이션 부담을 극대화시키는 핵심 위험 신호입니다.")
+    
+    fig4 = go.Figure()
+    if '^TNX' in df_norm.columns:
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^TNX'], name="미 국채 10년물 금리 (Base 100)", line=dict(color='#d62728', width=2)))
+    if 'CL=F' in df_norm.columns:
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['CL=F'], name="WTI 유가 (Base 100)", line=dict(color='#8c564b', width=2)))
+    if '069500.KS' in df_norm.columns:
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
+    fig4.update_layout(title="채권 자경단 모니터링: 국채 10년물 금리 및 유가 상승 압력 (Base 100)", height=450, hovermode="x unified")
+    st.plotly_chart(fig4, use_container_width=True)
