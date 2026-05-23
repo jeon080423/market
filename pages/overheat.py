@@ -9,10 +9,10 @@ import time
 
 def render_overheat_page():
     st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
-    st.markdown("""
-    신영증권 김효진 박사의 분석에 기반하여, 시장이 단순 '주도주 상승 국면'을 넘어 
-    **'주도주만 좋은(쏠림이 극단화된) 과열 국면'**에 진입했는지 판단하는 3가지 시그널을 모니터링합니다.
-    """)
+    st.markdown('''
+    신영증권 김효진 애널리스트가 제시한 강세장에서 반드시 점검해야 할 **4가지 핵심 체크포인트**를 모니터링합니다. 
+    이러한 리스크들이 무르익지 않으면 추세가 곧장 꺾이지는 않겠지만, 임계점을 넘는 사건이 발생하면 시장이 빠르게 반전될 수 있으므로 사이드미러와 백미러를 함께 확인하는 신중한 투자가 필요한 시점입니다.
+    ''')
 
     # Data fetching
     @st.cache_data(ttl=3600)
@@ -20,14 +20,12 @@ def render_overheat_page():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)
         
-        # KODEX 200 (시총가중) vs KODEX 200 동일가중
-        # 반도체 주도주 (삼성전자, SK하이닉스) vs 타 섹터 (KODEX 자동차)
         tickers_map = {
-            '069500.KS': '069500',
-            '252650.KS': '252650',
-            '005930.KS': '005930',
-            '000660.KS': '000660',
-            '091180.KS': '091180'
+            '069500.KS': '069500', # KODEX 200
+            '252650.KS': '252650', # KODEX 200 동일가중
+            '005930.KS': '005930', # 삼성전자
+            '000660.KS': '000660', # SK하이닉스
+            '091180.KS': '091180'  # KODEX 자동차
         }
         
         try:
@@ -42,30 +40,27 @@ def render_overheat_page():
                     pass
                     
             try:
-                tnx = yf.download('^TNX', start=start_date, end=end_date)['Close']
-                if isinstance(tnx, pd.DataFrame): tnx = tnx.iloc[:, 0]
-                df_list.append(pd.DataFrame({'^TNX': tnx}))
-                
-                cl = yf.download('CL=F', start=start_date, end=end_date)['Close']
-                if isinstance(cl, pd.DataFrame): cl = cl.iloc[:, 0]
-                df_list.append(pd.DataFrame({'CL=F': cl}))
+                # Add US Indicators: ^TNX (10Y), CL=F (Oil), HYG (High Yield), IPO (Renaissance IPO ETF)
+                us_tickers = {'^TNX': '^TNX', 'CL=F': 'CL=F', 'HYG': 'HYG', 'IPO': 'IPO'}
+                for t_name, t_sym in us_tickers.items():
+                    data = yf.download(t_sym, start=start_date, end=end_date)['Close']
+                    if isinstance(data, pd.DataFrame): data = data.iloc[:, 0]
+                    df_list.append(pd.DataFrame({t_name: data}))
             except Exception:
                 pass
 
             if df_list:
                 df = pd.concat(df_list, axis=1)
-                for col in tickers_map.keys():
+                all_cols = list(tickers_map.keys()) + ['^TNX', 'CL=F', 'HYG', 'IPO']
+                for col in all_cols:
                     if col not in df.columns:
                         df[col] = pd.NA
-                if '^TNX' not in df.columns: df['^TNX'] = pd.NA
-                if 'CL=F' not in df.columns: df['CL=F'] = pd.NA
                 return df
             else:
-                cols = list(tickers_map.keys()) + ['^TNX', 'CL=F']
-                return pd.DataFrame(columns=cols)
+                return pd.DataFrame(columns=list(tickers_map.keys()) + ['^TNX', 'CL=F', 'HYG', 'IPO'])
         except Exception as e:
             st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
-            return pd.DataFrame(columns=list(tickers_map.keys()))
+            return pd.DataFrame()
 
     with st.spinner("데이터를 불러오는 중입니다..."):
         df = get_overheat_data()
@@ -93,8 +88,6 @@ def render_overheat_page():
         return
 
     st.markdown("---")
-
-    st.markdown("---")
     st.header("🤖 실시간 AI 진단 (김효진 박사 관점)")
     
     # AI API 설정
@@ -117,22 +110,24 @@ def render_overheat_page():
         if not gemini_key:
             return "⚠️ Gemini API 키가 설정되지 않아 AI 분석을 수행할 수 없습니다. Secrets 설정을 확인해주세요."
         
-        prompt = f"""
+        prompt = f'''
 당신은 신영증권 김효진 박사의 관점을 가진 수석 시장 분석가입니다.
-김효진 박사는 시장이 '주도주 상승 국면'을 넘어 '과열 및 쏠림 국면'에 진입했는지, 그리고 '채권 자경단(Bond Vigilantes)'이 출현하여 증시에 부담을 주고 있는지 판단하기 위해 4가지 시그널을 중시합니다.
-1. 주도주와 비주도주 간의 극단적인 수익률 격차 
-2. 시가총액 가중 지수 대비 동일 가중 지수의 하락 또는 정체 
-3. 확산의 부재 (반도체 외 후발 주자들이 동참하는지)
-4. 채권 자경단의 귀환 (미 국채 10년물 금리와 유가의 동반 상승 여부, 인플레이션 및 재정 적자 우려)
+현재 코스피 등 증시가 3년 전 대비 세 배 가까이 오른 강세장에서, 시장의 과열과 반전 리스크를 판단하기 위해 다음 4가지 핵심 체크포인트를 분석해야 합니다.
 
-최근 6개월(180일) 수익률 데이터 요약(최초일을 Base 100으로 환산한 현재값):
+1. 주도주의 압착 현상 (소수 주도주로만 자금이 쏠리고 나머지 종목은 하락하는지)
+2. 채권 자경단의 출현 (미 국채 금리 급등, 인플레이션 등 연준 통제력 약화 여부)
+3. 사모 크레딧 환매 리스크 (데이터센터 대출 등 비우량 채권/하이일드 스프레드 불안 징후)
+4. 대형 IPO와 위험 선호도 (IPO ETF 등을 통한 시장의 위험 선호도 정점 징후)
+
+최근 6개월 데이터 요약 (최초일 Base 100 환산값):
 {data_text}
 
-위 데이터를 바탕으로 현재 시장이 건강한 상승 국면인지, 아니면 과열 징후가 뚜렷한 쏠림 국면인지, 그리고 채권 자경단의 활동(금리 급등)이 증시의 발목을 잡을 위험이 있는지 김효진 박사의 어조로 분석해주세요.
-단, 한두 달의 짧은 이격만으로 시장을 섣불리 과열로 단정 짓지 말고 균형 잡힌 시각을 유지하며, 결론을 3~4문장으로 요약해주세요.
-마크다운 포맷을 사용하여 핵심 내용을 강조하되, 불필요한 인사말이나 서론은 생략하고 곧바로 분석 결과만 제시해주세요.
-절대로 코드 블록(```)이나 표(Table)를 사용하지 마세요. (화면 레이아웃이 깨집니다)
-"""
+지시사항:
+- 위 데이터를 종합하여 현재 시장의 리스크 수준을 평가하고 결론을 내리세요.
+- 절대로 혼잣말, 서론, 사고 과정("분석을 시작하겠습니다", "이 데이터를 보면" 등)을 출력하지 마세요. 
+- 오직 전문가의 통찰이 담긴 "분석 결과"와 "결론"만 깔끔하게 3~4문단으로 출력하세요.
+- 마크다운 포맷을 사용하되, 코드 블록(```)이나 표(Table)는 절대 사용하지 마세요.
+'''
         models = [
             "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash",
             "gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it", "gemini-pro"
@@ -150,11 +145,14 @@ def render_overheat_page():
         
     if st.button("실시간 AI 진단 실행", use_container_width=True):
         with st.spinner("AI가 최근 6개월 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
-            # 데이터 추출
             recent_data = {}
-            ticker_names = {'069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)', '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가'}
+            ticker_names = {
+                '069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', 
+                '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)', 
+                '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)'
+            }
             for col, name in ticker_names.items():
-                if col in df_norm.columns:
+                if col in df_norm.columns and not pd.isna(df_norm[col].iloc[-1]):
                     recent_data[name] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
             
             data_text = "\n".join([f"- {k}: {v}" for k, v in recent_data.items()])
@@ -166,59 +164,60 @@ def render_overheat_page():
                 st.markdown(analysis_result)
 
     st.markdown("---")
-    # 1. 주도주와 비주도주 간의 극단적인 수익률 격차
-    st.header("1. 주도주와 비주도주 간의 극단적인 수익률 격차")
-    st.markdown("과거 닷컴 버블 당시의 사례처럼, 시장 전체의 지수는 상승하지만 주도주를 제외한 대다수 종목들의 수익률이 마이너스로 돌아설 때입니다. 이는 시장에 새로운 유동성이 유입되는 것이 아니라, 기존 자금이 힘없는 종목을 팔아 주도주로만 몰리는 상황임을 의미하며, 이는 상승 사이클의 고점이 다가왔다는 강력한 신호로 해석될 수 있습니다.")
+    
+    # 1. 주도주의 압착 현상
+    st.header("1. 주도주의 압착 현상")
+    st.markdown("소수 주도주로 자금이 지나치게 쏠리는 현상이 심화되는지 모니터링합니다. 시총가중 지수(KODEX 200) 대비 동일가중 지수가 하락하거나, AI 관련주 외 나머지 후발 종목들(자동차 등)이 마이너스로 가면서 주도주만 독주하는 상황이 더 심화될 가능성을 경계해야 합니다.")
     
     fig1 = go.Figure()
     if '005930.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자", line=dict(color='#ff4b4b', width=2)))
     if '000660.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스", line=dict(color='#ff7f0e', width=2)))
+    if '091180.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (후발주)", line=dict(color='#2ca02c', width=2, dash='dash')))
     if '069500.KS' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (시총가중)", line=dict(color='#1f77b4', width=2)))
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
     if '252650.KS' in df_norm.columns:
         fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['252650.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
-    fig1.update_layout(title="최근 6개월 주도주 vs 시장 지수 수익률 변화 (Base 100)", height=450, hovermode="x unified")
+    fig1.update_layout(title="주도주 압착 현상: AI 주도주 vs 후발주 및 동일가중 지수 (Base 100)", height=450, hovermode="x unified")
     st.plotly_chart(fig1, use_container_width=True)
 
-    # 2. 동일 가중 지수의 하락 또는 정체
-    st.header("2. 동일 가중 지수(Equal-Weighted Index)의 하락 또는 정체")
-    st.markdown("시가총액 가중 지수는 주도주의 비중이 커서 시장의 건강성을 왜곡할 수 있습니다. 반면, 모든 종목을 동일한 비중(1/n)으로 계산하는 동일 가중 지수가 하락하거나 전고점을 회복하지 못하고 있다면, 이는 주도주 이외의 나머지 종목들이 힘을 잃고 있다는 징후입니다.")
+    # 2. 채권 자경단의 출현
+    st.header("2. 채권 자경단의 출현")
+    st.markdown("미 재정부채 누적, 인플레이션 통제력 약화, 중앙은행 독립성 훼손이라는 세 가지 조건이 충족된 상황에서 미국 국채 시장으로 불똥이 튈 위험을 모니터링합니다. 유가 상승과 함께 국채 금리가 급등하는 현상은 채권 자경단의 활동을 암시합니다.")
     
-    if '069500.KS' in df_norm.columns and '252650.KS' in df_norm.columns:
-        spread = df_norm['069500.KS'] - df_norm['252650.KS']
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=spread.index, y=spread, name="시총가중 - 동일가중 격차", fill='tozeroy', line=dict(color='#9467bd', width=2)))
-        fig2.update_layout(title="KODEX 200 (시총가중) vs KODEX 200 동일가중 수익률 격차 (격차가 클수록 쏠림 심화)", height=400, hovermode="x unified")
-        st.plotly_chart(fig2, use_container_width=True)
+    fig2 = go.Figure()
+    if '^TNX' in df_norm.columns:
+        fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^TNX'], name="미 국채 10년물 금리", line=dict(color='#d62728', width=2)))
+    if 'CL=F' in df_norm.columns:
+        fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['CL=F'], name="WTI 유가", line=dict(color='#8c564b', width=2)))
+    if '069500.KS' in df_norm.columns:
+        fig2.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
+    fig2.update_layout(title="채권 자경단 모니터링: 10년물 국채 금리 및 유가 상승 압력 (Base 100)", height=400, hovermode="x unified")
+    st.plotly_chart(fig2, use_container_width=True)
 
-    # 3. 확산의 부재
-    st.header("3. '확산'의 부재")
-    st.markdown("주도주 외의 후발 주자들이 함께 성장하는 '확산'의 모습이 나타나지 않고, 오직 주도주만 독식하는 구조가 지속될 때 경계심을 가져야 합니다.")
+    # 3. 사모 크레딧 환매 리스크
+    st.header("3. 사모 크레딧 환매 리스크")
+    st.markdown("데이터센터 대출 등에 집중된 사모 크레딧은 공시 의무가 없어 위험이 가려져 있습니다. 시장 불안 시 환매가 도미노처럼 발생할 수 있으며, 하이일드 채권(HYG) 성과나 스프레드를 통해 비우량 신용 시장의 불안 조짐을 간접적으로 트래킹합니다.")
     
     fig3 = go.Figure()
+    if 'HYG' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['HYG'], name="하이일드 ETF (HYG)", line=dict(color='#e377c2', width=2)))
     if '069500.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
-    if '005930.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
-    if '000660.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
-    if '091180.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (후발주)", line=dict(color='#2ca02c', width=2, dash='dash')))
-    fig3.update_layout(title="확산 여부 확인: 주도주(반도체) vs 후발주(자동차) 동향 (Base 100)", height=450, hovermode="x unified")
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
+    fig3.update_layout(title="크레딧 리스크 대용 지표: 하이일드 ETF 추이 (Base 100)", height=400, hovermode="x unified")
     st.plotly_chart(fig3, use_container_width=True)
 
-    # 4. 채권 자경단의 귀환 (미 국채 금리 및 유가)
-    st.header("4. 채권 자경단(Bond Vigilantes)의 출현 여부")
-    st.markdown("정부의 재정 적자나 인플레이션 우려로 인해 채권 투자자들이 국채를 매도하며 금리가 급등하는 현상을 모니터링합니다. 국채 10년물 금리의 가파른 상승세와 인플레이션의 선행 지표인 유가(WTI)의 동반 상승은 증시의 밸류에이션 부담을 극대화시키는 핵심 위험 신호입니다.")
+    # 4. 대형 IPO와 위험 선호도
+    st.header("4. 대형 IPO와 위험 선호도")
+    st.markdown("스페이스X, 앤트로픽, 오픈AI 등 대형 IPO의 성공은 시장 위험 선호도의 정점 신호가 될 수 있습니다. 신규 상장 주식들의 성과를 대변하는 IPO ETF의 자금 유입 및 수익률 동향을 통해 시장의 투기적 과열 분위기가 어느 정도인지 가늠할 수 있습니다.")
     
     fig4 = go.Figure()
-    if '^TNX' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^TNX'], name="미 국채 10년물 금리 (Base 100)", line=dict(color='#d62728', width=2)))
-    if 'CL=F' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['CL=F'], name="WTI 유가 (Base 100)", line=dict(color='#8c564b', width=2)))
+    if 'IPO' in df_norm.columns:
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['IPO'], name="미국 IPO ETF", line=dict(color='#bcbd22', width=2)))
     if '069500.KS' in df_norm.columns:
         fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
-    fig4.update_layout(title="채권 자경단 모니터링: 국채 10년물 금리 및 유가 상승 압력 (Base 100)", height=450, hovermode="x unified")
+    fig4.update_layout(title="위험 선호도 정점 징후: 대형 IPO ETF 추이 (Base 100)", height=400, hovermode="x unified")
     st.plotly_chart(fig4, use_container_width=True)
+
