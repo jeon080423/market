@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
+import re
+import concurrent.futures
 
 # Header for crawler requests
 HEADERS = {
@@ -360,11 +362,74 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
         
     # 빈도(count) 내림차순, 동일 빈도 시 최신 발행일(latest_date) 내림차순 정렬
     freq_list.sort(key=lambda x: (x['count'], x['latest_date']), reverse=True)
-    
+    top_items = freq_list[:10]
+
+    # 상위 10개 종목의 리포트 상세 페이지를 병렬 크롤링하여 투자의견/목표가/요약 키워드 추출
+    def _fetch_report_detail(item: dict) -> dict:
+        """Thread worker: 리포트 상세 페이지에서 투자의견, 목표가, 핵심 요약 키워드 크롤링"""
+        result = {'opinion': '', 'target_price': '', 'summary': ''}
+        url = item.get('latest_report_url', '')
+        if not url:
+            return result
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=8)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
+            content_area = soup.find(id='contentarea')
+            if not content_area:
+                return result
+
+            # 소스 태그(목표가|투자의견) 찾기
+            source_p = content_area.find('p', {'class': 'source'})
+            if source_p:
+                src_txt = source_p.get_text(strip=True)
+                # 목표가 판두 e.g. "목표가 1,600,000|투자의견 Buy"
+                tp_m = re.search(r'목표가\s*([\d,]+)', src_txt)
+                op_m = re.search(r'투자의견\s*([\w ]+)', src_txt)
+                if tp_m:
+                    result['target_price'] = f"목표가 {tp_m.group(1)}"
+                if op_m:
+                    result['opinion'] = op_m.group(1).strip()[:20]
+
+            # 학습 view_cnt td 내 핸실 요약 문단
+            view_td = content_area.find('td', {'class': 'view_cnt'})
+            if view_td:
+                paras = [p.get_text(strip=True) for p in view_td.find_all('p') if len(p.get_text(strip=True)) > 20]
+                if paras:
+                    result['summary'] = paras[0][:160]  # 첫 번째 단락의 첫 160자
+        except Exception:
+            pass
+        return result
+
+    # ThreadPoolExecutor로 병렬 요청 (max 5 스레드, TTL 5분 캐싱으로 부담 최소화)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        detail_futures = {executor.submit(_fetch_report_detail, item): i for i, item in enumerate(top_items)}
+        detail_results = [None] * len(top_items)
+        for future in concurrent.futures.as_completed(detail_futures):
+            idx = detail_futures[future]
+            try:
+                detail_results[idx] = future.result()
+            except Exception:
+                detail_results[idx] = {'opinion': '', 'target_price': '', 'summary': ''}
+
     # 상위 10개 종목 구성
     sorted_reports = []
     rank_counter = 1
-    for item in freq_list[:10]:
+    for i, item in enumerate(top_items):
+        detail = detail_results[i] or {'opinion': '', 'target_price': '', 'summary': ''}
+        # 투자의견 + 목표가 조합
+        opinion_str = detail.get('opinion', '')
+        tp_str = detail.get('target_price', '')
+        summary_str = detail.get('summary', '')
+        keyword_parts = []
+        if opinion_str:
+            keyword_parts.append(f"투자의견: {opinion_str}")
+        if tp_str:
+            keyword_parts.append(tp_str)
+        if summary_str:
+            keyword_parts.append(summary_str)
+        keywords = " | ".join(keyword_parts) if keyword_parts else "-"
+
         # 리포트 페이지 URL 우선, 없으면 PDF URL 사용
         link_url = item['latest_report_url'] or item['latest_pdf_url'] or ""
         sorted_reports.append({
@@ -373,6 +438,7 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
             '티커': item['ticker'],
             '언급 빈도': f"{item['count']}회",
             '최근 리포트 제목': item['latest_title'],
+            '핵심 키워드': keywords,
             '발행 증권사': item['latest_brokerage'],
             '최근 발행일': item['latest_date'],
             '리포트 링크': link_url
@@ -493,13 +559,14 @@ def render_analyst_reports_table(df: pd.DataFrame):
         "순위": st.column_config.TextColumn("순위", width="small"),
         "티커": None,  # 숨김
         "리포트 링크": st.column_config.LinkColumn(
-            "리포트 열기 ↗1︎️",
+            "리포트 열기 ↗️",
             display_text="최신 리포트 보기",
             width="medium"
         ),
         "종목명": st.column_config.TextColumn("종목명", width="medium"),
         "언급 빈도": st.column_config.TextColumn("언급 빈도", width="small"),
         "최근 리포트 제목": st.column_config.TextColumn("최근 리포트 제목", width="large"),
+        "핵심 키워드": st.column_config.TextColumn("핵심 키워드", width="large"),
         "발행 증권사": st.column_config.TextColumn("발행 증권사", width="medium"),
         "최근 발행일": st.column_config.TextColumn("최근 발행일", width="small"),
     }
@@ -507,10 +574,10 @@ def render_analyst_reports_table(df: pd.DataFrame):
     st.dataframe(
         styled_df,
         use_container_width=True,
-        height=420,
+        height=450,
         hide_index=True,
         column_config=cols_config,
-        column_order=["순위", "종목명", "언급 빈도", "최근 리포트 제목", "발행 증권사", "최근 발행일", "리포트 링크"]
+        column_order=["순위", "종목명", "언급 빈도", "최근 리포트 제목", "핵심 키워드", "발행 증권사", "최근 발행일", "리포트 링크"]
     )
 
 def render_youtube_rank_page():
