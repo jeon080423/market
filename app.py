@@ -12,6 +12,7 @@ import time
 import re
 from io import StringIO
 import google.generativeai as genai
+from utils.ai_gsheet_cache import load_ai_cache, save_ai_cache, should_update_ai, is_data_changed_significantly
 
 # 이전 파일 자동 삭제 스크립트 (Windows 샌드박스 우회용)
 import os
@@ -954,10 +955,32 @@ try:
     시장 위험 지수 모델 유효성 진단 및 핵심 시장 지표 종합 진단을 한 번에 수행합니다.
     """)
     
+    if "ai_cache_loaded" not in st.session_state:
+        saved_at, data_hash, response_text = load_ai_cache(SHEET_ID, "main_risk")
+        if response_text:
+            try:
+                st.session_state["ai_analysis_results"] = json.loads(response_text)
+                st.session_state["ai_last_saved_at"] = saved_at
+                st.session_state["ai_last_data_hash"] = data_hash
+            except:
+                pass
+        st.session_state["ai_cache_loaded"] = True
+
+    current_data_hash = {}
+    try:
+        current_data_hash["kospi"] = round(float(ks_s.iloc[-1]), 2)
+        current_data_hash["fx"] = round(float(fx_s.iloc[-1]), 1)
+        current_data_hash["vix"] = round(float(vx_s.iloc[-1]), 2)
+        current_data_hash["b10"] = round(float(b10_s.iloc[-1]), 3)
+    except:
+        pass
+
     if st.session_state.get("ai_analysis_results") is not None:
+        saved_at = st.session_state.get("ai_last_saved_at", "N/A")
+        st.caption(f"✅ 마지막 AI 분석: {saved_at} (변동이 적을 경우 자동 캐싱 유지)")
         col_btn1, col_btn2, _ = st.columns([1.5, 1.5, 5])
         with col_btn1:
-            if st.button("🔄 AI 재분석 시작", key="btn_run_ai_analysis", use_container_width=True):
+            if st.button("🔄 최신 AI 분석 강제 요청", key="btn_run_ai_analysis", use_container_width=True):
                 st.session_state["run_ai_trigger"] = True
                 st.session_state["ai_analysis_results"] = None
                 st.rerun()
@@ -969,7 +992,16 @@ try:
     else:
         col_btn1, _ = st.columns([2, 6])
         with col_btn1:
-            if st.button("🚀 AI 분석 시작", key="btn_run_ai_analysis", use_container_width=True):
+            if st.button("🚀 최신 AI 분석 요청", key="btn_run_ai_analysis", use_container_width=True):
+                st.session_state["run_ai_trigger"] = True
+                st.rerun()
+
+    # 정각 경과 + 데이터 변동성 확인을 통한 자동 트리거
+    if st.session_state.get("ai_analysis_results") is not None and not st.session_state.get("run_ai_trigger"):
+        saved_at = st.session_state.get("ai_last_saved_at")
+        old_hash = st.session_state.get("ai_last_data_hash")
+        if should_update_ai(saved_at):
+            if is_data_changed_significantly(old_hash, current_data_hash, 0.005):
                 st.session_state["run_ai_trigger"] = True
                 st.rerun()
                 
@@ -1433,8 +1465,13 @@ if st.session_state.get("run_ai_trigger"):
             "bt": bt_result,
             "indicator": indicator_result
         }
+        st.session_state["ai_last_data_hash"] = current_data_hash
+        st.session_state["ai_last_saved_at"] = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
+        
+        save_ai_cache(SHEET_ID, "main_risk", current_data_hash, json.dumps(st.session_state["ai_analysis_results"], ensure_ascii=False))
+        
         st.session_state["run_ai_trigger"] = False
-        st.success("AI 통합 분석 완료!")
+        st.success("AI 통합 분석 완료 및 구글 시트 저장!")
         st.rerun()
 
 # --- [컨테이너에 결과 또는 안내문 출력] ---

@@ -391,36 +391,76 @@ def render_overheat_page():
                     time.sleep(1)
         return "AI 분석을 가져오는 중 오류가 발생했습니다.\n\n잠시 후 다시 시도해주세요."
         
-    if st.button("실시간 AI 진단 실행", use_container_width=True):
-        with st.spinner("AI가 최근 6개월 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
-            recent_data = {}
-            ticker_names = {
-                '069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', 
-                '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', 
-                '091180.KS': 'KODEX 자동차(비주도주)', '091220.KS': 'KODEX 은행(비주도주)', '261240.KS': 'KODEX 바이오(비주도주)',
-                '091210.KS': 'KODEX 건설(비주도주)', '228790.KS': 'TIGER 화장품(비주도주)', '450320.KS': 'PLUS K방산(비주도주)',
-                '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)', '^GSPC': 'S&P 500'
-            }
-            for col, name in ticker_names.items():
-                if col in df_norm.columns and not pd.isna(df_norm[col].iloc[-1]):
-                    recent_data[name] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
-            
-            data_text = "\n".join([f"- {k}: {v}" for k, v in recent_data.items()])
+    # 구글 시트 캐시 연동
+    sheet_id = st.secrets.get("gsheet", {}).get("sheet_id") or st.secrets.get("sheet_id")
+    from utils.ai_gsheet_cache import load_ai_cache, save_ai_cache, should_update_ai, is_data_changed_significantly
+    from datetime import datetime, timezone, timedelta
+    
+    KST = timezone(timedelta(hours=9))
+
+    recent_data = {}
+    ticker_names = {
+        '069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', 
+        '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', 
+        '091180.KS': 'KODEX 자동차(비주도주)', '091220.KS': 'KODEX 은행(비주도주)', '261240.KS': 'KODEX 바이오(비주도주)',
+        '091210.KS': 'KODEX 건설(비주도주)', '228790.KS': 'TIGER 화장품(비주도주)', '450320.KS': 'PLUS K방산(비주도주)',
+        '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)', '^GSPC': 'S&P 500'
+    }
+    for col, name in ticker_names.items():
+        if col in df_norm.columns and not pd.isna(df_norm[col].iloc[-1]):
+            recent_data[name] = round(float(df_norm[col].iloc[-1]), 2)
+
+    if "overheat_ai_cache_loaded" not in st.session_state:
+        saved_at, data_hash, response_text = load_ai_cache(sheet_id, "overheat")
+        if response_text:
+            st.session_state["overheat_ai_result"] = response_text
+            st.session_state["overheat_ai_saved_at"] = saved_at
+            st.session_state["overheat_ai_data_hash"] = data_hash
+        st.session_state["overheat_ai_cache_loaded"] = True
+
+    if st.session_state.get("overheat_ai_result"):
+        saved_at = st.session_state.get("overheat_ai_saved_at", "N/A")
+        st.caption(f"✅ 마지막 AI 분석: {saved_at} (변동이 적을 경우 자동 캐싱 유지)")
+        col_btn1, _ = st.columns([2, 6])
+        with col_btn1:
+            run_ai = st.button("🔄 최신 AI 분석 강제 요청", use_container_width=True)
+    else:
+        col_btn1, _ = st.columns([2, 6])
+        with col_btn1:
+            run_ai = st.button("🚀 실시간 AI 진단 실행", use_container_width=True)
+
+    # 자동 로직
+    if not run_ai and st.session_state.get("overheat_ai_result"):
+        saved_at = st.session_state.get("overheat_ai_saved_at")
+        old_hash = st.session_state.get("overheat_ai_data_hash")
+        if should_update_ai(saved_at) and is_data_changed_significantly(old_hash, recent_data, 0.005):
+            run_ai = True
+
+    if run_ai:
+        with st.spinner("AI가 최근 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
+            data_text = "\n".join([f"- {k}: {v:.2f} (Base 100)" for k, v in recent_data.items()])
             analysis_result = get_ai_overheat_analysis(data_text)
             analysis_result = analysis_result.replace("```markdown", "").replace("```", "").strip()
             
-            # AI가 지시를 무시하고 뱉은 영어 메타데이터, 서론 등을 강제 절단 (정규식 필터링)
             import re
             match = re.search(r'(\*\*\[종합 분석 결과\]\*\*|\[종합 분석 결과\])(.*)', analysis_result, re.DOTALL | re.IGNORECASE)
             if match:
                 analysis_result = match.group(1) + match.group(2)
             
-            # 모든 마침표 뒤에 강제 줄바꿈(엔터 2번) 추가하여 가독성 개선
             analysis_result = analysis_result.replace(". ", ".\n\n")
             
-            st.success("분석 완료")
-            with st.container(border=True):
-                st.markdown(analysis_result)
+            st.session_state["overheat_ai_result"] = analysis_result
+            st.session_state["overheat_ai_saved_at"] = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
+            st.session_state["overheat_ai_data_hash"] = recent_data
+            
+            if sheet_id:
+                save_ai_cache(sheet_id, "overheat", recent_data, analysis_result)
+            
+            st.success("분석 완료 및 구글 시트 저장!")
+            
+    if st.session_state.get("overheat_ai_result"):
+        with st.container(border=True):
+            st.markdown(st.session_state["overheat_ai_result"])
 
     st.markdown("---")
     
