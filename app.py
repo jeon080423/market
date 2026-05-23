@@ -887,6 +887,7 @@ try:
     - 원/달러 환율: {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
     - 구리 가격: {cp_s.iloc[-1]:.2f} (최근 추세: {'상승' if cp_s.iloc[-1] > cp_s.iloc[-5] else '하락'})
     - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
+    - 미 국채 10년물 금리: {b10_s.iloc[-1]:.3f}% (위험 수준: {'높음' if b10_s.iloc[-1] > 4.5 else '낮음'})
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
@@ -974,6 +975,16 @@ try:
             dx_th = round(float(dx_s[dx_s.index >= (dx_s.index.max() - pd.Timedelta(days=365))].mean() * 1.05), 2)
             st.plotly_chart(create_chart(dx_s, "달러 인덱스", dx_th, "달러 강세 시 신흥국 매도 압력"), use_container_width=True)
             st.info("**달러 강세**: 글로벌 안전자산 선호 심리는 KOSPI 하락 요인")
+
+    r4_c1, r4_c2, r4_c3 = st.columns(3)
+    with r4_c1:
+        st.subheader("미국 국채 10년물 금리")
+        if b10_s is not None and not b10_s.empty:
+            # 위험 기준선 판별: 
+            # 4.5% 이상이면 주식시장에 상당한 할인율 부담으로 작용하므로 위험 기준선으로 설정
+            b10_th = 4.5 
+            st.plotly_chart(create_chart(b10_s, "10년물 국채 금리", b10_th, "4.5% 돌파 시 주식 밸류에이션 부담"), use_container_width=True)
+            st.info("**국채 금리**: 4.5% 이상 상승 시 무위험 대안 수익률이 높아져 주식 밸류에이션 부담이 커짐")
 
     # 현재 시장 지표 종합 진단 AI 컨테이너 정의 (위치: 모든 지표 차트 하단)
     ai_indicator_container = st.container()
