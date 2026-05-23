@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import google.generativeai as genai
 import time
 
-def render_overheat_page():
+def render_overheat_page(selected_model_name="gemini-2.0-flash"):
     st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
 
     # Data fetching
@@ -344,7 +344,7 @@ def render_overheat_page():
         pass
 
     @st.cache_data(ttl=3600)
-    def get_ai_overheat_analysis(data_text):
+    def get_ai_overheat_analysis(data_text, selected_model_name=selected_model_name):
         if not gemini_key:
             return "⚠️ Gemini API 키가 설정되지 않아 AI 분석을 수행할 수 없습니다.\n\nSecrets 설정을 확인해주세요."
         
@@ -360,9 +360,10 @@ def render_overheat_page():
 **[최종 결론]**
 (여기에 시장 리스크에 대한 명확하고 단호한 최종 결론 1문단 작성)
 '''
-        models = [
-            "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash",
-            "gemini-3.1-flash", "gemini-3.1-pro", "gemma-4-31b-it", "gemini-pro"
+        models = [selected_model_name] + [
+            m for m in ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", 
+                        "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+            if m != selected_model_name
         ]
         for model_name in models:
             for attempt in range(2):
@@ -390,7 +391,7 @@ def render_overheat_page():
                     recent_data[name] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
             
             data_text = "\n".join([f"- {k}: {v}" for k, v in recent_data.items()])
-            analysis_result = get_ai_overheat_analysis(data_text)
+            analysis_result = get_ai_overheat_analysis(data_text, selected_model_name=selected_model_name)
             analysis_result = analysis_result.replace("```markdown", "").replace("```", "").strip()
             
             # AI가 지시를 무시하고 뱉은 영어 메타데이터, 서론 등을 강제 절단 (정규식 필터링)
