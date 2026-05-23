@@ -9,12 +9,6 @@ import time
 
 def render_overheat_page():
     st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
-    st.markdown('''
-    신영증권 김효진 애널리스트가 제시한 강세장에서 반드시 점검해야 할 **4가지 핵심 체크포인트**를 모니터링합니다.\n\n이러한 리스크들이 무르익지 않으면 추세가 곧장 꺾이지는 않겠지만, 임계점을 넘는 사건이 발생하면 시장이 빠르게 반전될 수 있으므로 사이드미러와 백미러를 함께 확인하는 신중한 투자가 필요한 시점입니다.\n\n''')
-
-    with st.expander("💡 차트 데이터 표준화(Base 100) 및 읽는 법 안내"):
-        st.markdown('''
-        본 페이지의 모든 차트는 수만 원대의 주식, 80달러대의 유가, 4%대의 국채 금리 등 **서로 단위가 완전히 다른 지표들을 한 화면에서 직관적으로 비교**하기 위해 **'Base 100' 표준화 기법**을 적용했습니다.\n\n* **Base 100 작동 원리**: 조회 기간(최근 6개월)의 첫날 가격을 무조건 '100'으로 환산하여 출발합니다.\n\n* **해석 방법**: 만약 삼성전자의 선이 '110'에 있고 유가 선이 '90'에 있다면, 이는 6개월 전 대비 삼성전자는 정확히 10% 상승했고 유가는 10% 하락했음을 의미합니다.\n\n* **비교의 타당성**: Z-Score(표준편차) 방식과 달리 누적 수익률(성장률)을 그대로 반영하므로, **"주도주로 얼마나 자금이 쏠리고 있는지(압착)", "시장 지표들이 상대적으로 얼마나 과열되었는지"**를 1:1로 비교하는 데 가장 타당하고 직관적인 방식입니다.\n\n차트의 Y축 수치는 단순한 가격이 아닌 **'누적 수익률'**로 읽어주시면 됩니다.\n\n''')
 
     # Data fetching
     @st.cache_data(ttl=3600)
@@ -50,7 +44,13 @@ def render_overheat_page():
                 # Add US Indicators: ^TNX (10Y), CL=F (Oil), HYG (High Yield), IPO (Renaissance IPO ETF), ^GSPC (S&P 500)
                 us_tickers = {'^TNX': '^TNX', 'CL=F': 'CL=F', 'HYG': 'HYG', 'IPO': 'IPO', '^GSPC': '^GSPC'}
                 for t_name, t_sym in us_tickers.items():
-                    data = yf.download(t_sym, start=start_date, end=end_date)['Close']
+                    raw = yf.download(t_sym, start=start_date, end=end_date)
+                    if isinstance(raw.columns, pd.MultiIndex) and 'Close' in raw.columns.levels[0]:
+                        data = raw['Close'].iloc[:, 0]
+                    elif 'Close' in raw.columns:
+                        data = raw['Close']
+                    else:
+                        data = raw.iloc[:, 0]
                     if isinstance(data, pd.DataFrame): data = data.iloc[:, 0]
                     df_list.append(pd.DataFrame({t_name: data}))
             except Exception:
@@ -93,6 +93,235 @@ def render_overheat_page():
     if df_norm.empty:
         st.warning("분석할 충분한 데이터가 없습니다.")
         return
+
+    st.header("🌡️ 시장 과열 지수 (Market Overheat Index, 0~100)")
+    st.markdown("4가지 핵심 리스크 시그널을 **각각 0~100점으로 정규화(Z-Score + Sigmoid)**한 후 가중 평균하여 산출한 단일 복합 과열 지수입니다. 50점이 중립, 70점 이상이면 과열 경보, 85점 이상이면 위험 구간입니다.")
+
+    # ─────────────────────────────────────────────────────────────────
+    # [복합 과열 지수 계산 엔진] Z-Score + Sigmoid 0~100 정규화 방식
+    # 각 시그널의 단위가 달라도 비교 가능한 0~100 스코어로 변환 후 가중 평균
+    # ─────────────────────────────────────────────────────────────────
+    import numpy as np
+
+    def sigmoid_score(series, inverse=False):
+        """시계열 데이터를 Z-Score → Sigmoid 변환으로 0~100점 정규화"""
+        if series is None or len(series.dropna()) < 5:
+            return pd.Series(50.0, index=series.index if series is not None else [])
+        mu = series.mean()
+        std = series.std()
+        if std == 0:
+            return pd.Series(50.0, index=series.index)
+        z = (series - mu) / std
+        score = 100 / (1 + np.exp(-z))
+        return (100 - score) if inverse else score
+
+    # ── 시그널 1: 주도주 쏠림도 (높을수록 과열) ──
+    kodex_mkt  = df_norm.get('069500.KS', pd.Series(dtype=float))
+    kodex_eq   = df_norm.get('252650.KS', pd.Series(dtype=float))
+    if not kodex_mkt.empty and not kodex_eq.empty:
+        spread_comp = (kodex_mkt - kodex_eq).reindex(df_norm.index).ffill()
+    else:
+        spread_comp = pd.Series(0.0, index=df_norm.index)
+    s1_raw = sigmoid_score(spread_comp)  # 스프레드 클수록 고점수 = 과열
+
+    # ── 시그널 2: 채권 자경단 (금리+유가 동반 상승, 높을수록 위험) ──
+    tnx  = df_norm.get('^TNX', pd.Series(dtype=float)).reindex(df_norm.index).ffill()
+    wti  = df_norm.get('CL=F', pd.Series(dtype=float)).reindex(df_norm.index).ffill()
+    if not tnx.empty and not wti.empty:
+        spread_vigil = ((tnx - 100) + (wti - 100)).reindex(df_norm.index).ffill()
+    elif not tnx.empty:
+        spread_vigil = (tnx - 100).reindex(df_norm.index).ffill()
+    else:
+        spread_vigil = pd.Series(0.0, index=df_norm.index)
+    s2_raw = sigmoid_score(spread_vigil)
+
+    # ── 시그널 3: 크레딧 스트레스 (HYG 하락 = 위험, inverse) ──
+    hyg = df_norm.get('HYG', pd.Series(dtype=float)).reindex(df_norm.index).ffill()
+    if not hyg.empty:
+        s3_raw = sigmoid_score(hyg, inverse=True)   # HYG 낮을수록 위험 → 역방향
+    else:
+        s3_raw = pd.Series(50.0, index=df_norm.index)
+
+    # ── 시그널 4: 투기적 과열 (IPO ETF ↑ > S&P500, 높을수록 과열) ──
+    ipo  = df_norm.get('IPO',  pd.Series(dtype=float)).reindex(df_norm.index).ffill()
+    gspc = df_norm.get('^GSPC', pd.Series(dtype=float)).reindex(df_norm.index).ffill()
+    if not ipo.empty and not gspc.empty:
+        spread_spec = (ipo - gspc).reindex(df_norm.index).ffill()
+    else:
+        spread_spec = pd.Series(0.0, index=df_norm.index)
+    s4_raw = sigmoid_score(spread_spec)
+
+    # ── 가중 평균 합산 (동일 가중치 25%씩) ──
+    W1, W2, W3, W4 = 0.25, 0.25, 0.25, 0.25
+    df_overheat = pd.DataFrame({
+        '쏠림_리스크':    s1_raw * W1,
+        '채권자경단':     s2_raw * W2,
+        '크레딧_스트레스': s3_raw * W3,
+        '투기적_과열':    s4_raw * W4,
+    }, index=df_norm.index)
+    df_overheat['과열_지수'] = df_overheat.sum(axis=1)
+
+    latest_idx  = df_overheat['과열_지수'].iloc[-1]
+    prev_idx    = df_overheat['과열_지수'].iloc[-6] if len(df_overheat) > 5 else 50.0  # 5일 전 대비
+    delta_5d    = latest_idx - prev_idx
+
+    # 등급 판정
+    if latest_idx >= 85:
+        grade, grade_color, grade_emoji = "위험 (DANGER)", "#c0392b", "🚨"
+    elif latest_idx >= 70:
+        grade, grade_color, grade_emoji = "과열 (CAUTION)", "#e67e22", "⚠️"
+    elif latest_idx >= 55:
+        grade, grade_color, grade_emoji = "주의 (WATCH)", "#f1c40f", "👀"
+    elif latest_idx >= 35:
+        grade, grade_color, grade_emoji = "중립 (NEUTRAL)", "#27ae60", "✅"
+    else:
+        grade, grade_color, grade_emoji = "냉각 (COOL)", "#2980b9", "❄️"
+
+    # ─── 레이아웃: 게이지 + 카드 ───
+    col_g, col_c = st.columns([1.2, 0.8])
+
+    with col_g:
+        # 반원형 게이지
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=latest_idx,
+            number={'suffix': "점", 'font': {'size': 38}},
+            delta={'reference': prev_idx, 'increasing': {'color': "#e74c3c"}, 'decreasing': {'color': "#2ecc71"},
+                   'suffix': "pt (5일전 대비)", 'font': {'size': 14}},
+            title={'text': f"시장 과열 지수 (MOI)  {grade_emoji} {grade}", 'font': {'size': 16}},
+            gauge={
+                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#555",
+                         'tickvals': [0, 35, 55, 70, 85, 100],
+                         'ticktext': ['0', '35', '55', '70', '85', '100']},
+                'bar': {'color': grade_color, 'thickness': 0.25},
+                'bgcolor': "#f8f9fa",
+                'borderwidth': 1,
+                'bordercolor': "#dee2e6",
+                'steps': [
+                    {'range': [0,  35], 'color': '#d6eaf8'},   # 냉각 - 파랑
+                    {'range': [35, 55], 'color': '#d5f5e3'},   # 중립 - 초록
+                    {'range': [55, 70], 'color': '#fef9e7'},   # 주의 - 노랑
+                    {'range': [70, 85], 'color': '#fdebd0'},   # 과열 - 주황
+                    {'range': [85,100], 'color': '#fadbd8'},   # 위험 - 빨강
+                ],
+                'threshold': {
+                    'line': {'color': grade_color, 'width': 5},
+                    'thickness': 0.8,
+                    'value': latest_idx
+                }
+            }
+        ))
+        fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
+                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+    with col_c:
+        # 4개 컴포넌트 점수 카드
+        st.markdown("**📊 컴포넌트별 현재 점수**")
+        comp_data = {
+            '🏦 주도주 쏠림': s1_raw.iloc[-1],
+            '📈 채권 자경단': s2_raw.iloc[-1],
+            '💳 크레딧 스트레스': s3_raw.iloc[-1],
+            '🚀 투기적 과열': s4_raw.iloc[-1],
+        }
+        for label, score in comp_data.items():
+            bar_color = "#e74c3c" if score >= 70 else ("#f39c12" if score >= 55 else "#27ae60")
+            bar_width = int(score)
+            st.markdown(f"""
+            <div style="margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                    <span style="font-size:0.85rem;">{label}</span>
+                    <span style="font-size:0.85rem; font-weight:bold; color:{bar_color};">{score:.1f}점</span>
+                </div>
+                <div style="background:#e9ecef; border-radius:4px; height:10px;">
+                    <div style="background:{bar_color}; width:{bar_width}%; border-radius:4px; height:10px;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # 해석 기준표
+        st.markdown("""
+        <div style="font-size:0.78rem; color:#666; margin-top:12px; line-height:1.7;">
+        <b>📋 등급 기준</b><br>
+        ❄️ &nbsp;0~35점: 냉각 — 매수 유리<br>
+        ✅ 35~55점: 중립 — 관망<br>
+        👀 55~70점: 주의 — 비중 축소 검토<br>
+        ⚠️ 70~85점: 과열 — 방어적 운용<br>
+        🚨 85~100점: 위험 — 최소화
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown('''
+    신영증권 김효진 애널리스트가 제시한 강세장에서 반드시 점검해야 할 **4가지 핵심 체크포인트**를 모니터링합니다.\n\n이러한 리스크들이 무르익지 않으면 추세가 곧장 꺾이지는 않겠지만, 임계점을 넘는 사건이 발생하면 시장이 빠르게 반전될 수 있으므로 사이드미러와 백미러를 함께 확인하는 신중한 투자가 필요한 시점입니다.\n\n''')
+
+    with st.expander("💡 차트 데이터 표준화(Base 100) 및 읽는 법 안내"):
+        st.markdown('''
+        본 페이지의 모든 차트는 수만 원대의 주식, 80달러대의 유가, 4%대의 국채 금리 등 **서로 단위가 완전히 다른 지표들을 한 화면에서 직관적으로 비교**하기 위해 **'Base 100' 표준화 기법**을 적용했습니다.\n\n* **Base 100 작동 원리**: 조회 기간(최근 6개월)의 첫날 가격을 무조건 '100'으로 환산하여 출발합니다.\n\n* **해석 방법**: 만약 삼성전자의 선이 '110'에 있고 유가 선이 '90'에 있다면, 이는 6개월 전 대비 삼성전자는 정확히 10% 상승했고 유가는 10% 하락했음을 의미합니다.\n\n* **비교의 타당성**: Z-Score(표준편차) 방식과 달리 누적 수익률(성장률)을 그대로 반영하므로, **"주도주로 얼마나 자금이 쏠리고 있는지(압착)", "시장 지표들이 상대적으로 얼마나 과열되었는지"**를 1:1로 비교하는 데 가장 타당하고 직관적인 방식입니다.\n\n차트의 Y축 수치는 단순한 가격이 아닌 **'누적 수익률'**로 읽어주시면 됩니다.\n\n''')
+
+    st.markdown("---")
+
+    # ─── 6개월 추세 (4개 시그널 + 종합 인덱스) ───
+    st.markdown("**📉 과열 지수 6개월 추세 (시그널별 기여도 분해)**")
+
+    fig_trend = go.Figure()
+
+    # 음영 배경 영역 (위험 존)
+    fig_trend.add_hrect(y0=85, y1=100, fillcolor="rgba(192,57,43,0.10)", line_width=0, annotation_text="위험", annotation_position="right")
+    fig_trend.add_hrect(y0=70,  y1=85,  fillcolor="rgba(230,126,34,0.10)",  line_width=0, annotation_text="과열", annotation_position="right")
+    fig_trend.add_hrect(y0=55,  y1=70,  fillcolor="rgba(241,196,15,0.10)",  line_width=0, annotation_text="주의", annotation_position="right")
+    fig_trend.add_hrect(y0=35,  y1=55,  fillcolor="rgba(39,174,96,0.10)",   line_width=0, annotation_text="중립", annotation_position="right")
+    fig_trend.add_hrect(y0=0,   y1=35,  fillcolor="rgba(41,128,185,0.10)",  line_width=0, annotation_text="냉각", annotation_position="right")
+
+    # 컴포넌트 기여도 (스택 에리어)
+    fig_trend.add_trace(go.Scatter(
+        x=df_overheat.index, y=df_overheat['쏠림_리스크'],
+        name='주도주 쏠림 (×0.25)', mode='lines',
+        line=dict(color='#3498db', width=1, dash='dot'), opacity=0.6
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=df_overheat.index, y=df_overheat['채권자경단'],
+        name='채권자경단 (×0.25)', mode='lines',
+        line=dict(color='#e74c3c', width=1, dash='dot'), opacity=0.6
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=df_overheat.index, y=df_overheat['크레딧_스트레스'],
+        name='크레딧 스트레스 (×0.25)', mode='lines',
+        line=dict(color='#9b59b6', width=1, dash='dot'), opacity=0.6
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=df_overheat.index, y=df_overheat['투기적_과열'],
+        name='투기적 과열 (×0.25)', mode='lines',
+        line=dict(color='#f39c12', width=1, dash='dot'), opacity=0.6
+    ))
+    # 종합 지수 (굵은 선)
+    fig_trend.add_trace(go.Scatter(
+        x=df_overheat.index, y=df_overheat['과열_지수'],
+        name='📊 종합 과열 지수', mode='lines',
+        line=dict(color='#2c3e50', width=3), fill='tozeroy',
+        fillcolor='rgba(44,62,80,0.08)'
+    ))
+    # 현재 수준 기준선
+    fig_trend.add_hline(y=latest_idx, line_dash="dash", line_color=grade_color,
+                        annotation_text=f"현재 {latest_idx:.1f}점", annotation_position="left")
+
+    fig_trend.update_layout(
+        height=380,
+        margin=dict(l=20, r=80, t=30, b=20),
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(range=[0, 100], title="과열 지수 (0~100점)"),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+    )
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+    st.info(f"""💡 **과열 지수(MOI) 해석 가이드**
+{grade_emoji} **현재 {latest_idx:.1f}점 ({grade})** | 5일 전 대비 **{delta_5d:+.1f}점**
+
+각 시그널(주도주 쏠림·채권자경단·크레딧·투기자금)을 Z-Score+Sigmoid로 0~100점 정규화 후 균등 가중(25%)으로 합산합니다. 
+50점 = 과거 평균 수준, 70점 이상이면 과열 경보, 85점 이상이면 강력한 매도 대기 신호입니다.""")
+
 
     st.markdown("---")
     st.header("🤖 실시간 AI 진단 (김효진 박사 관점)")
@@ -216,148 +445,152 @@ def render_overheat_page():
     st.header("2. 채권 자경단의 출현")
     st.markdown("미 재정부채 누적, 인플레이션 통제력 약화, 중앙은행 독립성 훼손이라는 세 가지 조건이 충족된 상황에서 미국 국채 시장으로 불똥이 튈 위험을 모니터링합니다.\n\n유가 상승과 함께 국채 금리가 급등하는 현상은 채권 자경단의 활동을 암시합니다.")
     
-    from plotly.subplots import make_subplots
-    fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig2 = go.Figure()
     
-    df_raw = df_6m if not df_6m.empty else df
-    
-    if '^TNX' in df_raw.columns:
+    # 좌측 Y축: KODEX 200, WTI 유가 (Base 100)
+    if '069500.KS' in df_norm.columns:
         fig2.add_trace(
             go.Scatter(
-                x=df_raw.index, 
-                y=df_raw['^TNX'], 
-                name="미 국채 10년물 금리 (실제 %, 우축)", 
-                line=dict(color='#d62728', width=2.5)
-            ),
-            secondary_y=True
+                x=df_norm.index, 
+                y=df_norm['069500.KS'], 
+                name="KODEX 200 (좌축, Base 100)", 
+                line=dict(color='#1f77b4', dash='dash', width=2),
+                yaxis='y1'
+            )
         )
     if 'CL=F' in df_norm.columns:
         fig2.add_trace(
             go.Scatter(
                 x=df_norm.index, 
                 y=df_norm['CL=F'], 
-                name="WTI 유가 (Base 100, 좌축)", 
-                line=dict(color='#8c564b', width=2)
-            ),
-            secondary_y=False
+                name="WTI 유가 (좌축, Base 100)", 
+                line=dict(color='#8c564b', width=2),
+                yaxis='y1'
+            )
         )
-    if '069500.KS' in df_norm.columns:
+
+    # 우측 Y축: 미 국채 10년물 실제 금리(%) - df 원본 데이터 사용
+    if '^TNX' in df.columns:
+        tnx_6m = df[df.index >= (df.index.max() - pd.Timedelta(days=180))]['^TNX'].ffill()
         fig2.add_trace(
             go.Scatter(
-                x=df_norm.index, 
-                y=df_norm['069500.KS'], 
-                name="KODEX 200 (Base 100, 좌축)", 
-                line=dict(color='#1f77b4', dash='dash', width=2)
-            ),
-            secondary_y=False
+                x=tnx_6m.index, 
+                y=tnx_6m.values, 
+                name="미 국채 10년물 금리 (우축, 실제 %)", 
+                line=dict(color='#d62728', width=2.5),
+                yaxis='y2'
+            )
         )
         
     fig2.update_layout(
         title="채권 자경단 모니터링: 10년물 국채 금리(실제 %) vs 유가 및 주가 (Base 100)", 
-        height=400, 
+        height=430, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(title="누적 수익률 (Base 100)", side='left'),
+        yaxis2=dict(title="국채 금리 (%)", side='right', overlaying='y', showgrid=False)
     )
-    fig2.update_yaxes(title_text="누적 수익률 (Base 100)", secondary_y=False)
-    fig2.update_yaxes(title_text="국채 금리 (%)", secondary_y=True)
     
     st.plotly_chart(fig2, use_container_width=True)
-    st.info("💡 **차트 읽는 법:** KODEX 200이 고점을 높이는데도 불구하고, 유가(WTI)와 미 국채 10년물 금리가 동반 급등한다면 인플레이션 우려로 인한 '채권 자경단'의 출현을 암시하는 위험 신호입니다. 금리 변동성(수십 bp 수준)을 한눈에 포착할 수 있도록 **미 국채 10년물 금리는 오른쪽 Y축(실제 % 수치)**에, **유가와 주가지수는 왼쪽 Y축(Base 100 누적 수익률)**에 배치했습니다.\n\n📊 **데이터 가공 기준:** 주가와 유가는 6개월 전 첫 날을 100으로 두고 누적 등락률(%)을 좌측 축에 그리며, 미 국채 10년물 금리는 시장 금리의 절대적 영향력을 왜곡 없이 모니터링하기 위해 실제 만기수익률(%) 자체를 우측 축에 직접 매핑했습니다.")
+    st.info("💡 **차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200과 WTI 유가의 누적 수익률을, 우측 Y축은 미 국채 10년물 금리의 실제 수치(%)를 표시합니다. KODEX 200이 고점을 높이는데도 불구하고, 금리(우축)가 4%→5% 같이 가파르게 오른다면 '채권 자경단'의 출현을 암시하는 강력한 위험 신호입니다.\n\n📊 **데이터 가공 기준:** KODEX 200/WTI는 6개월 전 = 100 기준(Base 100), 국채 금리는 실제 만기수익률(%)을 우측 Y축에 직접 표시합니다.")
 
     # 3. 사모 크레딧 환매 리스크
     st.header("3. 사모 크레딧 환매 리스크")
     st.markdown("데이터센터 대출 등에 집중된 사모 크레딧은 공시 의무가 없어 위험이 가려져 있습니다.\n\n시장 불안 시 환매가 도미노처럼 발생할 수 있으며, 하이일드 채권(HYG) 성과나 스프레드를 통해 비우량 신용 시장의 불안 조짐을 간접적으로 트래킹합니다.")
     
-    from plotly.subplots import make_subplots
-    fig3 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig3 = go.Figure()
     
-    df_raw = df_6m if not df_6m.empty else df
-    
-    if 'HYG' in df_raw.columns:
-        fig3.add_trace(
-            go.Scatter(
-                x=df_raw.index, 
-                y=df_raw['HYG'], 
-                name="하이일드 ETF (HYG, 실제 $, 우축)", 
-                line=dict(color='#e377c2', width=2.5)
-            ),
-            secondary_y=True
-        )
+    # 좌측 Y축: KODEX 200 (Base 100)
     if '069500.KS' in df_norm.columns:
         fig3.add_trace(
             go.Scatter(
                 x=df_norm.index, 
                 y=df_norm['069500.KS'], 
-                name="KODEX 200 (Base 100, 좌축)", 
-                line=dict(color='#1f77b4', dash='dash', width=2)
-            ),
-            secondary_y=False
+                name="KODEX 200 (좌축, Base 100)", 
+                line=dict(color='#1f77b4', dash='dash', width=2),
+                yaxis='y1'
+            )
+        )
+
+    # 우측 Y축: HYG 실제 달러 가격 - df 원본 데이터 사용
+    if 'HYG' in df.columns:
+        hyg_6m = df[df.index >= (df.index.max() - pd.Timedelta(days=180))]['HYG'].ffill()
+        fig3.add_trace(
+            go.Scatter(
+                x=hyg_6m.index, 
+                y=hyg_6m.values, 
+                name="하이일드 ETF HYG (우축, 실제 $)", 
+                line=dict(color='#e377c2', width=2.5),
+                yaxis='y2'
+            )
         )
         
     fig3.update_layout(
-        title="크레딧 리스크 대용 지표: 하이일드 ETF 실제 가격(우축) vs 주가 지수(좌축)", 
-        height=400, 
+        title="크레딧 리스크 대용 지표: 하이일드 ETF(실제 $) vs 주가 지수 (Base 100)", 
+        height=430, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(title="누적 수익률 (Base 100)", side='left'),
+        yaxis2=dict(title="HYG 실제 가격 ($)", side='right', overlaying='y', showgrid=False)
     )
-    fig3.update_yaxes(title_text="KODEX 200 (Base 100, 좌축)", secondary_y=False)
-    fig3.update_yaxes(title_text="하이일드 ETF 가격 (실제 $, 우축)", secondary_y=True)
     
     st.plotly_chart(fig3, use_container_width=True)
-    st.info("💡 **차트 읽는 법:** 증시는 평온해 보여도, 하이일드 ETF(HYG)가 하락하거나 크게 출렁인다면 수면 아래 사모 크레딧 등 비우량 신용 시장에서 자금이 이탈하고 있다는 숨은 경고등입니다. 채권 가격의 미세한 리스크 신호(몇 %의 미세한 움직임)도 명확하게 인지할 수 있도록 **하이일드 ETF(HYG)는 오른쪽 Y축(실제 $ 수치)**에, **주가지수(KODEX 200)는 왼쪽 Y축(Base 100 누적 수익률)**에 배치했습니다.\n\n📊 **데이터 가공 기준:** 주가는 6개월 전 첫 날을 100으로 두고 누적 등락률(%)을 좌측 축에 그리며, 하이일드 ETF(HYG)는 글로벌 신용 시장의 미세한 환매 압력을 왜곡 없이 모니터링하기 위해 실제 달러 가격($) 자체를 우측 축에 직접 매핑했습니다.")
+    st.info("💡 **차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200 누적 수익률을, 우측 Y축은 하이일드 ETF(HYG)의 실제 달러 가격을 표시합니다. 증시(좌축)는 평온해 보여도 HYG(우축)가 $80→$79처럼 미세하게 하락하기 시작하면, 수면 아래 비우량 신용 시장의 자금 이탈이 시작된 것으로 해석합니다.\n\n📊 **데이터 가공 기준:** KODEX 200은 Base 100 누적 수익률(좌축), HYG는 실제 달러($) 가격(우축)으로 직접 표시합니다.")
 
     # 4. 대형 IPO와 위험 선호도
     st.header("4. 대형 IPO와 위험 선호도")
     st.markdown("스페이스X, 앤트로픽, 오픈AI 등 대형 IPO의 성공은 시장 위험 선호도의 정점 신호가 될 수 있습니다.\n\n신규 상장 주식들의 성과를 대변하는 IPO ETF의 자금 유입 및 수익률 동향을 통해 시장의 투기적 과열 분위기가 어느 정도인지 가늠할 수 있습니다.")
     
-    from plotly.subplots import make_subplots
-    fig4 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig4 = go.Figure()
     
+    # 좌측 Y축: KODEX 200 (Base 100) - 스케일이 크므로 좌측 분리
+    if '069500.KS' in df_norm.columns:
+        fig4.add_trace(
+            go.Scatter(
+                x=df_norm.index, 
+                y=df_norm['069500.KS'], 
+                name="KODEX 200 (좌축, Base 100)", 
+                line=dict(color='#1f77b4', dash='dash', width=2),
+                yaxis='y1'
+            )
+        )
+
+    # 우측 Y축: 미국 IPO ETF와 S&P 500 (Base 100) - 두 미국 지표를 동일 스케일로 우측에 배치
     if 'IPO' in df_norm.columns:
         fig4.add_trace(
             go.Scatter(
                 x=df_norm.index, 
                 y=df_norm['IPO'], 
-                name="미국 IPO ETF (투기적 자금, 우축)", 
-                line=dict(color='#bcbd22', width=2.5)
-            ),
-            secondary_y=True
+                name="미국 IPO ETF (우축, Base 100)", 
+                line=dict(color='#bcbd22', width=2.5),
+                yaxis='y2'
+            )
         )
     if '^GSPC' in df_norm.columns:
         fig4.add_trace(
             go.Scatter(
                 x=df_norm.index, 
                 y=df_norm['^GSPC'], 
-                name="S&P 500 (글로벌 증시, 우축)", 
-                line=dict(color='#ff7f0e', dash='dot', width=2)
-            ),
-            secondary_y=True
-        )
-    if '069500.KS' in df_norm.columns:
-        fig4.add_trace(
-            go.Scatter(
-                x=df_norm.index, 
-                y=df_norm['069500.KS'], 
-                name="KODEX 200 (한국 증시, 좌축)", 
-                line=dict(color='#1f77b4', dash='dash', width=2)
-            ),
-            secondary_y=False
+                name="S&P 500 (우축, Base 100)", 
+                line=dict(color='#ff7f0e', dash='dot', width=2),
+                yaxis='y2'
+            )
         )
         
     fig4.update_layout(
-        title="위험 선호도 정점 징후: 미국 IPO ETF vs S&P 500(우축) 및 국내 증시(좌축) (Base 100)", 
-        height=400, 
+        title="위험 선호도 정점 징후: IPO ETF vs S&P 500 (우측) / 국내 증시 (좌측)", 
+        height=430, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(title="KODEX 200 누적 수익률 (Base 100)", side='left'),
+        yaxis2=dict(title="미국 지표 누적 수익률 (Base 100)", side='right', overlaying='y', showgrid=False)
     )
-    fig4.update_yaxes(title_text="KODEX 200 (Base 100, 좌축)", secondary_y=False)
-    fig4.update_yaxes(title_text="미국 지표 (Base 100, 우축)", secondary_y=True)
     
     st.plotly_chart(fig4, use_container_width=True)
-    st.info("💡 **차트 읽는 법:** 스페이스X 등 대형 IPO 이슈와 맞물려 미국 IPO ETF(연두색 실선)가 S&P 500(주황색 점선) 대비 가파르게 급등하며 격차를 벌린다면, 시장의 투기적 과열과 위험 선호도가 극단에 달했음을 뜻합니다. 국내 증시(KODEX 200)의 급격한 수익률 상승에 의한 시각적 왜곡을 방지하고 미국 시장 내의 투기적 에너지를 미세하게 비교할 수 있도록 **미국 지표들(IPO, S&P 500)은 오른쪽 Y축**에, **국내 증시(KODEX 200)는 왼쪽 Y축**에 각각 분리하여 배치했습니다.\n\n📊 **데이터 가공 기준:** 세 지표 모두 6개월 전 첫 날을 100으로 둔 누적 등락률(Base 100)을 추적하되, 국가 및 성격별 등락률 편차에 따른 스케일 찌그러짐을 방지하고자 한국 지수(좌축)와 미국 지수(우축)의 Y축을 이중화했습니다.")
+    st.info("💡 **차트 읽는 법:** 좌측 Y축은 KODEX 200(국내 증시), 우측 Y축은 미국 IPO ETF와 S&P 500을 각각 Base 100으로 표시합니다. 우측 축 안에서 IPO ETF(연두)가 S&P 500(주황)보다 가파르게 벌어진다면 투기적 과열의 신호입니다. 국내 주가의 큰 스케일에 미국 지표가 묻히지 않도록 좌우 축을 분리했습니다.\n\n📊 **데이터 가공 기준:** 세 지표 모두 6개월 전 첫 날 = 100 기준(Base 100). KODEX 200은 좌축, IPO ETF / S&P 500은 우축으로 정밀 비교합니다.")
 
     # 하단 여백 추가 (화면 잘림 방지)
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
