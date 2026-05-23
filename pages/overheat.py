@@ -107,11 +107,13 @@ def render_overheat_page():
         """시계열 데이터를 Z-Score → Sigmoid 변환으로 0~100점 정규화"""
         if series is None or len(series.dropna()) < 5:
             return pd.Series(50.0, index=series.index if series is not None else [])
+        series = pd.to_numeric(series, errors='coerce')
         mu = series.mean()
         std = series.std()
-        if std == 0:
+        if std == 0 or pd.isna(std):
             return pd.Series(50.0, index=series.index)
         z = (series - mu) / std
+        z = pd.to_numeric(z, errors='coerce').astype(float)
         score = 100 / (1 + np.exp(-z))
         return (100 - score) if inverse else score
 
