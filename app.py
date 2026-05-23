@@ -862,7 +862,7 @@ try:
         fig_bt = go.Figure()
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Risk'], name="위험 지수", line=dict(color='red'), connectgaps=True)) # connectgaps 추가
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot'), connectgaps=True))
-        fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400); st.plotly_chart(fig_bt, use_container_width=True)
+        fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_bt, use_container_width=True)
         
         # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
@@ -891,6 +891,7 @@ try:
         fig_bs1 = go.Figure()
         fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
         fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
+        fig_bs1.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_bs1, use_container_width=True)
         if avg_current_risk > 60: st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 위기 초기와 유사합니다.")
         else: st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
@@ -900,6 +901,7 @@ try:
         fig_bs2 = go.Figure()
         fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
         fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
+        fig_bs2.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_bs2, use_container_width=True)
         if avg_current_risk > 50: st.error(f"🚨 주의: 현재 위험 지수가 2020년 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
         else: st.info(f"💡 현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
@@ -975,6 +977,7 @@ try:
             bgcolor="white",
             bordercolor="red"
         )
+        fig_ks.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_ks, use_container_width=True)
         st.info("**기술적 분석**: 20일선 하회 시 단기 추세 하락")
     with r2_c3:
@@ -1023,7 +1026,7 @@ try:
     fig_norm.add_trace(go.Scatter(x=ks_norm.index, y=ks_norm.values, name="KOSPI (Std)", line=dict(color='red'), connectgaps=True))
     fig_norm.add_trace(go.Scatter(x=sp_norm.index, y=sp_norm.values, name="S&P 500 (Std)", line=dict(color='blue'), connectgaps=True))
     fig_norm.add_trace(go.Scatter(x=fr_norm.index, y=fr_norm.values, name="BDRY (Std)", line=dict(color='orange'), connectgaps=True))
-    fig_norm.update_layout(title="Z-Score 동조화 추세"); st.plotly_chart(fig_norm, use_container_width=True)
+    fig_norm.update_layout(title="Z-Score 동조화 추세", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_norm, use_container_width=True)
     st.info("""
 **[현재 상황 상세 해석 가이드]**
 * **KOSPI(Red) vs S&P 500(Blue) 디커플링**: S&P 500 지수가 KOSPI보다 확연히 높이 위치할 경우, 글로벌 증시 상승에서 한국이 소외되는 현상(외자 이탈, 구조적 우려 등)을 시사할 수 있습니다.\n\n반대의 경우는 KOSPI의 단기 과열이나 강한 독자 모멘텀을 뜻합니다.\n\n* **주가지수(Red, Blue)가 물동량(Orange)보다 위에 있을 때**: 실물 경기 뒷받침 없이 기대감만으로 지수가 과열된 상태일 수 있습니다.\n\n하락 가능성이 높습니다.\n\n* **지표들이 비슷한 위치일 때**: KOSPI, 글로벌 증시, 실물 경기가 동조화되어 움직이는 매우 안정적인 추세입니다.\n\n* **글로벌 물동량(Orange)이 주가지수보다 위에 있을 때**: 실물 경기는 회복되었으나 주가가 저평가된 상태입니다.\n\n우상향 가능성을 시사합니다.\n\n""")
