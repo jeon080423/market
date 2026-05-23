@@ -124,14 +124,28 @@ except Exception as e:
     st.error(f"Gemini 설정 중 오류 발생: {e}")
 
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
+@st.cache_data(ttl=86400) # cache for 1 day
+def get_supported_gemini_models():
+    default_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+    try:
+        api_models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                model_name = m.name.replace('models/', '')
+                api_models.append(model_name)
+        if api_models:
+            priority_list = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
+            supported = [m for m in priority_list if m in api_models]
+            supported += [m for m in api_models if m not in supported and ('vision' not in m.lower())]
+            if supported:
+                return supported
+    except:
+        pass
+    return default_models
+
 @st.cache_data(ttl=3600)  # 1시간 동안 동일 프롬프트에 대해 API 호출 방지
-def get_ai_analysis(prompt, selected_model_name="gemini-2.5-flash"):
-    # 사용자가 선택한 모델을 리스트의 맨 앞으로 배치
-    models = [selected_model_name] + [
-        m for m in ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", 
-                    "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-latest"]
-        if m != selected_model_name
-    ]
+def get_ai_analysis(prompt):
+    models = get_supported_gemini_models()
     
     last_error_msg = ""
     for model_name in models:
@@ -257,6 +271,7 @@ if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "risk_monitor"
 
 # 사이드바 공통 메뉴 추가
+# 사이드바 공통 메뉴 추가
 with st.sidebar:
     st.subheader("📋 대시보드 메뉴")
     if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
@@ -268,30 +283,13 @@ with st.sidebar:
     if st.button("🔥 과열 국면 시그널", use_container_width=True):
         st.session_state["active_tab"] = "overheat_signal"
         st.rerun()
-        
-    st.markdown("---")
-    st.subheader("🤖 AI 분석 모델 설정")
-    available_models = {
-        "Gemini 2.5 Flash (기본)": "gemini-2.5-flash",
-        "Gemini 2.5 Pro (고성능)": "gemini-2.5-pro",
-        "Gemini 2.0 Flash (신속)": "gemini-2.0-flash",
-        "Gemini 1.5 Flash (안정)": "gemini-1.5-flash",
-        "Gemini 1.5 Pro (정밀)": "gemini-1.5-pro"
-    }
-    selected_model_label = st.selectbox(
-        "사용할 AI 모델을 선택하세요:",
-        list(available_models.keys()),
-        index=0,
-        key="selected_gemini_model_ui"
-    )
-    selected_model = available_models[selected_model_label]
 
 # 다른 페이지 라우팅
 if st.session_state["active_tab"] == "youtube_rank":
     render_youtube_rank_page()
     st.stop()
 elif st.session_state["active_tab"] == "overheat_signal":
-    render_overheat_page(selected_model_name=selected_model)
+    render_overheat_page()
     st.stop()
 
 # 3. 제목 및 설명
@@ -1311,7 +1309,7 @@ if news_data and ai_news_container:
 <result>
 (각 헤드라인의 한국어 번역을 번호 순으로)
 </result>"""
-            summary_text = get_ai_analysis(prompt, selected_model_name=selected_model)
+            summary_text = get_ai_analysis(prompt)
             clean_summary = clean_ai_output(summary_text)
             
             if clean_summary:
@@ -1344,7 +1342,7 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
 <result>
 (한국어 번역 단락)
 </result>"""
-                t_translated = get_ai_analysis(t_translate_prompt, selected_model_name=selected_model)
+                t_translated = get_ai_analysis(t_translate_prompt)
                 t_clean = clean_ai_output(t_translated)
                 
                 if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean:
@@ -1378,7 +1376,7 @@ if bt_analysis_container:
                 상관계수의 의미, 최근 7일 흐름 평가, 현재 위험 수준에 따른 투자 전략을 요약한 3~4문장의 단일 문단
                 </result>
                 """
-                bt_analysis = get_ai_analysis(bt_prompt, selected_model_name=selected_model)
+                bt_analysis = get_ai_analysis(bt_prompt)
                 clean_bt = clean_ai_output(bt_analysis)
                 st.markdown(f"""
                 <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
@@ -1401,7 +1399,7 @@ if ai_indicator_container:
     <result>
     (현재 지표 상태 요약 2문장. 시장 진단 및 투자자 주의사항 2문장.)
     </result>"""
-                    analysis_output = get_ai_analysis(ai_desc_prompt, selected_model_name=selected_model)
+                    analysis_output = get_ai_analysis(ai_desc_prompt)
                     clean_indicator = clean_ai_output(analysis_output)
                     st.markdown(f"""
                     <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
