@@ -158,6 +158,15 @@ def render_overheat_page():
             analysis_result = get_ai_overheat_analysis(data_text)
             analysis_result = analysis_result.replace("```markdown", "").replace("```", "").strip()
             
+            # AI가 지시를 무시하고 뱉은 영어 메타데이터, 서론 등을 강제 절단 (정규식 필터링)
+            import re
+            match = re.search(r'(\*\*\[종합 분석 결과\]\*\*|\[종합 분석 결과\])(.*)', analysis_result, re.DOTALL | re.IGNORECASE)
+            if match:
+                analysis_result = match.group(1) + match.group(2)
+            
+            # 모든 마침표 뒤에 강제 줄바꿈(엔터 2번) 추가하여 가독성 개선
+            analysis_result = analysis_result.replace(". ", ".\n\n")
+            
             st.success("분석 완료")
             with st.container(border=True):
                 st.markdown(analysis_result)
