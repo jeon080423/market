@@ -275,6 +275,171 @@ def crawl_naver_institution_top() -> pd.DataFrame:
         st.warning(f"기관 순매수 상위 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
+@st.cache_data(ttl=120)
+def crawl_pure_foreigner_rankings() -> dict:
+    """
+    KOSPI 및 KOSDAQ의 순수 외국인 (프로그램 제외) 순매수/순매도 데이터를 크롤링하고 정제하여 반환.
+    - 반환: {
+        '01': {'data': pd.DataFrame, 'date': str},  # KOSPI
+        '02': {'data': pd.DataFrame, 'date': str}   # KOSDAQ
+      }
+    """
+    HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Referer': 'https://finance.naver.com/sise/sise_deal_rank.naver'
+    }
+
+    def clean_num(val):
+        if not val:
+            return 0.0
+        val = val.replace(',', '').strip()
+        try:
+            return float(val)
+        except ValueError:
+            return 0.0
+
+    # Parallel worker function
+    def fetch_iframe_page(sosok, gubun, type_, page):
+        url = f"https://finance.naver.com/sise/sise_deal_rank_iframe.naver?sosok={sosok}&investor_gubun={gubun}&type={type_}&page={page}"
+        try:
+            res = requests.get(url, headers=HEADERS, timeout=8)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
+            
+            blocks = soup.find_all('div', {'class': 'box_type_ms'})
+            page_data = {}
+            for block in blocks:
+                date_div = block.find('div', {'class': 'sise_guide_date'})
+                if not date_div:
+                    continue
+                date_str = date_div.get_text(strip=True)
+                
+                if date_str not in page_data:
+                    page_data[date_str] = {}
+                    
+                table = block.find('table')
+                if not table:
+                    continue
+                rows = table.find_all('tr')
+                for row in rows:
+                    cols = row.find_all('td')
+                    link = row.find('a')
+                    if link and len(cols) >= 4:
+                        name = link.get_text(strip=True)
+                        ticker = link.get('href', '').split('code=')[-1]
+                        qty = clean_num(cols[1].get_text(strip=True))
+                        amt = clean_num(cols[2].get_text(strip=True))
+                        
+                        page_data[date_str][ticker] = {
+                            'name': name,
+                            'qty': qty,
+                            'amt': amt
+                        }
+            return page_data
+        except Exception:
+            return {}
+
+    # We will query 2 pages per combination to get top 80 stocks.
+    # Total tasks: 2 (markets) * 2 (gubun: 1000, 9000) * 2 (types: buy, sell) * 2 (pages: 1, 2) = 16 tasks.
+    tasks = []
+    for sosok in ['01', '02']:
+        for gubun in ['1000', '9000']:
+            for type_ in ['buy', 'sell']:
+                for page in [1, 2]:
+                    tasks.append((sosok, gubun, type_, page))
+
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_task = {executor.submit(fetch_iframe_page, *task): task for task in tasks}
+        for future in concurrent.futures.as_completed(future_to_task):
+            task = future_to_task[future]
+            sosok, gubun, type_, page = task
+            try:
+                page_data = future.result()
+                key = (sosok, gubun, type_)
+                if key not in results:
+                    results[key] = {}
+                for date_str, ticker_dict in page_data.items():
+                    if date_str not in results[key]:
+                        results[key][date_str] = {}
+                    results[key][date_str].update(ticker_dict)
+            except Exception:
+                pass
+
+    final_output = {}
+    for sosok in ['01', '02']:
+        sosok_dates = set()
+        for gubun in ['1000', '9000']:
+            for type_ in ['buy', 'sell']:
+                key = (sosok, gubun, type_)
+                if key in results:
+                    sosok_dates.update(results[key].keys())
+        
+        dates_sorted = sorted(list(sosok_dates))
+        if not dates_sorted:
+            final_output[sosok] = {'data': pd.DataFrame(), 'date': 'N/A'}
+            continue
+        
+        latest_date = dates_sorted[-1]
+        
+        f_buy = results.get((sosok, '1000', 'buy'), {}).get(latest_date, {})
+        f_sell = results.get((sosok, '1000', 'sell'), {}).get(latest_date, {})
+        p_buy = results.get((sosok, '9000', 'buy'), {}).get(latest_date, {})
+        p_sell = results.get((sosok, '9000', 'sell'), {}).get(latest_date, {})
+        
+        tickers = set()
+        names = {}
+        for d in [f_buy, f_sell, p_buy, p_sell]:
+            for ticker, info in d.items():
+                tickers.add(ticker)
+                names[ticker] = info['name']
+                
+        rows = []
+        for ticker in tickers:
+            name = names[ticker]
+            
+            if ticker in f_buy:
+                f_qty = f_buy[ticker]['qty']
+                f_amt = f_buy[ticker]['amt']
+            elif ticker in f_sell:
+                f_qty = f_sell[ticker]['qty']
+                f_amt = f_sell[ticker]['amt']
+            else:
+                f_qty = 0.0
+                f_amt = 0.0
+                
+            if ticker in p_buy:
+                p_qty = p_buy[ticker]['qty']
+                p_amt = p_buy[ticker]['amt']
+            elif ticker in p_sell:
+                p_qty = p_sell[ticker]['qty']
+                p_amt = p_sell[ticker]['amt']
+            else:
+                p_qty = 0.0
+                p_amt = 0.0
+                
+            pure_qty = f_qty - p_qty
+            pure_amt = f_amt - p_amt
+            
+            rows.append({
+                '티커': ticker,
+                '종목명': name,
+                '외인순매수_수량': f_qty,
+                '외인순매수_금액': f_amt,
+                '프로그램순매수_수량': p_qty,
+                '프로그램순매수_금액': p_amt,
+                '순수외인순매수_수량': pure_qty,
+                '순수외인순매수_금액': pure_amt
+            })
+            
+        df = pd.DataFrame(rows)
+        final_output[sosok] = {
+            'data': df,
+            'date': latest_date
+        }
+        
+    return final_output
+
 @st.cache_data(ttl=300)  # 리포트는 업데이트 주기가 길어 5분 캐싱
 def crawl_naver_analyst_reports() -> pd.DataFrame:
     """
@@ -521,6 +686,78 @@ def render_naver_sise_table(df: pd.DataFrame):
         column_config=cols_config
     )
 
+def render_pure_foreigner_table(df: pd.DataFrame, sort_by="금액", is_buy=True):
+    """
+    순수 외국인 수급 테이블 렌더링
+    - sort_by: "금액" 또는 "수량"
+    - is_buy: True(순매수 상위), False(순매도 상위)
+    """
+    if df.empty:
+        st.info("📊 데이터를 불러올 수 없습니다.")
+        return
+
+    df_copy = df.copy()
+    
+    if sort_by == "금액":
+        sort_col = "순수외인순매수_금액"
+    else:
+        sort_col = "순수외인순매수_수량"
+        
+    df_sorted = df_copy.sort_values(by=sort_col, ascending=not is_buy)
+    df_display = df_sorted.head(10).copy()
+    
+    sign = 1 if is_buy else -1
+    
+    df_display["순수 외인 수급"] = df_display[sort_col].apply(lambda x: f"{x * sign:,.1f}")
+    
+    if sort_by == "금액":
+        df_display["전체 외인 수급"] = df_display["외인순매수_금액"].apply(lambda x: f"{x * sign:,.1f}")
+        df_display["프로그램 수급"] = df_display["프로그램순매수_금액"].apply(lambda x: f"{x * sign:,.1f}")
+        unit = "백만원"
+    else:
+        df_display["전체 외인 수급"] = df_display["외인순매수_수량"].apply(lambda x: f"{x * sign:,.1f}")
+        df_display["프로그램 수급"] = df_display["프로그램순매수_수량"].apply(lambda x: f"{x * sign:,.1f}")
+        unit = "천주"
+        
+    df_display = df_display.reset_index(drop=True)
+    df_display["순위"] = [f"🥇 1" if i == 0 else f"🥈 2" if i == 1 else f"🥉 3" if i == 2 else str(i+1) for i in range(len(df_display))]
+    
+    def row_style(row):
+        rank_val = row["순위"]
+        if "🥇" in str(rank_val):
+            return ["background-color: rgba(255, 215, 0, 0.15); font-weight: bold;"] * len(row)
+        elif "🥈" in str(rank_val):
+            return ["background-color: rgba(192, 192, 192, 0.15); font-weight: bold;"] * len(row)
+        elif "🥉" in str(rank_val):
+            return ["background-color: rgba(205, 127, 50, 0.15); font-weight: bold;"] * len(row)
+        return [""] * len(row)
+        
+    styled_df = df_display.style.apply(row_style, axis=1)
+    
+    cols_config = {
+        "순위": st.column_config.TextColumn("순위", width="small"),
+        "종목명": st.column_config.TextColumn("종목명", width="medium"),
+        "순수 외인 수급": st.column_config.TextColumn(f"순수 외인 ({unit})", width="medium"),
+        "전체 외인 수급": st.column_config.TextColumn(f"전체 외인 ({unit})", width="small"),
+        "프로그램 수급": st.column_config.TextColumn(f"프로그램 ({unit})", width="small"),
+        "티커": None,
+        "외인순매수_수량": None,
+        "외인순매수_금액": None,
+        "프로그램순매수_수량": None,
+        "프로그램순매수_금액": None,
+        "순수외인순매수_수량": None,
+        "순수외인순매수_금액": None
+    }
+    
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=388,
+        hide_index=True,
+        column_config=cols_config,
+        column_order=["순위", "종목명", "순수 외인 수급", "전체 외인 수급", "프로그램 수급"]
+    )
+
 def render_analyst_reports_table(df: pd.DataFrame):
     """
     애널리스트 리포트 전용 렌더링 테이블
@@ -631,8 +868,8 @@ def render_youtube_rank_page():
     st.markdown("---")
     
     # 60초 TTL 캐싱 데이터 로딩
-    if "market_data" not in st.session_state or "foreigner" not in st.session_state["market_data"] or "reports" not in st.session_state["market_data"] or "institution" not in st.session_state["market_data"]:
-        with st.spinner("실시간 시장 데이터(인기검색/외인순매수/기관순매수/리포트/거래상위/급등)를 크롤링 중입니다..."):
+    if "market_data" not in st.session_state or "foreigner" not in st.session_state["market_data"] or "reports" not in st.session_state["market_data"] or "institution" not in st.session_state["market_data"] or "pure_foreigner" not in st.session_state["market_data"]:
+        with st.spinner("실시간 시장 데이터(인기검색/외인순매수/기관순매수/순수외인/리포트/거래상위/급등)를 크롤링 중입니다..."):
             # 1. 인기검색
             df_popular = crawl_naver_popular_stocks()
             # 2. 외국인 순매수 상위
@@ -647,6 +884,8 @@ def render_youtube_rank_page():
             # 6. 주가급등 (KOSPI & KOSDAQ)
             df_surge_kospi = crawl_naver_price_surge(0)
             df_surge_kosdaq = crawl_naver_price_surge(1)
+            # 7. 순수 외국인 수급 (프로그램 제외)
+            dict_pure_foreigner = crawl_pure_foreigner_rankings()
             
             st.session_state["market_data"] = {
                 "popular": df_popular,
@@ -656,7 +895,8 @@ def render_youtube_rank_page():
                 "vol_kospi": df_vol_kospi,
                 "vol_kosdaq": df_vol_kosdaq,
                 "surge_kospi": df_surge_kospi,
-                "surge_kosdaq": df_surge_kosdaq
+                "surge_kosdaq": df_surge_kosdaq,
+                "pure_foreigner": dict_pure_foreigner
             }
             st.session_state["market_last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
@@ -670,6 +910,7 @@ def render_youtube_rank_page():
     df_vol_kosdaq = m_data["vol_kosdaq"]
     df_surge_kospi = m_data["surge_kospi"]
     df_surge_kosdaq = m_data["surge_kosdaq"]
+    dict_pure_foreigner = m_data.get("pure_foreigner", {})
 
     # --- 1행: 실시간 인기 검색 종목 (개인 관심도) & 외국인 순매수 상위 종목 (외국인 관심도) ---
     col_a, col_b = st.columns(2)
@@ -696,8 +937,47 @@ def render_youtube_rank_page():
     
     st.markdown("---")
 
+    # --- 1.8행: 순수 외국인 수급 상위 종목 (프로그램 제외) ---
+    st.subheader("🌍 4. 순수 외국인 실시간 수급 상위 종목 (프로그램 매매 제외)")
+    st.caption("당일 외국인 총 매매량에서 프로그램 매매량을 차감한 순수한 외국인의 비프로그램 수급 상위/하위 종목 리스트입니다.")
+    
+    # KOSPI / KOSDAQ dates
+    date_kospi = dict_pure_foreigner.get('01', {}).get('date', 'N/A')
+    date_kosdaq = dict_pure_foreigner.get('02', {}).get('date', 'N/A')
+    st.markdown(f"<div style='font-size:0.85em; color:gray; margin-top:-10px; margin-bottom:10px;'>기준일자: KOSPI {date_kospi} / KOSDAQ {date_kosdaq} (최근 거래일 기준)</div>", unsafe_allow_html=True)
+    
+    # Filter selection: 금액 vs 수량
+    col_filter_select, col_filter_fill = st.columns([1, 2])
+    with col_filter_select:
+        sort_by = st.radio("순위 기준 선택", ["금액 기준 (백만원)", "수량 기준 (천주)"], horizontal=True, label_visibility="collapsed")
+        sort_unit = "금액" if "금액" in sort_by else "수량"
+        
+    tab_kospi, tab_kosdaq = st.tabs(["🇰🇷 KOSPI 순수 외국인 수급", "💎 KOSDAQ 순수 외국인 수급"])
+    
+    with tab_kospi:
+        df_k = dict_pure_foreigner.get('01', {}).get('data', pd.DataFrame())
+        col_kb, col_ks = st.columns(2)
+        with col_kb:
+            st.markdown("##### 📈 순수 외국인 순매수 상위 (Top 10)")
+            render_pure_foreigner_table(df_k, sort_by=sort_unit, is_buy=True)
+        with col_ks:
+            st.markdown("##### 📉 순수 외국인 순매도 상위 (Top 10)")
+            render_pure_foreigner_table(df_k, sort_by=sort_unit, is_buy=False)
+            
+    with tab_kosdaq:
+        df_q = dict_pure_foreigner.get('02', {}).get('data', pd.DataFrame())
+        col_qb, col_qs = st.columns(2)
+        with col_qb:
+            st.markdown("##### 📈 순수 외국인 순매수 상위 (Top 10)")
+            render_pure_foreigner_table(df_q, sort_by=sort_unit, is_buy=True)
+        with col_qs:
+            st.markdown("##### 📉 순수 외국인 순매도 상위 (Top 10)")
+            render_pure_foreigner_table(df_q, sort_by=sort_unit, is_buy=False)
+            
+    st.markdown("---")
+
     # --- 2행: 실시간 거래량 상위 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("📊 4. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
+    st.subheader("📊 5. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
     st.caption("KOSPI 및 KOSDAQ 시장에서 대량 거래가 유입되어 유동성 쏠림이 극대화된 종목 리스트입니다. 거래량은 수급의 선행 시그널입니다.")
     
     col1, col2 = st.columns(2)
@@ -710,7 +990,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- 3행: 실시간 주가 급등 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("⚡ 5. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
+    st.subheader("⚡ 6. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
     st.caption("당일 거래량 증가를 수반하며 가격 등락 변동률이 가장 높은 상방 돌파 주도 테마 종목 리스트입니다.")
     
     col3, col4 = st.columns(2)
@@ -724,7 +1004,7 @@ def render_youtube_rank_page():
     st.markdown("---")
 
     # --- 4행: 최근 증권사 애널리스트 리포트 언급 종목 ---
-    st.subheader("📑 6. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
+    st.subheader("📑 7. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
     st.caption("국내 주요 증권사 리서치 센터에서 발행한 최신 종목 분석 리포트 현황입니다. 애널리스트의 분석 대상이 된 최신 관심 종목 흐름을 나타냅니다.")
     render_analyst_reports_table(df_reports)
 
