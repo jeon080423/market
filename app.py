@@ -944,13 +944,25 @@ try:
         )
         
         # 유사도 점수 표시 (우측 상단)
-        sim_score = max(0, best_corr * 100)
+        if best_corr > 0:
+            sim_score = best_corr * 100
+            sim_text = f"🚨 폭락 직전 패턴 일치율: {sim_score:.1f}%"
+            bg_color = "rgba(255, 255, 255, 0.8)"
+            font_color = "red" if sim_score > 70 else "black"
+            border_color = "red" if sim_score > 70 else "gray"
+        else:
+            sim_score = 0
+            sim_text = f"✅ 패턴 불일치 (위험 징후 없음)"
+            bg_color = "rgba(230, 255, 230, 0.8)"
+            font_color = "green"
+            border_color = "green"
+            
         fig.add_annotation(
             x=0.02, y=0.98, xref="paper", yref="paper",
-            text=f"🚨 폭락 직전 패턴 일치율: {sim_score:.1f}%",
+            text=sim_text,
             showarrow=False,
-            font=dict(color="red" if sim_score > 70 else "black", size=13, weight="bold"),
-            bgcolor="rgba(255, 255, 255, 0.8)", bordercolor="red" if sim_score > 70 else "gray", borderwidth=1
+            font=dict(color=font_color, size=13, weight="bold"),
+            bgcolor=bg_color, bordercolor=border_color, borderwidth=1
         )
         
         fig.update_layout(
