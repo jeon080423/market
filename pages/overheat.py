@@ -19,10 +19,9 @@ def render_overheat_page():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)
         
-        # S&P 500 (SPY) vs Equal-Weight (RSP)
-        # Leading (NVDA) vs Market
-        # KOSPI (KS11) vs Samsung/SK
-        tickers = ['SPY', 'RSP', 'NVDA', '^KS11', '005930.KS', '000660.KS']
+        # KODEX 200 (시총가중) vs KODEX 200 동일가중
+        # 반도체 주도주 (삼성전자, SK하이닉스) vs 타 섹터 (KODEX 자동차)
+        tickers = ['069500.KS', '201590.KS', '005930.KS', '000660.KS', '091180.KS']
         try:
             raw_data = yf.download(tickers, start=start_date, end=end_date)
             if isinstance(raw_data.columns, pd.MultiIndex):
@@ -71,12 +70,14 @@ def render_overheat_page():
     st.markdown("과거 닷컴 버블 당시의 사례처럼, 시장 전체의 지수는 상승하지만 주도주를 제외한 대다수 종목들의 수익률이 마이너스로 돌아설 때입니다. 이는 시장에 새로운 유동성이 유입되는 것이 아니라, 기존 자금이 힘없는 종목을 팔아 주도주로만 몰리는 상황임을 의미하며, 이는 상승 사이클의 고점이 다가왔다는 강력한 신호로 해석될 수 있습니다.")
     
     fig1 = go.Figure()
-    if 'NVDA' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['NVDA'], name="주도주 (NVDA)", line=dict(color='#ff4b4b', width=3)))
-    if 'SPY' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['SPY'], name="S&P 500 (SPY)", line=dict(color='#1f77b4', width=2)))
-    if 'RSP' in df_norm.columns:
-        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['RSP'], name="동일가중 (RSP)", line=dict(color='#7f7f7f', dash='dash')))
+    if '005930.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
+    if '000660.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
+    if '069500.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (시총가중)", line=dict(color='#1f77b4', width=2)))
+    if '201590.KS' in df_norm.columns:
+        fig1.add_trace(go.Scatter(x=df_norm.index, y=df_norm['201590.KS'], name="KODEX 200 동일가중", line=dict(color='#7f7f7f', dash='dash')))
     fig1.update_layout(title="최근 6개월 주도주 vs 시장 지수 수익률 변화 (Base 100)", height=450, hovermode="x unified")
     st.plotly_chart(fig1, use_container_width=True)
 
@@ -84,11 +85,11 @@ def render_overheat_page():
     st.header("2. 동일 가중 지수(Equal-Weighted Index)의 하락 또는 정체")
     st.markdown("시가총액 가중 지수는 주도주의 비중이 커서 시장의 건강성을 왜곡할 수 있습니다. 반면, 모든 종목을 동일한 비중(1/n)으로 계산하는 동일 가중 지수가 하락하거나 전고점을 회복하지 못하고 있다면, 이는 주도주 이외의 나머지 종목들이 힘을 잃고 있다는 징후입니다.")
     
-    if 'SPY' in df_norm.columns and 'RSP' in df_norm.columns:
-        spread = df_norm['SPY'] - df_norm['RSP']
+    if '069500.KS' in df_norm.columns and '201590.KS' in df_norm.columns:
+        spread = df_norm['069500.KS'] - df_norm['201590.KS']
         fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=spread.index, y=spread, name="SPY - RSP 격차", fill='tozeroy', line=dict(color='#9467bd', width=2)))
-        fig2.update_layout(title="시가총액 가중(SPY) vs 동일 가중(RSP) 수익률 격차 (격차가 클수록 쏠림 심화)", height=400, hovermode="x unified")
+        fig2.add_trace(go.Scatter(x=spread.index, y=spread, name="시총가중 - 동일가중 격차", fill='tozeroy', line=dict(color='#9467bd', width=2)))
+        fig2.update_layout(title="KODEX 200 (시총가중) vs KODEX 200 동일가중 수익률 격차 (격차가 클수록 쏠림 심화)", height=400, hovermode="x unified")
         st.plotly_chart(fig2, use_container_width=True)
 
     # 3. 확산의 부재
@@ -96,13 +97,15 @@ def render_overheat_page():
     st.markdown("주도주 외의 후발 주자들이 함께 성장하는 '확산'의 모습이 나타나지 않고, 오직 주도주만 독식하는 구조가 지속될 때 경계심을 가져야 합니다.")
     
     fig3 = go.Figure()
-    if '^KS11' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^KS11'], name="KOSPI 지수", line=dict(color='#1f77b4', width=2)))
+    if '069500.KS' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', width=2)))
     if '005930.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자", line=dict(color='#2ca02c', width=2)))
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['005930.KS'], name="삼성전자 (주도주)", line=dict(color='#ff4b4b', width=2)))
     if '000660.KS' in df_norm.columns:
-        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스", line=dict(color='#ff7f0e', width=2)))
-    fig3.update_layout(title="국내 시장: KOSPI vs 반도체 주도주 동향 (Base 100)", height=450, hovermode="x unified")
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['000660.KS'], name="SK하이닉스 (주도주)", line=dict(color='#ff7f0e', width=2)))
+    if '091180.KS' in df_norm.columns:
+        fig3.add_trace(go.Scatter(x=df_norm.index, y=df_norm['091180.KS'], name="KODEX 자동차 (후발주)", line=dict(color='#2ca02c', width=2, dash='dash')))
+    fig3.update_layout(title="확산 여부 확인: 주도주(반도체) vs 후발주(자동차) 동향 (Base 100)", height=450, hovermode="x unified")
     st.plotly_chart(fig3, use_container_width=True)
 
     st.markdown("---")
@@ -132,8 +135,8 @@ def render_overheat_page():
 당신은 신영증권 김효진 박사의 관점을 가진 수석 시장 분석가입니다.
 김효진 박사는 시장이 '주도주 상승 국면'을 넘어 '주도주만 좋은 극단화된 과열 국면'에 진입했는지 판단하기 위해 3가지 시그널을 중시합니다.
 1. 주도주와 비주도주 간의 극단적인 수익률 격차 (시장 전체 지수는 오르나 나머지 종목은 하락하는지)
-2. 시가총액 가중 지수(SPY) 대비 동일 가중 지수(RSP)의 하락 또는 정체 
-3. 확산의 부재 (반도체 외 후발 주자들이 동참하는지)
+2. 시가총액 가중 지수(KODEX 200 등) 대비 동일 가중 지수의 하락 또는 정체 
+3. 확산의 부재 (반도체 외 자동차 등 후발 주자들이 동참하는지)
 
 최근 6개월(180일) 수익률 데이터 요약(최초일을 Base 100으로 환산한 현재값):
 {data_text}
@@ -158,9 +161,10 @@ def render_overheat_page():
         with st.spinner("AI가 최근 6개월 시장 데이터를 바탕으로 과열 시그널을 분석 중입니다..."):
             # 데이터 추출
             recent_data = {}
-            for col in ['NVDA', 'SPY', 'RSP', '^KS11', '005930.KS', '000660.KS']:
+            ticker_names = {'069500.KS': 'KODEX 200(시총가중)', '201590.KS': 'KODEX 200 동일가중', '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', '091180.KS': 'KODEX 자동차(후발주)'}
+            for col, name in ticker_names.items():
                 if col in df_norm.columns:
-                    recent_data[col] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
+                    recent_data[name] = f"{df_norm[col].iloc[-1]:.2f} (Base 100)"
             
             data_text = "\n".join([f"- {k}: {v}" for k, v in recent_data.items()])
             analysis_result = get_ai_overheat_analysis(data_text)
