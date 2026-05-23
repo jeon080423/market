@@ -18,9 +18,6 @@ import os
 try:
     if os.path.exists("pages/youtube_rank.py"):
         os.remove("pages/youtube_rank.py")
-except Exception:
-    pass
-
 from pages.종목탐색 import render_youtube_rank_page
 from pages.overheat import render_overheat_page
 
@@ -762,59 +759,100 @@ try:
     k = 0.5
     total_risk_index = ((np.exp(k * applied_base_risk / 100) - 1) / (np.exp(k) - 1)) * 100
 
-    c_gauge, c_guide = st.columns([1, 1.6])
+    # [신규] 패닉 경보 배너 표시
+    if final_panic_score > 60 and final_panic_score > base_risk:
+        st.error(f"🚨 **[긴급: 실시간 패닉 이벤트 확률 상승]** 🚨\n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다.\n\n(기초 위험 점수: {base_risk:.1f} ➔ **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
+
+    # 등급 판정
+    if total_risk_index >= 80:
+        grade, grade_color, grade_emoji = "패닉 (PANIC)", "#c0392b", "🚨"
+    elif total_risk_index >= 60:
+        grade, grade_color, grade_emoji = "방어 (CAUTION)", "#e67e22", "⚠️"
+    elif total_risk_index >= 40:
+        grade, grade_color, grade_emoji = "대비 (READY)", "#f1c40f", "👀"
+    else:
+        grade, grade_color, grade_emoji = "수익 극대화 (GROWTH)", "#27ae60", "✅"
+
+    c_gauge, c_guide = st.columns([1.2, 0.8])
+    with c_gauge: 
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=total_risk_index,
+            number={'suffix': "점", 'font': {'size': 38}},
+            title={'text': f"KOSPI 예측적 위험  {grade_emoji} {grade}", 'font': {'size': 16}},
+            gauge={
+                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#555",
+                         'tickvals': [0, 40, 60, 80, 100],
+                         'ticktext': ['0', '40', '60', '80', '100']},
+                'bar': {'color': grade_color, 'thickness': 0.25},
+                'bgcolor': "#f8f9fa",
+                'borderwidth': 1,
+                'bordercolor': "#dee2e6",
+                'steps': [
+                    {'range': [0,  40], 'color': '#d5f5e3'},   # Growth - 초록
+                    {'range': [40, 60], 'color': '#fef9e7'},   # Ready - 노랑
+                    {'range': [60, 80], 'color': '#fdebd0'},   # Caution - 주황
+                    {'range': [80,100], 'color': '#fadbd8'},   # Panic - 빨강
+                ],
+                'threshold': {
+                    'line': {'color': grade_color, 'width': 5},
+                    'thickness': 0.8,
+                    'value': total_risk_index
+                }
+            }
+        ))
+        fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
+                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
     with c_guide: 
-        st.markdown('<p class="guide-header">💡 예측 지수 활용 가이드 (1주일 선행)</p>', unsafe_allow_html=True)
+        st.markdown("**📊 예측 컴포넌트별 위험도**")
+        comp_data = {
+            '🌍 매크로 (금리/환율)': m_now,
+            '📈 글로벌 시장 (S&P 500)': calculate_score(sp_s, sp_s, True),
+            '😱 시장 공포 (VIX)': calculate_score(vx_s, vx_s),
+            '📉 기술적 과매수': t_now,
+        }
+        for label, score in comp_data.items():
+            bar_color = "#e74c3c" if score >= 80 else ("#f39c12" if score >= 60 else ("#f1c40f" if score >= 40 else "#27ae60"))
+            bar_width = int(score) if not np.isnan(score) else 0
+            st.markdown(f"""
+            <div style="margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                    <span style="font-size:0.85rem;">{label}</span>
+                    <span style="font-size:0.85rem; font-weight:bold; color:{bar_color};">{score:.1f}점</span>
+                </div>
+                <div style="background:#e9ecef; border-radius:4px; height:10px;">
+                    <div style="background:{bar_color}; width:{bar_width}%; border-radius:4px; height:10px;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
         st.markdown("""
-        <div class="guide-text" style="line-height: 1.5;">
-        <p style="margin-bottom: 10px;">0-40 (Growth): <b>수익 극대화 구간</b>. 다음 주 상방 압력이 높습니다. 주도주 위주의 공격적 포트폴리오 운용이 유효합니다.</p>
-        <p style="margin-bottom: 10px;">40-60 (Ready): <b>변동성 대비 구간</b>. 다음 주 중립 국면이 예상됩니다. 과도한 추가 매수는 지양하고 현금을 일부 확보하세요.</p>
-        <p style="margin-bottom: 10px;">60-80 (Caution): <b>선제적 방어 구간</b>. 1주일 내 하락 경보가 감지됩니다. 주식 비중을 50% 이하로 축소하고 리스크 관리에 집중하세요.</p>
-        <p style="margin-bottom: 0;">80-100 (Panic): <b>비상 탈출 구간</b>. 다음 주 강력한 시장 충격이 예견됩니다. 주식 비중을 최소화하고 자산 보존을 최우선으로 하세요.</p>
+        <div style="font-size:0.78rem; color:#666; margin-top:12px; line-height:1.7;">
+        <b>💡 예측 지수 활용 가이드 (1주 선행)</b><br>
+        ✅ &nbsp;&nbsp;0~40: 수익 극대화 — 상방 압력 우세<br>
+        👀 40~60: 대비 — 변동성 대비, 관망<br>
+        ⚠️ 60~80: 방어 — 주식 비중 축소<br>
+        🚨 80~100: 패닉 — 비상 탈출, 현금 확보
         </div>
         """, unsafe_allow_html=True)
-        
-        # [신규] 패닉 경보 배너 표시
-        if final_panic_score > 60 and final_panic_score > base_risk:
-            st.error(f"🚨 **[긴급: 실시간 패닉 이벤트 확률 상승]** 🚨\n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다.\n\n(기초 위험 점수: {base_risk:.1f} ➔ **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
 
-        # 좋아요 기능 레이아웃 개선
         if 'likes' not in st.session_state:
             st.session_state.likes = 0
         
-        st.write("") # 간격 조절
-        like_box = st.container()
-        with like_box:
-            # 시인성 있는 박스 형태의 레이아웃
-            l_col1, l_col2 = st.columns([1, 4])
-            with l_col1:
-                if st.button(f"👍 {st.session_state.likes}", use_container_width=True):
-                    st.session_state.likes += 1
-                    st.rerun()
-            with l_col2:
-                st.markdown(f"""
-                <div style="padding-top: 5px;">
-                    <span style="font-size: 0.9rem; color: #666;">대시보드가 유익했다면 좋아요로 응원해주세요!</span>
-                </div>
-                """, unsafe_allow_html=True)
-        
-    with c_gauge: 
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number", 
-            value=total_risk_index, 
-            title={'text': "KOSPI 예측적 위험 (Next Week)", 'font': {'size': 20}},
-            number={'suffix': ""}, 
-            gauge={
-                'axis': {'range': [0, 100]}, 
-                'bar': {'color': "black"},
-                'steps': [
-                    {'range': [0, 40], 'color': "green"}, 
-                    {'range': [40, 60], 'color': "yellow"}, 
-                    {'range': [60, 80], 'color': "orange"}, 
-                    {'range': [80, 100], 'color': "red"}
-                ]}))
-        fig_gauge.update_layout(margin=dict(l=40, r=40, t=80, b=40), height=350, autosize=True)
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.write("")
+        l_col1, l_col2 = st.columns([1, 4])
+        with l_col1:
+            if st.button(f"👍 {st.session_state.likes}", use_container_width=True):
+                st.session_state.likes += 1
+                st.rerun()
+        with l_col2:
+            st.markdown(f"""
+            <div style="padding-top: 5px;">
+                <span style="font-size: 0.85rem; color: #666;">대시보드가 유익했다면 추천!</span>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("---")
     c_news_left, c_news_right = st.columns(2)
