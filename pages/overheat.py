@@ -256,3 +256,6 @@ def render_overheat_page():
     st.plotly_chart(fig4, use_container_width=True)
     st.info("💡 **차트 읽는 법:** 스페이스X 등 대형 IPO 이슈와 맞물려 미국 IPO ETF가 가파르게 급등한다면, 시장의 투기적 과열과 위험 선호도가 극단에 달한 단기 정점일 가능성이 높습니다.")
 
+    # 하단 여백 추가 (화면 잘림 방지)
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
