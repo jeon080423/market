@@ -887,46 +887,117 @@ try:
         d = yf.download(t, start=s, end=bs_end)['Close'].ffill() # ffill 추가
         if isinstance(d, pd.DataFrame): d = d.iloc[:, 0]
         return 100 - ((d - d.min()) / (d.max() - d.min()) * 100)
+    
+    def create_black_swan_chart(hist_series, current_series, title):
+        # 1. 과거 궤적의 폭락 시점 찾기
+        crash_idx = int(np.argmax(hist_series.values))
+        
+        # 2. X축 재정렬 (폭락 시점 = 0)
+        hist_x = np.arange(len(hist_series)) - crash_idx
+        
+        # 3. 최적 정렬(상관관계 슬라이딩 윈도우) 찾기
+        M = len(current_series)
+        N = len(hist_series)
+        best_corr = -1
+        best_offset = 0
+        
+        if N > M:
+            for offset in range(N - M + 1):
+                window = hist_series.values[offset:offset+M]
+                if np.std(window) > 0 and np.std(current_series.values) > 0:
+                    corr = np.corrcoef(window, current_series.values)[0, 1]
+                    if corr > best_corr:
+                        best_corr = corr
+                        best_offset = offset
+        else:
+            best_corr = 0
+            best_offset = 0
+            
+        # 4. 현재 궤적의 X축 계산
+        curr_x = np.arange(M) + best_offset - crash_idx
+        
+        fig = go.Figure()
+        
+        # Danger Zone 음영 (D-10 ~ D+10)
+        fig.add_vrect(x0=-10, x1=10, fillcolor="red", opacity=0.1, layer="below", line_width=0, annotation_text="Danger Zone", annotation_position="top left")
+        
+        # 과거 궤적
+        fig.add_trace(go.Scatter(x=hist_x, y=hist_series.values, name=f"{title[:4]}년 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
+        
+        # 현재 궤적
+        fig.add_trace(go.Scatter(x=curr_x, y=current_series.values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
+        
+        # 폭락 시점 화살표
+        fig.add_annotation(
+            x=0, y=100, text="폭락 시점 (D-Day)", 
+            showarrow=True, arrowhead=2, arrowsize=1.5, arrowcolor="blue",
+            font=dict(color="blue", size=12, weight="bold"), ax=0, ay=-40
+        )
+        
+        # 현재 위치 수직선
+        curr_last_x = curr_x[-1]
+        fig.add_vline(x=curr_last_x, line_width=2, line_dash="dash", line_color="gray")
+        
+        # 현재 위치 텍스트
+        days_to_crash = -curr_last_x
+        if days_to_crash > 0:
+            status_text = f"현재 위치 (D-{int(days_to_crash)})"
+        elif days_to_crash == 0:
+            status_text = f"현재 위치 (D-Day)"
+        else:
+            status_text = f"현재 위치 (D+{int(-days_to_crash)})"
+            
+        fig.add_annotation(
+            x=curr_last_x, y=current_series.values[-1], text=status_text, 
+            showarrow=True, arrowhead=1, arrowsize=1, arrowcolor="gray",
+            font=dict(color="black", size=11, weight="bold"), ax=40, ay=0
+        )
+        
+        # 유사도 점수 표시 (우측 상단)
+        sim_score = max(0, best_corr * 100)
+        fig.add_annotation(
+            x=0.02, y=0.98, xref="paper", yref="paper",
+            text=f"🚨 과거 패턴 일치율: {sim_score:.1f}%",
+            showarrow=False,
+            font=dict(color="red" if sim_score > 70 else "black", size=13, weight="bold"),
+            bgcolor="rgba(255, 255, 255, 0.8)", bordercolor="red" if sim_score > 70 else "gray", borderwidth=1
+        )
+        
+        fig.update_layout(
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis_title="폭락일 기준 (Days)",
+            yaxis_title="위험 지수",
+            margin=dict(l=0, r=0, t=30, b=30)
+        )
+        return fig, sim_score, days_to_crash
+
     col_bs1, col_bs2 = st.columns(2)
     avg_current_risk = np.mean(hist_df['Risk'].iloc[-30:])
+    current_series = hist_df['Risk'].iloc[-120:]
+    
     with col_bs1:
         st.info("**2008 금융위기 vs 현재**")
         bs_2008 = get_norm_risk_proxy("^KS11", "2008-01-01", "2009-01-01")
-        fig_bs1 = go.Figure()
-        fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
-        fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
-        
-        # 폭락 시점 (위험 지수 100) 파란 화살표 표시
-        crash_idx_08 = np.argmax(bs_2008.values)
-        fig_bs1.add_annotation(
-            x=crash_idx_08, y=100, text="폭락 시점", 
-            showarrow=True, arrowhead=2, arrowsize=1.5, arrowcolor="blue",
-            font=dict(color="blue", size=12, weight="bold"), ax=0, ay=-40
-        )
-        
-        fig_bs1.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
         st.plotly_chart(fig_bs1, use_container_width=True)
-        if avg_current_risk > 60: st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 위기 초기와 유사합니다.")
-        else: st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
+        if sim_08 > 70 and d_day_08 > 0 and d_day_08 <= 30:
+            st.warning(f"⚠️ 2008년 위기 직전(D-{int(d_day_08)})과 패턴이 {sim_08:.1f}% 일치하여 주의가 필요합니다.")
+        elif avg_current_risk > 60:
+            st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 높아 위기 초기 단계일 수 있습니다.")
+        else:
+            st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
+            
     with col_bs2:
         st.info("**2020 코로나 폭락 vs 현재**")
         bs_2020 = get_norm_risk_proxy("^KS11", "2020-01-01", "2020-06-01")
-        fig_bs2 = go.Figure()
-        fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
-        fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
-        
-        # 폭락 시점 (위험 지수 100) 파란 화살표 표시
-        crash_idx_20 = np.argmax(bs_2020.values)
-        fig_bs2.add_annotation(
-            x=crash_idx_20, y=100, text="폭락 시점", 
-            showarrow=True, arrowhead=2, arrowsize=1.5, arrowcolor="blue",
-            font=dict(color="blue", size=12, weight="bold"), ax=0, ay=-40
-        )
-        
-        fig_bs2.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
         st.plotly_chart(fig_bs2, use_container_width=True)
-        if avg_current_risk > 50: st.error(f"🚨 주의: 현재 위험 지수가 2020년 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
-        else: st.info(f"💡 현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
+        if sim_20 > 70 and d_day_20 > 0 and d_day_20 <= 30:
+            st.error(f"🚨 2020년 팬데믹 폭락(D-{int(d_day_20)})과 패턴이 {sim_20:.1f}% 일치하며 매우 위험합니다.")
+        elif avg_current_risk > 50:
+            st.error(f"🚨 주의: 현재 위험 지수가 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
+        else:
+            st.info(f"💡 현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
 
     # 9. 지표별 상세 분석 및 AI 설명
     st.markdown("---")
