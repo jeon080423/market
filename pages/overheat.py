@@ -45,7 +45,12 @@ def render_overheat_page():
         return
 
     # 최근 6개월(180일) 기준 데이터 정규화
-    df_6m = df.last('180D').ffill().dropna(how='all')
+    try:
+        cutoff_date = df.index.max() - pd.Timedelta(days=180)
+        df_6m = df[df.index >= cutoff_date].ffill().dropna(how='all')
+    except Exception:
+        df_6m = pd.DataFrame()
+
     if df_6m.empty:
         df_norm = df.ffill().dropna(how='all')
         if not df_norm.empty:
