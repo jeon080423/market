@@ -42,8 +42,8 @@ def render_overheat_page():
                     pass
                     
             try:
-                # Add US Indicators: ^TNX (10Y), CL=F (Oil), HYG (High Yield), IPO (Renaissance IPO ETF)
-                us_tickers = {'^TNX': '^TNX', 'CL=F': 'CL=F', 'HYG': 'HYG', 'IPO': 'IPO'}
+                # Add US Indicators: ^TNX (10Y), CL=F (Oil), HYG (High Yield), IPO (Renaissance IPO ETF), ^GSPC (S&P 500)
+                us_tickers = {'^TNX': '^TNX', 'CL=F': 'CL=F', 'HYG': 'HYG', 'IPO': 'IPO', '^GSPC': '^GSPC'}
                 for t_name, t_sym in us_tickers.items():
                     data = yf.download(t_sym, start=start_date, end=end_date)['Close']
                     if isinstance(data, pd.DataFrame): data = data.iloc[:, 0]
@@ -53,13 +53,13 @@ def render_overheat_page():
 
             if df_list:
                 df = pd.concat(df_list, axis=1)
-                all_cols = list(tickers_map.keys()) + ['^TNX', 'CL=F', 'HYG', 'IPO']
+                all_cols = list(tickers_map.keys()) + ['^TNX', 'CL=F', 'HYG', 'IPO', '^GSPC']
                 for col in all_cols:
                     if col not in df.columns:
                         df[col] = pd.NA
                 return df
             else:
-                return pd.DataFrame(columns=list(tickers_map.keys()) + ['^TNX', 'CL=F', 'HYG', 'IPO'])
+                return pd.DataFrame(columns=list(tickers_map.keys()) + ['^TNX', 'CL=F', 'HYG', 'IPO', '^GSPC'])
         except Exception as e:
             st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
             return pd.DataFrame()
@@ -152,7 +152,7 @@ def render_overheat_page():
                 '069500.KS': 'KODEX 200(시총가중)', '252650.KS': 'KODEX 200 동일가중', 
                 '005930.KS': '삼성전자(주도주)', '000660.KS': 'SK하이닉스(주도주)', 
                 '091180.KS': 'KODEX 자동차(비주도주)', '091220.KS': 'KODEX 은행(비주도주)', '261240.KS': 'KODEX 바이오(비주도주)',
-                '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)'
+                '^TNX': '미 국채 10년물 금리', 'CL=F': 'WTI 유가', 'HYG': '하이일드 ETF (사모/크레딧 대용)', 'IPO': 'IPO ETF (위험선호 대용)', '^GSPC': 'S&P 500'
             }
             for col, name in ticker_names.items():
                 if col in df_norm.columns and not pd.isna(df_norm[col].iloc[-1]):
@@ -243,9 +243,11 @@ def render_overheat_page():
     
     fig4 = go.Figure()
     if 'IPO' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['IPO'], name="미국 IPO ETF", line=dict(color='#bcbd22', width=2)))
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['IPO'], name="미국 IPO ETF (투기적 자금)", line=dict(color='#bcbd22', width=2)))
+    if '^GSPC' in df_norm.columns:
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['^GSPC'], name="S&P 500 (글로벌 증시)", line=dict(color='#ff7f0e', dash='dot')))
     if '069500.KS' in df_norm.columns:
-        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200", line=dict(color='#1f77b4', dash='dash')))
+        fig4.add_trace(go.Scatter(x=df_norm.index, y=df_norm['069500.KS'], name="KODEX 200 (한국 증시)", line=dict(color='#1f77b4', dash='dash')))
     fig4.update_layout(
         title="위험 선호도 정점 징후: 대형 IPO ETF 추이 (Base 100)", 
         height=400, 
