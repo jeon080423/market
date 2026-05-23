@@ -320,7 +320,7 @@ def render_youtube_rank_page():
     st.markdown("---")
     
     # 60초 TTL 캐싱 데이터 로딩
-    if "market_data" not in st.session_state:
+    if "market_data" not in st.session_state or "foreigner" not in st.session_state["market_data"]:
         with st.spinner("실시간 시장 데이터(인기검색/외인순매수/거래상위/급등)를 크롤링 중입니다..."):
             # 1. 인기검색
             df_popular = crawl_naver_popular_stocks()
@@ -346,7 +346,7 @@ def render_youtube_rank_page():
     # Load from session state
     m_data = st.session_state["market_data"]
     df_popular = m_data["popular"]
-    df_foreigner = m_data["foreigner"]
+    df_foreigner = m_data.get("foreigner", pd.DataFrame())
     df_vol_kospi = m_data["vol_kospi"]
     df_vol_kosdaq = m_data["vol_kosdaq"]
     df_surge_kospi = m_data["surge_kospi"]
