@@ -881,12 +881,50 @@ try:
     # 7.5 블랙스완
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
-    def get_norm_risk_proxy(t, s, e):
-        # 최신 데이터를 위해 end_date 보정
-        bs_end = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d') if e == datetime.now().strftime('%Y-%m-%d') else e
-        d = yf.download(t, start=s, end=bs_end)['Close'].ffill() # ffill 추가
-        if isinstance(d, pd.DataFrame): d = d.iloc[:, 0]
-        return 100 - ((d - d.min()) / (d.max() - d.min()) * 100)
+    @st.cache_data(ttl=86400, show_spinner=False)
+    def get_true_historical_risk(start_date, end_date, w_m, w_t, w_g, w_f):
+        # 과거 데이터는 분석 기간보다 1년 전부터 가져와야 z-score 계산(과거 1년 롤링)이 가능합니다.
+        fetch_start = (pd.to_datetime(start_date) - pd.Timedelta(days=365)).strftime('%Y-%m-%d')
+        tickers = ['^KS11', '^GSPC', 'KRW=X', '^TNX', 'HG=F', '^VIX']
+        
+        # yf.download (진행률 표시 숨김)
+        df = yf.download(tickers, start=fetch_start, end=end_date, progress=False)['Close'].ffill()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+            
+        _ks_s = df['^KS11'].ffill()
+        _sp_s = df['^GSPC'].ffill()
+        _fx_s = df['KRW=X'].ffill()
+        _b10_s = df['^TNX'].ffill()
+        _cp_s = df['HG=F'].ffill()
+        _vx_s = df['^VIX'].ffill()
+        
+        _ma20 = _ks_s.rolling(window=20).mean()
+        
+        analyze_dates = _ks_s[_ks_s.index >= start_date].index
+        hist_risks = []
+        tot_w = w_m + w_t + w_g + w_f
+        
+        if tot_w == 0: tot_w = 1.0 # 0 나누기 방지
+        
+        def calc_z_score(series, date, inverse=False):
+            past_data = series[series.index <= date]
+            past_1y = past_data[past_data.index >= (date - pd.Timedelta(days=365))]
+            if len(past_1y) < 30: return 50.0
+            val = float(series.loc[date]) if date in series.index else float(past_data.iloc[-1])
+            z = (val - past_1y.mean()) / (past_1y.std() + 1e-9)
+            return max(0.0, min(100.0, 50.0 + z * 15.0 * (-1 if inverse else 1)))
+
+        for d in analyze_dates:
+            m = (calc_z_score(_fx_s, d) + calc_z_score(_b10_s, d) + calc_z_score(_cp_s, d, True)) / 3.0
+            val_ks = float(_ks_s.loc[d])
+            val_ma = float(_ma20.loc[d]) if pd.notna(_ma20.loc[d]) else val_ks
+            s_tech = max(0.0, min(100.0, 100.0 - (val_ks / val_ma - 0.9) * 500.0)) if val_ma != 0 else 50.0
+            
+            risk = (m * w_m + s_tech * w_t + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f) / tot_w
+            hist_risks.append(risk)
+            
+        return pd.Series(hist_risks, index=analyze_dates)
     
     def create_black_swan_chart(hist_series, current_series, title):
         # 1. 과거 궤적의 폭락 시점 찾기
@@ -979,7 +1017,7 @@ try:
     
     with col_bs1:
         st.info("**2008 금융위기 vs 현재**")
-        bs_2008 = get_norm_risk_proxy("^KS11", "2008-01-01", "2009-01-01")
+        bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_macro, w_tech, w_global, w_fear)
         fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
         st.plotly_chart(fig_bs1, use_container_width=True)
         if sim_08 > 70 and d_day_08 > 0 and d_day_08 <= 30:
@@ -991,7 +1029,7 @@ try:
             
     with col_bs2:
         st.info("**2020 코로나 폭락 vs 현재**")
-        bs_2020 = get_norm_risk_proxy("^KS11", "2020-01-01", "2020-06-01")
+        bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_macro, w_tech, w_global, w_fear)
         fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
         st.plotly_chart(fig_bs2, use_container_width=True)
         if sim_20 > 70 and d_day_20 > 0 and d_day_20 <= 30:
