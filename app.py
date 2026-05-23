@@ -502,18 +502,31 @@ def get_trump_feed():
     # Trump's Truth Social RSS feed proxy
     url = "https://trumpstruth.org/feed"
     try:
+        import xml.etree.ElementTree as ET
+        import re
         res = requests.get(url, timeout=10)
-        # XML 파싱을 위해 BeautifulSoup 사용 (lxml 없이 원활한 작동을 위해 html.parser 사용)
-        soup = BeautifulSoup(res.content, "html.parser")
-        items = soup.find_all("item")
+        root = ET.fromstring(res.content)
+        items = root.findall('.//item')
         feed_data = []
-        for item in items[:3]:
-            # 불필요한 HTML 태그 제거 및 텍스트 추출
-            title = item.title.get_text() if item.title else ""
-            desc = item.description.get_text() if item.description else ""
-            feed_data.append({"title": title, "description": desc})
+        for item in items[:5]: # 여유있게 5개를 가져와서 중복 필터링
+            title = item.find('title').text if item.find('title') is not None else ""
+            desc = item.find('description').text if item.find('description') is not None else ""
+            
+            # [No Title] 필터링 및 HTML 태그 제거
+            if title and title.startswith("[No Title]"): title = ""
+            desc = re.sub(r'<[^>]+>', '', desc if desc else "").strip()
+            
+            # 내용이 없거나 이미 똑같은 내용이 추가된 경우 건너뜀 (중복 방지)
+            text_check = f"{title} {desc}".strip()
+            if not text_check or any(d['description'] == desc for d in feed_data):
+                continue
+                
+            feed_data.append({"title": title.strip(), "description": desc})
+            if len(feed_data) == 3: # 3개까지만 채움
+                break
+                
         return feed_data
-    except:
+    except Exception as e:
         return []
 
 # --- [전역 변수 및 컨테이너 초기화 (NameError 방지)] ---
