@@ -895,6 +895,15 @@ try:
         fig_bs1 = go.Figure()
         fig_bs1.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
         fig_bs1.add_trace(go.Scatter(y=bs_2008.values, name="2008년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
+        
+        # 폭락 시점 (위험 지수 100) 파란 화살표 표시
+        crash_idx_08 = np.argmax(bs_2008.values)
+        fig_bs1.add_annotation(
+            x=crash_idx_08, y=100, text="폭락 시점", 
+            showarrow=True, arrowhead=2, arrowsize=1.5, arrowcolor="blue",
+            font=dict(color="blue", size=12, weight="bold"), ax=0, ay=-40
+        )
+        
         fig_bs1.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_bs1, use_container_width=True)
         if avg_current_risk > 60: st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 위기 초기와 유사합니다.")
@@ -905,6 +914,15 @@ try:
         fig_bs2 = go.Figure()
         fig_bs2.add_trace(go.Scatter(y=hist_df['Risk'].iloc[-120:].values, name="현재 위험 지수", line=dict(color='red', width=3), connectgaps=True))
         fig_bs2.add_trace(go.Scatter(y=bs_2020.values, name="2020년 위기 궤적", line=dict(color='blue', dash='dot'), connectgaps=True))
+        
+        # 폭락 시점 (위험 지수 100) 파란 화살표 표시
+        crash_idx_20 = np.argmax(bs_2020.values)
+        fig_bs2.add_annotation(
+            x=crash_idx_20, y=100, text="폭락 시점", 
+            showarrow=True, arrowhead=2, arrowsize=1.5, arrowcolor="blue",
+            font=dict(color="blue", size=12, weight="bold"), ax=0, ay=-40
+        )
+        
         fig_bs2.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_bs2, use_container_width=True)
         if avg_current_risk > 50: st.error(f"🚨 주의: 현재 위험 지수가 2020년 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
