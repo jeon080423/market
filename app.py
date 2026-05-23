@@ -1148,19 +1148,19 @@ if bt_analysis_container:
     with bt_analysis_container:
         with st.spinner("AI가 추세를 분석 중..."):
             bt_prompt = f"""
-            시장 위험 지수(Risk Index)의 통계적 유효성을 정밀히 진단해줘.
+            Task: 시장 위험 지수(Risk Index)의 통계적 유효성 및 현재 상황을 진단하세요.
             
-            [분석 데이터]
-            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f} (음의 상관성이 높을수록 위험 포착 능력이 우수함)
-            - 현재 시점 위험 지수: {hist_risks[-1]:.1f} (0~100 범위)
-            - 최근 7일간의 지수 변동 추이 요약: {[round(r, 1) for r in hist_risks[-7:]]}
+            데이터:
+            - 지수-코스피 최근 1년 상관계수: {corr_val:.2f}
+            - 현재 시점 위험 지수: {hist_risks[-1]:.1f}
+            - 최근 7일 지수 흐름: {[round(r, 1) for r in hist_risks[-7:]]}
             
-            [진단 요청 사항]
-            1. 현재의 상관계수가 모델의 통계적 유의성(신뢰도)을 얼마나 보장하는지 전문가 관점에서 설명해줘.
-            2. 최근 7일간의 위험 지수 변화가 실제 코스피 흐름과 얼마나 동조화되고 있는지, 혹은 선행 전조를 보이고 있는지 정교하게 분석해줘.
-            3. 과거의 주요 하락장 데이터와 비교했을 때, 현재의 위험 수준이 실질적으로 경계해야 할 단계인지 구체적인 투자 전략 제언과 함께 답변해줘.
-            
-            지침: 한자 절대 금지, 강조기호(**, ## 등) 절대 금지, 명확하고 전문적인 한국어 문장 사용.
+            Rules:
+            - Output ONLY the final Korean analysis. NO English, NO thinking process, NO keywords.
+            - 한자(漢字) 절대 금지.
+            - 마크다운 기호(*, # 등) 절대 금지.
+            - 프롬프트 지시사항이나 질문을 절대 반복하지 마세요.
+            - 상관계수의 의미, 최근 7일 흐름 평가, 그리고 현재 위험 수준에 따른 투자 전략을 3~4문장의 단일 문단으로 깔끔하게 작성하세요.
             """
             bt_analysis = get_ai_analysis(bt_prompt)
             clean_bt = clean_ai_output(bt_analysis)
@@ -1176,17 +1176,19 @@ if ai_indicator_container:
         with st.expander("🤖 현재 시장 지표 종합 진단", expanded=True):
             with st.spinner("지표 데이터를 분석 중..."):
                 ai_desc_prompt = f"""
-                주식 시장 지표 데이터: {latest_data_summary}
+                Task: 분석용 지표 데이터를 바탕으로 현재 한국 증시(KOSPI) 상황을 진단하세요.
                 
-                위 데이터를 바탕으로 현재 한국 증시(KOSPI)의 상황을 진단해줘.
-                지침:
-                1. 반드시 완벽한 한국어 문장을 사용하고, 외국어를 섞지 마.
-                2. 한자(漢字)를 단 하나도 포함하지 마. '仔細'와 같은 표현 대신 '자세히'를 사용해.
-                3. 답변 내용에 ** 기호나 ## 기호와 같은 마크다운 강조 기호를 절대 사용하지 마.
-                4. 가독성을 위해 다음 형식을 엄격히 지켜줘 (강조 기호 없이 텍스트만 출력):
-                    [주요 지표 요약]: 각 지표의 상태를 불렛 포인트로 설명.
-                    [시장 진단 및 전망]: 종합적인 분위기와 투자자 주의 사항을 2~3문장으로 설명.
-                5. 쉽고 전문적인 톤을 유지해.
+                데이터: {latest_data_summary}
+                
+                Rules:
+                - Output ONLY the final Korean analysis. NO English, NO thinking process, NO keywords.
+                - 한자(漢字) 절대 금지.
+                - 마크다운 기호(*, # 등) 절대 금지.
+                - 불필요한 서론이나 프롬프트 지시사항을 반복하지 마세요.
+                - 다음 두 문단으로만 깔끔하게 출력하세요 (각 문단의 제목도 달지 말고 오직 내용만 출력하세요):
+                
+                (첫 번째 문단): 주어진 데이터의 현재 상태와 움직임을 요약한 2문장.
+                (두 번째 문단): 이를 종합한 현재 시장 진단 및 투자자 주의사항을 담은 2문장.
                 """
                 analysis_output = get_ai_analysis(ai_desc_prompt)
                 clean_indicator = clean_ai_output(analysis_output)
