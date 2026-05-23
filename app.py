@@ -757,10 +757,53 @@ try:
     
     # [추가 보정] 위쪽에서 뉴스 데이터를 아직 로드하기 전이므로, 이 스크립트 흐름 특성상 뉴스 기반 패닉 점수는 UI 하단에 별도 경고로 띄우거나 이후 캐싱되어 반영됨
     
-    # 비선형 볼록성(Convexity) 적용: 위험이 높을수록 지수가 지수함수적으로 민감하게 반응
-    # k값이 클수록 패닉 국면에서 더 강력하게 반응함 (k=0.5 설정)
+    # -------------------------------------------------------------
+    # [백테스팅 & 실시간 지수 일치화 및 선행 계산]
+    # -------------------------------------------------------------
+    def get_hist_panic_score(series, date):
+        if series.empty: return 0.0
+        try:
+            sub = series.loc[:date]
+            if len(sub) < 10: return 0.0
+            recent_5d_mean = sub.iloc[-5:].mean()
+            past_1y = sub[sub.index >= (date - pd.Timedelta(days=365))]
+            mu = past_1y.mean()
+            std = past_1y.std()
+            if std == 0: return 0.0
+            z_score = (recent_5d_mean - mu) / std
+            if z_score <= 1.0: return 0.0
+            return min(100.0, max(0.0, (z_score - 1.0) * 40))
+        except:
+            return 0.0
+
+    dates = ks_s.index[-252:]
+    hist_risks = []
     k = 0.5
-    total_risk_index = ((np.exp(k * applied_base_risk / 100) - 1) / (np.exp(k) - 1)) * 100
+    for d in dates:
+        m = (get_hist_score_val(fx_s, d) + get_hist_score_val(b10_s, d) + get_hist_score_val(cp_s, d, True)) / 3
+        t = max(0.0, min(100.0, float(100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500))) if d in ma20.index and pd.notna(ma20.loc[d]) and ma20.loc[d] != 0 else 50.0
+        s_sp = get_hist_score_val(sp_s, d, True)
+        s_vx = get_hist_score_val(vx_s, d)
+        
+        base = (m * w_macro + t * w_tech + s_sp * w_global + s_vx * w_fear) / total_w
+        
+        p_g = get_hist_panic_score(gd_s, d)
+        p_j = get_hist_panic_score(jk_s, d)
+        p_c = get_hist_panic_score(uf_s, d)
+        p_v = get_hist_panic_score(vv_s, d)
+        
+        act_panics = sum([1 for p in [p_g, p_j, p_c, p_v] if p > 30])
+        raw_p_avg = (p_g + p_j + p_c + p_v) / 4.0
+        p_mult = 1.0 + (act_panics * 0.5)
+        fin_panic = min(100.0, raw_p_avg * p_mult)
+        
+        app_base = max(base, fin_panic) if fin_panic > 60 else base
+        convex_risk = ((np.exp(k * app_base / 100) - 1) / (np.exp(k) - 1)) * 100
+        hist_risks.append(convex_risk)
+
+    total_risk_index = hist_risks[-1]
+    prev_idx = hist_risks[-6] if len(hist_risks) > 5 else 50.0
+    delta_5d = total_risk_index - prev_idx
 
     # [신규] 패닉 경보 배너 표시
     if final_panic_score > 60 and final_panic_score > base_risk:
@@ -779,9 +822,11 @@ try:
     c_gauge, c_guide = st.columns([1.2, 0.8])
     with c_gauge: 
         fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
+            mode="gauge+number+delta",
             value=total_risk_index,
             number={'suffix': "점", 'font': {'size': 38}},
+            delta={'reference': prev_idx, 'increasing': {'color': "#e74c3c"}, 'decreasing': {'color': "#2ecc71"},
+                   'suffix': "pt (5일전 대비)", 'font': {'size': 14}},
             title={'text': f"KOSPI 예측적 위험  {grade_emoji} {grade}", 'font': {'size': 16}},
             gauge={
                 'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#555",
@@ -895,12 +940,6 @@ try:
     st.markdown("---")
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
     st.info("과거 데이터를 사용하여 모델의 유효성을 검증합니다.")
-    dates = ks_s.index[-252:]
-    hist_risks = []
-    for d in dates:
-        # 데이터 끊김 현상 보정을 위해 ffill된 데이터 사용
-        m = (get_hist_score_val(fx_s, d) + get_hist_score_val(b10_s, d) + get_hist_score_val(cp_s, d, True)) / 3
-        hist_risks.append((m * w_macro + max(0, min(100, 100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500)) * w_tech + get_hist_score_val(sp_s, d, True) * w_global + get_hist_score_val(vx_s, d) * w_fear) / total_w)
     hist_df = pd.DataFrame({'Date': dates, 'Risk': hist_risks, 'KOSPI': ks_s.loc[dates].values})
     cb1, cb2 = st.columns([3, 1])
     with cb1:
