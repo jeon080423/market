@@ -543,59 +543,74 @@ def render_analyst_reports_table(df: pd.DataFrame):
         link = row.get('리포트 링크', '')
         freq = row.get('언급 빈도', '1')
         
-        link_html = f'<a href="{link}" target="_blank" style="display:inline-block; background-color:#ff385c; color:#ffffff; font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px; text-decoration:none; transition: background-color 0.2s;">리포트 열기 ↗️</a>' if link else ''
-        
-        cards_html += f"""
-        <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:18px; margin-bottom:14px; 
-                    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease;" 
-             class="airbnb-card-report">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-                <div style="display:flex; align-items:center;">
-                    {rank_html}
-                    <span style="font-weight:700; font-size:16px; color:#222222;">{name}</span>
-                    <span style="font-size:12px; color:#929292; margin-left:6px;">{ticker}</span>
-                </div>
-                <div style="background-color:#f7f7f7; border-radius:12px; padding:3px 10px; font-size:12px; font-weight:600; color:#ff385c;">
-                    언급 빈도: {freq}회
-                </div>
-            </div>
-            <div style="font-size:14px; font-weight:500; color:#222222; margin-top:8px; line-height:1.4;">
-                {title}
-            </div>
-            <div style="font-size:13px; color:#ff385c; margin-top:6px; font-weight:500;">
-                🔑 핵심 키워드: {keywords}
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid #ebebeb; padding-top:10px;">
-                <span style="font-size:12px; color:#6a6a6a;">{broker} | {date}</span>
-                {link_html}
-            </div>
-        </div>
-        """
-        
-    st.markdown(f"""<style>
-.airbnb-card-report:hover {{
-    transform: translateY(-2px);
-    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.12) 0 8px 16px !important;
-    border-color: #ff385c !important;
-}}
-.airbnb-card-report a:hover {{
-    background-color: #e00b41 !important;
-}}
-</style>
-<div>
-{cards_html}
-</div>""", unsafe_allow_html=True)
+        link_html = f'<a href="{link}" target="_blank" style="display:inline-block; background-color:#ff385c; color:#ffffff; font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px; text-decoration:none; transition: background-color 0.2s;">리포트 열�    st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-def render_youtube_rank_page():
-    """
-    실시간 수급 및 가격 지표 기반 선행 종목 탐색 엔진 (app.py 호환 진입점)
-    """
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    /* 글로벌 폰트 및 라이트 모드 강제 */
-    html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
+/* 글로벌 폰트 및 라이트 모드 강제 */
+html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    color: #222222 !important;
+    background-color: #ffffff !important;
+}
+
+/* 제목 (Airbnb 디스플레이 폰트 스케일 적용) */
+h1 {
+    font-family: 'Inter', sans-serif !important;
+    font-size: clamp(24px, 3.5vw, 28px) !important;
+    font-weight: 700 !important;
+    color: #222222 !important;
+    letter-spacing: -0.5px !important;
+    margin-bottom: 16px !important;
+}
+
+h2, h3, h4 {
+    font-family: 'Inter', sans-serif !important;
+    color: #222222 !important;
+    font-weight: 600 !important;
+}
+
+h2 {
+    font-size: 21px !important;
+    margin-top: 32px !important;
+    margin-bottom: 16px !important;
+}
+
+h3 {
+    font-size: 18px !important;
+    margin-top: 24px !important;
+    margin-bottom: 12px !important;
+}
+
+/* Airbnb 카드 형태 효과 */
+.airbnb-card, .ai-analysis-box, div[data-testid="stExpander"], div[data-testid="metric-container"] {
+    background-color: #ffffff !important;
+    border: 1px solid #dddddd !important;
+    border-radius: 14px !important;
+    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px !important;
+    padding: 24px !important;
+    margin-bottom: 20px !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.airbnb-card:hover, .ai-analysis-box:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.15) 0 8px 16px !important;
+}
+
+/* Expander 스타일 */
+div[data-testid="stExpander"] {
+    border: 1px solid #dddddd !important;
+    border-radius: 14px !important;
+    box-shadow: rgba(0, 0, 0, 0.02) 0 2px 6px !important;
+    margin-bottom: 20px !important;
+}
+
+div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
+    font-weight: 600 !important;
+    color: #222222 !important;
+    font-size: 16px !important;
+}
+</style>""", unsafe_allow_html=True)ache-q8sbsg {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         color: #222222 !important;
         background-color: #ffffff !important;

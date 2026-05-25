@@ -8,85 +8,83 @@ import google.generativeai as genai
 import time
 
 def render_overheat_page():
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    /* 글로벌 폰트 및 라이트 모드 강제 */
-    html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-        color: #222222 !important;
-        background-color: #ffffff !important;
-    }
-    
-    /* 제목 (Airbnb 디스플레이 폰트 스케일 적용) */
-    h1 {
-        font-family: 'Inter', sans-serif !important;
-        font-size: clamp(24px, 3.5vw, 28px) !important;
-        font-weight: 700 !important;
-        color: #222222 !important;
-        letter-spacing: -0.5px !important;
-        margin-bottom: 16px !important;
-    }
-    
-    h2, h3, h4 {
-        font-family: 'Inter', sans-serif !important;
-        color: #222222 !important;
-        font-weight: 600 !important;
-    }
+    st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    h2 {
-        font-size: 21px !important;
-        margin-top: 32px !important;
-        margin-bottom: 16px !important;
-    }
+/* 글로벌 폰트 및 라이트 모드 강제 */
+html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    color: #222222 !important;
+    background-color: #ffffff !important;
+}
 
-    h3 {
-        font-size: 18px !important;
-        margin-top: 24px !important;
-        margin-bottom: 12px !important;
-    }
-    
-    /* Airbnb 카드 형태 효과 */
-    .airbnb-card, .ai-analysis-box, div[data-testid="stExpander"], div[data-testid="metric-container"] {
-        background-color: #ffffff !important;
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px !important;
-        padding: 24px !important;
-        margin-bottom: 20px !important;
-        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-    }
+/* 제목 (Airbnb 디스플레이 폰트 스케일 적용) */
+h1 {
+    font-family: 'Inter', sans-serif !important;
+    font-size: clamp(24px, 3.5vw, 28px) !important;
+    font-weight: 700 !important;
+    color: #222222 !important;
+    letter-spacing: -0.5px !important;
+    margin-bottom: 16px !important;
+}
 
-    .airbnb-card:hover, .ai-analysis-box:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.15) 0 8px 16px !important;
-    }
+h2, h3, h4 {
+    font-family: 'Inter', sans-serif !important;
+    color: #222222 !important;
+    font-weight: 600 !important;
+}
 
-    /* Plotly 차트 콘테이너 패딩 조정 */
-    div[data-testid="stPlotlyChart"] {
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        padding: 12px !important;
-        background-color: #ffffff !important;
-        box-shadow: rgba(0,0,0,0.02) 0 2px 4px !important;
-    }
-    
-    /* Expander 스타일 */
-    div[data-testid="stExpander"] {
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 2px 6px !important;
-        margin-bottom: 20px !important;
-    }
+h2 {
+    font-size: 21px !important;
+    margin-top: 32px !important;
+    margin-bottom: 16px !important;
+}
 
-    div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-        font-weight: 600 !important;
-        color: #222222 !important;
-        font-size: 16px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+h3 {
+    font-size: 18px !important;
+    margin-top: 24px !important;
+    margin-bottom: 12px !important;
+}
+
+/* Airbnb 카드 형태 효과 */
+.airbnb-card, .ai-analysis-box, div[data-testid="stExpander"], div[data-testid="metric-container"] {
+    background-color: #ffffff !important;
+    border: 1px solid #dddddd !important;
+    border-radius: 14px !important;
+    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px !important;
+    padding: 24px !important;
+    margin-bottom: 20px !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.airbnb-card:hover, .ai-analysis-box:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.15) 0 8px 16px !important;
+}
+
+/* Plotly 차트 콘테이너 패딩 조정 */
+div[data-testid="stPlotlyChart"] {
+    border: 1px solid #dddddd !important;
+    border-radius: 14px !important;
+    padding: 12px !important;
+    background-color: #ffffff !important;
+    box-shadow: rgba(0,0,0,0.02) 0 2px 4px !important;
+}
+
+/* Expander 스타일 */
+div[data-testid="stExpander"] {
+    border: 1px solid #dddddd !important;
+    border-radius: 14px !important;
+    box-shadow: rgba(0, 0, 0, 0.02) 0 2px 6px !important;
+    margin-bottom: 20px !important;
+}
+
+div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
+    font-weight: 600 !important;
+    color: #222222 !important;
+    font-size: 16px !important;
+}
+</style>""", unsafe_allow_html=True)
 
     st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
 
