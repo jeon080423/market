@@ -5,8 +5,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 import re
 import concurrent.futures
-import textwrap
-
 
 # Header for crawler requests
 HEADERS = {
@@ -452,7 +450,7 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
 
 def render_naver_sise_table(df: pd.DataFrame):
     """
-    KOSPI / KOSDAQ 공통 데이터 프레임 렌더링 테이블 -> Airbnb 리스팅 카드 뷰포트로 전환
+    KOSPI / KOSDAQ 공통 데이터 프레임 렌더링 테이블
     """
     if df.empty:
         st.info("📊 실시간 데이터를 불러올 수 없습니다.")
@@ -460,213 +458,134 @@ def render_naver_sise_table(df: pd.DataFrame):
 
     df_display = df.head(10).copy()
     
-    # Airbnb 리스팅 카드 그리드 스타일로 종목 렌더링
-    cards_html = ""
-    for idx, row in df_display.iterrows():
-        rank = str(row['순위']).strip()
-        name = row['종목명']
-        ticker = row.get('티커', '')
+    # 순위 텍스트 이모지화
+    def make_rank_label(rank):
+        r = str(rank).strip()
+        if r == "1": return "🥇 1"
+        elif r == "2": return "🥈 2"
+        elif r == "3": return "🥉 3"
+        return r
         
-        # 순위 배지 디자인
-        badge_emoji = "🥇" if rank == "1" else ("🥈" if rank == "2" else ("🥉" if rank == "3" else ""))
-        badge_style = "background-color: #ffd700;" if rank == "1" else ("background-color: #e6e6e6;" if rank == "2" else ("background-color: #f5c293;" if rank == "3" else "background-color: #f2f2f2;"))
-        rank_html = f'<span style="display:inline-block; border-radius:12px; padding:3px 8px; font-size:11px; font-weight:700; color:#222222; {badge_style} margin-right:8px;">{badge_emoji} {rank}위</span>'
+    df_display["순위"] = df_display["순위"].apply(make_rank_label)
+    df_display = df_display.reset_index(drop=True)
+    
+    # 1, 2, 3위 행 강조 스타일링
+    def row_style(row):
+        rank_val = row["순위"]
+        if "🥇" in str(rank_val):
+            return ["background-color: rgba(255, 215, 0, 0.15); font-weight: bold;"] * len(row)
+        elif "🥈" in str(rank_val):
+            return ["background-color: rgba(192, 192, 192, 0.15); font-weight: bold;"] * len(row)
+        elif "🥉" in str(rank_val):
+            return ["background-color: rgba(205, 127, 50, 0.15); font-weight: bold;"] * len(row)
+        return [""] * len(row)
+    
+    styled_df = df_display.style.apply(row_style, axis=1)
+    
+    # 컬럼 설정 구성
+    cols_config = {
+        "순위": st.column_config.TextColumn("순위", width="small"),
+        "종목명": st.column_config.TextColumn("종목명", width="medium"),
+        "티커": None,  # 가로 공간 확보를 위해 감춤
+    }
+    
+    if "검색 비율" in df_display.columns:
+        cols_config["검색 비율"] = st.column_config.TextColumn("검색 비율", width="small")
+    if "현재가" in df_display.columns:
+        cols_config["현재가"] = st.column_config.TextColumn("현재가", width="small")
+    if "등락률" in df_display.columns:
+        cols_config["등락률"] = st.column_config.TextColumn("등락률", width="medium")
+    if "등락" in df_display.columns:
+        cols_config["등락"] = st.column_config.TextColumn("등락", width="small")
+    if "거래량" in df_display.columns:
+        cols_config["거래량"] = st.column_config.TextColumn("거래량", width="small")
+    if "리포트 제목" in df_display.columns:
+        cols_config["리포트 제목"] = st.column_config.TextColumn("리포트 제목", width="large")
+    if "증권사" in df_display.columns:
+        cols_config["증권사"] = st.column_config.TextColumn("증권사", width="medium")
+    if "작성일" in df_display.columns:
+        cols_config["작성일"] = st.column_config.TextColumn("작성일", width="small")
+    if "최근 리포트 제목" in df_display.columns:
+        cols_config["최근 리포트 제목"] = st.column_config.TextColumn("최근 리포트 제목", width="large")
+    if "발행 증권사" in df_display.columns:
+        cols_config["발행 증권사"] = st.column_config.TextColumn("발행 증권사", width="medium")
+    if "최근 발행일" in df_display.columns:
+        cols_config["최근 발행일"] = st.column_config.TextColumn("최근 발행일", width="small")
+    if "언급 빈도" in df_display.columns:
+        cols_config["언급 빈도"] = st.column_config.TextColumn("언급 빈도", width="small")
         
-        # 현재가 & 등락률 파싱
-        price = row.get('현재가', '')
-        change_rate = row.get('등락률', '')
-        
-        # 등락 부호에 따른 색상 정의 (Rausch vs Muted Gray)
-        text_color = "#ff385c" if "▲" in change_rate or "+" in change_rate else ("#222222" if "▼" in change_rate or "-" in change_rate else "#6a6a6a")
-        
-        # 검색 비율 또는 거래량 추가 정보
-        meta_html = ""
-        if "검색 비율" in row:
-            meta_html = f'<div style="font-size:13px; color:#6a6a6a; margin-top:4px;">검색 비율: {row["검색 비율"]}</div>'
-        elif "거래량" in row:
-            meta_html = f'<div style="font-size:13px; color:#6a6a6a; margin-top:4px;">거래량: {row["거래량"]} 주</div>'
-            
-        cards_html += textwrap.dedent(f"""\
-            <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:16px; margin-bottom:12px; 
-                        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease; cursor:pointer;" 
-                 class="airbnb-card-sise">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div style="display:flex; align-items:center;">
-                        {rank_html}
-                        <span style="font-weight:600; font-size:15px; color:#222222;">{name}</span>
-                        <span style="font-size:11px; color:#929292; margin-left:6px;">{ticker}</span>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-weight:600; font-size:15px; color:#222222;">{price} 원</div>
-                        <div style="font-weight:500; font-size:13px; color:{text_color};">{change_rate}</div>
-                    </div>
-                </div>
-                {meta_html}
-            </div>
-        """)
-        
-    st.markdown(textwrap.dedent(f"""\
-        <style>
-        .airbnb-card-sise:hover {{
-            transform: translateY(-2px);
-            box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 10px, rgba(0, 0, 0, 0.1) 0 6px 12px !important;
-            border-color: #ff385c !important;
-        }}
-        </style>
-        <div>
-        {cards_html}
-        </div>
-        """), unsafe_allow_html=True)
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=388,
+        hide_index=True,
+        column_config=cols_config
+    )
 
 
 def render_analyst_reports_table(df: pd.DataFrame):
     """
-    애널리스트 리포트 전용 렌더링 테이블 -> Airbnb 리스팅 카드 뷰포트로 전환
+    애널리스트 리포트 전용 렌더링 테이블
+    - '리포트 링크' 커럼을 LinkColumn으로 만들어 켜릭 시 최신 리포트를 새 브라우저 탭에서 열도록 구현
     """
     if df.empty:
         st.info("📊 리포트 데이터를 불러올 수 없습니다.")
         return
 
     df_display = df.head(10).copy()
-    
-    cards_html = ""
-    for idx, row in df_display.iterrows():
-        rank = str(row['순위']).strip()
-        name = row['종목명']
-        ticker = row.get('티커', '')
-        
-        # 순위 배지
-        badge_emoji = "🥇" if rank == "1" else ("🥈" if rank == "2" else ("🥉" if rank == "3" else ""))
-        badge_style = "background-color: #ffd700;" if rank == "1" else ("background-color: #e6e6e6;" if rank == "2" else ("background-color: #f5c293;" if rank == "3" else "background-color: #f2f2f2;"))
-        rank_html = f'<span style="display:inline-block; border-radius:12px; padding:3px 8px; font-size:11px; font-weight:700; color:#222222; {badge_style} margin-right:8px;">{badge_emoji} {rank}위</span>'
-        
-        title = row.get('최근 리포트 제목', row.get('리포트 제목', ''))
-        keywords = row.get('핵심 키워드', '')
-        broker = row.get('발행 증권사', row.get('증권사', ''))
-        date = row.get('최근 발행일', row.get('작성일', ''))
-        link = row.get('리포트 링크', '')
-        freq = row.get('언급 빈도', '1')
-        
-        link_html = f'<a href="{link}" target="_blank" style="display:inline-block; background-color:#ff385c; color:#ffffff; font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px; text-decoration:none; transition: background-color 0.2s;">리포트 열기 ↗️</a>' if link else ''
-        
-        cards_html += textwrap.dedent(f"""\
-            <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:18px; margin-bottom:14px; 
-                        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease;" 
-                 class="airbnb-card-report">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-                    <div style="display:flex; align-items:center;">
-                        {rank_html}
-                        <span style="font-weight:700; font-size:16px; color:#222222;">{name}</span>
-                        <span style="font-size:12px; color:#929292; margin-left:6px;">{ticker}</span>
-                    </div>
-                    <div style="background-color:#f7f7f7; border-radius:12px; padding:3px 10px; font-size:12px; font-weight:600; color:#ff385c;">
-                        언급 빈도: {freq}회
-                    </div>
-                </div>
-                <div style="font-size:14px; font-weight:500; color:#222222; margin-top:8px; line-height:1.4;">
-                    {title}
-                </div>
-                <div style="font-size:13px; color:#ff385c; margin-top:6px; font-weight:500;">
-                    🔑 핵심 키워드: {keywords}
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid #ebebeb; padding-top:10px;">
-                    <span style="font-size:12px; color:#6a6a6a;">{broker} | {date}</span>
-                    {link_html}
-                </div>
-            </div>
-        """)
-        
-    st.markdown(textwrap.dedent(f"""\
-        <style>
-        .airbnb-card-report:hover {{
-            transform: translateY(-2px);
-            box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.12) 0 8px 16px !important;
-            border-color: #ff385c !important;
-        }}
-        .airbnb-card-report a:hover {{
-            background-color: #e00b41 !important;
-        }}
-        </style>
-        <div>
-        {cards_html}
-        </div>
-        """), unsafe_allow_html=True)
+
+    # 순위 이모지화
+    def make_rank_label(rank):
+        r = str(rank).strip()
+        if r == "1": return "🥇 1"
+        elif r == "2": return "🥈 2"
+        elif r == "3": return "🥉 3"
+        return r
+    df_display["순위"] = df_display["순위"].apply(make_rank_label)
+    df_display = df_display.reset_index(drop=True)
+
+    # 1~3위 행 강조 스타일
+    def row_style(row):
+        rank_val = row["순위"]
+        if "🥇" in str(rank_val):
+            return ["background-color: rgba(255, 215, 0, 0.15); font-weight: bold;"] * len(row)
+        elif "🥈" in str(rank_val):
+            return ["background-color: rgba(192, 192, 192, 0.15); font-weight: bold;"] * len(row)
+        elif "🥉" in str(rank_val):
+            return ["background-color: rgba(205, 127, 50, 0.15); font-weight: bold;"] * len(row)
+        return [""] * len(row)
+    styled_df = df_display.style.apply(row_style, axis=1)
+
+    # 커럼 설정: '리포트 링크'를 LinkColumn으로 설정하여 켜릭 시 네이버 리포트 페이지가 새 탭에서 열림
+    cols_config = {
+        "순위": st.column_config.TextColumn("순위", width="small"),
+        "티커": None,  # 숨김
+        "리포트 링크": st.column_config.LinkColumn(
+            "리포트 열기 ↗️",
+            display_text="최신 리포트 보기",
+            width="medium"
+        ),
+        "종목명": st.column_config.TextColumn("종목명", width="medium"),
+        "언급 빈도": st.column_config.TextColumn("언급 빈도", width="small"),
+        "최근 리포트 제목": st.column_config.TextColumn("최근 리포트 제목", width="large"),
+        "핵심 키워드": st.column_config.TextColumn("핵심 키워드", width="large"),
+        "발행 증권사": st.column_config.TextColumn("발행 증권사", width="medium"),
+        "최근 발행일": st.column_config.TextColumn("최근 발행일", width="small"),
+    }
+
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=450,
+        hide_index=True,
+        column_config=cols_config,
+        column_order=["순위", "종목명", "언급 빈도", "최근 리포트 제목", "핵심 키워드", "발행 증권사", "최근 발행일", "리포트 링크"]
+    )
 
 def render_youtube_rank_page():
     """
     실시간 수급 및 가격 지표 기반 선행 종목 탐색 엔진 (app.py 호환 진입점)
     """
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    /* 글로벌 폰트 및 라이트 모드 강제 */
-    html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-        color: #222222 !important;
-        background-color: #ffffff !important;
-    }
-    
-    /* 제목 (Airbnb 디스플레이 폰트 스케일 적용) */
-    h1 {
-        font-family: 'Inter', sans-serif !important;
-        font-size: clamp(24px, 3.5vw, 28px) !important;
-        font-weight: 700 !important;
-        color: #222222 !important;
-        letter-spacing: -0.5px !important;
-        margin-bottom: 16px !important;
-    }
-    
-    h2, h3, h4 {
-        font-family: 'Inter', sans-serif !important;
-        color: #222222 !important;
-        font-weight: 600 !important;
-    }
-
-    h2 {
-        font-size: 21px !important;
-        margin-top: 32px !important;
-        margin-bottom: 16px !important;
-    }
-
-    h3 {
-        font-size: 18px !important;
-        margin-top: 24px !important;
-        margin-bottom: 12px !important;
-    }
-    
-    /* Airbnb 카드 형태 효과 */
-    .airbnb-card, .ai-analysis-box, div[data-testid="stExpander"], div[data-testid="metric-container"] {
-        background-color: #ffffff !important;
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px !important;
-        padding: 24px !important;
-        margin-bottom: 20px !important;
-        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-    }
-
-    .airbnb-card:hover, .ai-analysis-box:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.15) 0 8px 16px !important;
-    }
-    
-    /* Expander 스타일 */
-    div[data-testid="stExpander"] {
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 2px 6px !important;
-        margin-bottom: 20px !important;
-    }
-
-    div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-        font-weight: 600 !important;
-        color: #222222 !important;
-        font-size: 16px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     st.title("📊 실시간 코스피(KOSPI) 거래량 급증 및 주가 급등 종목 탐색")
     
     st.markdown("""

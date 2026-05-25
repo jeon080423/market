@@ -262,212 +262,61 @@ GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?form
 # CSS 주입: 제목 폰트 유동성 및 가이드북 간격/정렬 조정
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    /* 글로벌 폰트 및 라이트 모드 강제 */
-    html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-        color: #222222 !important;
-        background-color: #ffffff !important;
-    }
-    
-    /* 메인 제목 (Airbnb 디스플레이 폰트 스케일 적용) */
+    /* 메인 제목 유동적 폰트 크기 설정 */
     h1 {
-        font-family: 'Inter', sans-serif !important;
-        font-size: clamp(24px, 3.5vw, 28px) !important; /* Airbnb h1은 modest 28px */
-        font-weight: 700 !important;
-        color: #222222 !important;
-        letter-spacing: -0.5px !important;
-        margin-bottom: 16px !important;
+        font-size: clamp(24px, 4vw, 48px) !important;
     }
     
-    h2, h3, h4 {
-        font-family: 'Inter', sans-serif !important;
-        color: #222222 !important;
-        font-weight: 600 !important;
+    /* 지수 가이드북 제목 스타일 */
+    .guide-header {
+        font-size: clamp(18px, 2.5vw, 28px) !important;
+        font-weight: 600;
+        margin-bottom: 45px !important; 
+        margin-top: 60px !important;    
+        padding-top: 10px !important;
     }
 
-    h2 {
-        font-size: 21px !important;
-        margin-top: 32px !important;
-        margin-bottom: 16px !important;
-    }
-
-    h3 {
-        font-size: 18px !important;
-        margin-top: 24px !important;
-        margin-bottom: 12px !important;
+    /* 설명글 유동적 폰트 및 줄간격 설정 */
+    .guide-text {
+        font-size: clamp(14px, 1.2vw, 20px) !important;
+        line-height: 1.8 !important;
     }
     
-    /* Airbnb 스타일 사이드바 */
-    [data-testid="stSidebar"] {
-        background-color: #ffffff !important;
-        border-right: 1px solid #dddddd !important;
-    }
-
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #222222 !important;
-    }
-
-    [data-testid="stSidebar"] button {
-        background-color: #ffffff !important;
-        color: #222222 !important;
-        border: 1px solid #dddddd !important;
-        border-radius: 9999px !important; /* Pill shape */
-        padding: 8px 16px !important;
-        font-weight: 500 !important;
-        font-size: 14px !important;
-        box-shadow: rgba(0,0,0,0.02) 0 2px 4px !important;
-        transition: all 0.2s ease !important;
-        margin-bottom: 8px !important;
-        width: 100% !important;
-    }
-
-    [data-testid="stSidebar"] button:hover {
-        border-color: #ff385c !important; /* Rausch */
-        color: #ff385c !important;
-        box-shadow: rgba(0, 0, 0, 0.08) 0 4px 8px !important;
-        transform: translateY(-1px) !important;
-    }
-
-    [data-testid="stSidebar"] button:active {
-        background-color: #f7f7f7 !important;
-    }
-
-    /* 기본 사이드바 내비게이션 숨김 */
-    [data-testid="stSidebarNav"] {display: none;}
-    
-    /* Airbnb 둥근 모서리 및 Elevation 카드 효과 */
-    .airbnb-card, .ai-analysis-box, div[data-testid="stExpander"], div[data-testid="metric-container"] {
-        background-color: #ffffff !important;
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important; /* rounded.md */
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px !important;
-        padding: 24px !important;
-        margin-bottom: 20px !important;
-        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-    }
-
-    .airbnb-card:hover, .ai-analysis-box:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.15) 0 8px 16px !important;
-    }
-
-    /* AI 분석 결과 박스 - Airbnb Reservation Card 스타일 */
-    .ai-analysis-box {
-        background-color: #ffffff !important;
-        color: #222222 !important;
-        border-left: 5px solid #ff385c !important; /* Rausch Accent Line */
-        line-height: 1.6 !important;
-        font-size: 16px !important;
-    }
-
-    /* Streamlit 기본 폼 입력창 Airbnb 텍스트 입력창 스타일로 이식 */
-    div[data-testid="stTextInput"] input {
-        border-radius: 8px !important;
-        border: 1px solid #dddddd !important;
-        height: 48px !important;
-        font-size: 16px !important;
-        color: #222222 !important;
-        padding: 10px 14px !important;
-        transition: border 0.15s ease, box-shadow 0.15s ease !important;
-    }
-
-    div[data-testid="stTextInput"] input:focus {
-        border: 2px solid #222222 !important;
-        box-shadow: none !important;
-    }
-
-    /* Streamlit 버튼 스타일링 (Airbnb Primary & Secondary) */
-    div[data-testid="stButton"] button {
-        border-radius: 8px !important;
-        font-size: 16px !important;
-        font-weight: 500 !important;
-        padding: 12px 24px !important;
-        transition: all 0.2s ease !important;
-        height: 48px !important;
-        box-sizing: border-box !important;
-    }
-
-    /* Primary CTA (Rausch) */
-    div[data-testid="stButton"] button[kind="primary"], 
-    .st-emotion-cache-12w0qpk, 
-    button[key*="btn_run_ai_analysis"], 
-    button[key*="likes"] {
-        background-color: #ff385c !important;
-        color: #ffffff !important;
-        border: none !important;
-    }
-
-    div[data-testid="stButton"] button[kind="primary"]:hover, 
-    button[key*="btn_run_ai_analysis"]:hover {
-        background-color: #e00b41 !important;
-        box-shadow: rgba(0, 0, 0, 0.12) 0px 4px 10px !important;
-    }
-
-    /* Secondary Button */
-    div[data-testid="stButton"] button[kind="secondary"], 
-    button[key*="btn_clear_ai_analysis"] {
-        background-color: #ffffff !important;
-        color: #222222 !important;
-        border: 1px solid #222222 !important;
-    }
-
-    div[data-testid="stButton"] button[kind="secondary"]:hover, 
-    button[key*="btn_clear_ai_analysis"]:hover {
-        background-color: #f7f7f7 !important;
-        border-color: #222222 !important;
-    }
-
-    /* 가이드북 내 테이블 스타일 */
+    /* 가이드북 내 테이블 스타일: 설명 폰트(guide-text)와 동일하게 표시되도록 설정 */
     div[data-testid="stMarkdownContainer"] table {
         width: 100% !important;
-        border-collapse: collapse !important;
-        margin-bottom: 20px !important;
+        table-layout: auto !important;
+        margin-bottom: 10px !important;
     }
-
-    div[data-testid="stMarkdownContainer"] table th {
-        border-bottom: 2px solid #dddddd !important;
-        font-weight: 600 !important;
-        padding: 12px 8px !important;
-        color: #222222 !important;
-    }
-
+    div[data-testid="stMarkdownContainer"] table th,
     div[data-testid="stMarkdownContainer"] table td {
-        border-bottom: 1px solid #ebebeb !important;
-        padding: 12px 8px !important;
-        color: #3f3f3f !important;
+        font-size: clamp(14px, 1.2vw, 20px) !important; /* 설명글 폰트 크기와 동일하게 수정 */
+        word-wrap: break-word !important;
+        padding: 12px 4px !important; 
+        line-height: 1.8 !important; /* 줄간격 통일 */
     }
-
-    /* 수평선 (Hairline Soft) */
+    
+    /* 수평선(hr) 여백 조정 */
     hr {
-        border: 0 !important;
-        border-top: 1px solid #ebebeb !important;
-        margin: 24px 0 !important;
+        margin-top: 1rem !important;
+        margin-bottom: 1rem !important;
     }
 
-    /* Plotly 차트 콘테이너 패딩 조정 */
-    div[data-testid="stPlotlyChart"] {
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        padding: 12px !important;
-        background-color: #ffffff !important;
-        box-shadow: rgba(0,0,0,0.02) 0 2px 4px !important;
+    /* AI 분석 결과 박스 커스텀 (야간 모드 대응 및 시인성 개선) */
+    .ai-analysis-box {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        color: #31333F !important; /* 글자색 강제 고정 */
+        padding: 15px 20px;
+        border-radius: 10px;
+        border-left: 5px solid #007bff;
+        line-height: 1.65;
+        font-size: 1.0rem;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-
-    /* Expander(지수가이드북) 스타일 */
-    div[data-testid="stExpander"] {
-        border: 1px solid #dddddd !important;
-        border-radius: 14px !important;
-        box-shadow: rgba(0, 0, 0, 0.02) 0 2px 6px !important;
-        margin-bottom: 20px !important;
-    }
-
-    div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-        font-weight: 600 !important;
-        color: #222222 !important;
-        font-size: 16px !important;
-    }
+    
+    /* 기본 사이드바 네비게이션 숨김 (중복 메뉴 방지) */
+    [data-testid="stSidebarNav"] {display: none;}
     </style>
     <script>
         var parentHead = window.parent.document.head;
@@ -511,23 +360,12 @@ with st.sidebar:
     if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
         st.rerun()
-    if st.button("📺 실시간 종목 탐색", use_container_width=True):
+    if st.button("📺 실시간 종목 탐색 (인기/수급)", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
     if st.button("🔥 과열 국면 시그널", use_container_width=True):
         st.session_state["active_tab"] = "overheat_signal"
         st.rerun()
-        
-    st.markdown("---")
-    st.subheader("🔒 관리자 모드")
-    admin_id_input = st.text_input("아이디", key="admin_id")
-    admin_pw_input = st.text_input("비밀번호", type="password", key="admin_pw")
-    is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
-    
-    st.markdown("---")
-    st.subheader("자발적 후원으로 운영됩니다.")
-    st.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
-    st.write("유료API로 정밀한 데이터가 필요합니다.")
 
 # 다른 페이지 라우팅
 if st.session_state["active_tab"] == "youtube_rank":
@@ -942,7 +780,15 @@ try:
             지수 수준(Level)이 아닌 변동성(Return)을 분석하여 지표의 '전조 현상'을 통계적으로 입증합니다.\n\n3. **실시간 미래 위험 투사**:
             오늘의 지표값을 위에서 도출된 '미래 전조 가중치'에 대입하여, **다음 주 시장의 잠재적 리스크**를 산출합니다.\n\n""")
 
-
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔒 관리자 모드")
+    admin_id_input = st.sidebar.text_input("아이디", key="admin_id")
+    admin_pw_input = st.sidebar.text_input("비밀번호", type="password", key="admin_pw")
+    is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("자발적 후원으로 운영됩니다.")
+    st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
+    st.sidebar.write("유료API로 정밀한 데이터가 필요합니다.")
     
     total_w = w_macro + w_tech + w_global + w_fear
     if total_w == 0: 
@@ -1145,16 +991,15 @@ try:
             st.session_state.likes = 0
         
         st.write("")
-        l_col1, l_col2 = st.columns([1.2, 3.8])
+        l_col1, l_col2 = st.columns([1, 4])
         with l_col1:
-            heart_icon = "❤️" if st.session_state.likes > 0 else "🤍"
-            if st.button(f"{heart_icon} {st.session_state.likes}", key="likes_btn", use_container_width=True):
+            if st.button(f"👍 {st.session_state.likes}", use_container_width=True):
                 st.session_state.likes += 1
                 st.rerun()
         with l_col2:
             st.markdown(f"""
-            <div style="padding-top: 8px;">
-                <span style="font-size: 0.9rem; font-weight: 500; color: #222222;">이 대시보드가 유익했다면 추천! (위시리스트 저장)</span>
+            <div style="padding-top: 5px;">
+                <span style="font-size: 0.85rem; color: #666;">대시보드가 유익했다면 추천!</span>
             </div>
             """, unsafe_allow_html=True)
 
@@ -1453,59 +1298,13 @@ try:
     def create_chart(series, title, threshold, desc_text):
         # 데이터가 비어있지 않은지 확인 후 그래프 생성
         if series is not None and not series.empty and not series.isnull().all():
-            line_color = '#ff385c' if 'S&P' in title or 'KOSPI' in title else '#222222'
-            fig = go.Figure(go.Scatter(
-                x=series.index, 
-                y=series.values, 
-                name=title, 
-                line=dict(color=line_color, width=2.5),
-                connectgaps=True
-            ))
-            
-            # 위험선 (Rausch Active)
-            fig.add_hline(y=threshold, line_width=1.5, line_color="#e00b41", line_dash="dash")
+            fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title, connectgaps=True)) # connectgaps 추가
+            fig.add_hline(y=threshold, line_width=2, line_color="red")
+            # 주석 위치 계산을 위한 안전장치
             annot_idx = len(series)//2 if len(series) > 0 else 0
-            fig.add_annotation(
-                x=series.index[annot_idx], 
-                y=threshold, 
-                text=desc_text, 
-                showarrow=False, 
-                font=dict(color="#e00b41", size=10, family="Inter"), 
-                bgcolor="white", 
-                yshift=10
-            )
-            
-            # COVID 폭락 기점 (Luxe Purple)
-            fig.add_vline(x=COVID_EVENT_DATE, line_width=1.2, line_dash="dot", line_color="#460479")
-            fig.add_annotation(
-                x=COVID_EVENT_DATE, 
-                y=0.95, 
-                yref="paper", 
-                text="COVID 폭락 기점", 
-                showarrow=False, 
-                font=dict(color="#460479", size=9, family="Inter"), 
-                xanchor="left", 
-                xshift=5, 
-                bgcolor="white"
-            )
-            
-            fig.update_layout(
-                margin=dict(l=10, r=10, t=25, b=10),
-                height=240,
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(family="Inter", color="#222222", size=11),
-                xaxis=dict(
-                    showgrid=True, 
-                    gridcolor='#ebebeb', 
-                    tickfont=dict(size=10)
-                ),
-                yaxis=dict(
-                    showgrid=True, 
-                    gridcolor='#ebebeb', 
-                    tickfont=dict(size=10)
-                )
-            )
+            fig.add_annotation(x=series.index[annot_idx], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
+            fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
+            fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="COVID 지수 폭락 기점", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
             return fig
         return go.Figure()
 

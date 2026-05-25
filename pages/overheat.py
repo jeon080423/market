@@ -8,84 +8,6 @@ import google.generativeai as genai
 import time
 
 def render_overheat_page():
-    st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-/* 글로벌 폰트 및 라이트 모드 강제 */
-html, body, [data-testid="stAppViewContainer"], .st-emotion-cache-1102t3n, .st-emotion-cache-q8sbsg {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-    color: #222222 !important;
-    background-color: #ffffff !important;
-}
-
-/* 제목 (Airbnb 디스플레이 폰트 스케일 적용) */
-h1 {
-    font-family: 'Inter', sans-serif !important;
-    font-size: clamp(24px, 3.5vw, 28px) !important;
-    font-weight: 700 !important;
-    color: #222222 !important;
-    letter-spacing: -0.5px !important;
-    margin-bottom: 16px !important;
-}
-
-h2, h3, h4 {
-    font-family: 'Inter', sans-serif !important;
-    color: #222222 !important;
-    font-weight: 600 !important;
-}
-
-h2 {
-    font-size: 21px !important;
-    margin-top: 32px !important;
-    margin-bottom: 16px !important;
-}
-
-h3 {
-    font-size: 18px !important;
-    margin-top: 24px !important;
-    margin-bottom: 12px !important;
-}
-
-/* Airbnb 카드 형태 효과 */
-.airbnb-card, .ai-analysis-box, div[data-testid="stExpander"], div[data-testid="metric-container"] {
-    background-color: #ffffff !important;
-    border: 1px solid #dddddd !important;
-    border-radius: 14px !important;
-    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px !important;
-    padding: 24px !important;
-    margin-bottom: 20px !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-}
-
-.airbnb-card:hover, .ai-analysis-box:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.15) 0 8px 16px !important;
-}
-
-/* Plotly 차트 콘테이너 패딩 조정 */
-div[data-testid="stPlotlyChart"] {
-    border: 1px solid #dddddd !important;
-    border-radius: 14px !important;
-    padding: 12px !important;
-    background-color: #ffffff !important;
-    box-shadow: rgba(0,0,0,0.02) 0 2px 4px !important;
-}
-
-/* Expander 스타일 */
-div[data-testid="stExpander"] {
-    border: 1px solid #dddddd !important;
-    border-radius: 14px !important;
-    box-shadow: rgba(0, 0, 0, 0.02) 0 2px 6px !important;
-    margin-bottom: 20px !important;
-}
-
-div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
-    font-weight: 600 !important;
-    color: #222222 !important;
-    font-size: 16px !important;
-}
-</style>""", unsafe_allow_html=True)
-
     st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
 
     # Data fetching
@@ -310,13 +232,8 @@ div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
                 }
             }
         ))
-        fig_gauge.update_layout(
-            height=320, 
-            margin=dict(l=20, r=20, t=60, b=10),
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Inter", color="#222222")
-        )
+        fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
+                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_gauge, use_container_width=True)
 
     with col_c:
@@ -414,11 +331,9 @@ div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
         margin=dict(l=20, r=80, t=30, b=20),
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월", showgrid=True, gridcolor='#ebebeb'),
-        yaxis=dict(range=[0, 100], title="과열 지수 (0~100점)", showgrid=True, gridcolor='#ebebeb'),
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Inter", color="#222222")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(range=[0, 100], title="과열 지수 (0~100점)"),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
     )
     st.plotly_chart(fig_trend, use_container_width=True)
 
@@ -623,11 +538,7 @@ div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
         height=450, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월", showgrid=True, gridcolor='#ebebeb'),
-        yaxis=dict(showgrid=True, gridcolor='#ebebeb'),
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Inter", color="#222222")
+        xaxis=dict(tickformat="%m월")
     )
     st.plotly_chart(fig1, use_container_width=True)
     st.info("💡 **차트 읽는 법:** 주도주(삼성전자, SK하이닉스) 선과 나머지 비주도 섹터/동일가중 선의 위아래 격차가 무섭게 벌어질수록 극소수 종목으로 자금이 몰리는 '압착(Compression)'이 극심함을 의미합니다.\n\n📊 **데이터 가공 기준:** 6개월 전(조회 기간 첫 날)의 가격을 '100'으로 고정(Base 100)하여, 현재까지 누적해서 몇 % 상승/하락했는지 직관적으로 비교합니다.")
@@ -678,12 +589,9 @@ div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
         height=430, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월", showgrid=True, gridcolor='#ebebeb'),
-        yaxis=dict(title="누적 수익률 (Base 100)", side='left', showgrid=True, gridcolor='#ebebeb'),
-        yaxis2=dict(title="국채 금리 (%)", side='right', overlaying='y', showgrid=False),
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Inter", color="#222222")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(title="누적 수익률 (Base 100)", side='left'),
+        yaxis2=dict(title="국채 금리 (%)", side='right', overlaying='y', showgrid=False)
     )
     
     st.plotly_chart(fig2, use_container_width=True)
@@ -725,12 +633,9 @@ div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
         height=430, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월", showgrid=True, gridcolor='#ebebeb'),
-        yaxis=dict(title="누적 수익률 (Base 100)", side='left', showgrid=True, gridcolor='#ebebeb'),
-        yaxis2=dict(title="HYG 실제 가격 ($)", side='right', overlaying='y', showgrid=False),
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Inter", color="#222222")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(title="누적 수익률 (Base 100)", side='left'),
+        yaxis2=dict(title="HYG 실제 가격 ($)", side='right', overlaying='y', showgrid=False)
     )
     
     st.plotly_chart(fig3, use_container_width=True)
@@ -781,12 +686,9 @@ div[data-testid="stExpander"] [data-testid="stExpanderHeader"] {
         height=430, 
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(tickformat="%m월", showgrid=True, gridcolor='#ebebeb'),
-        yaxis=dict(title="KODEX 200 누적 수익률 (Base 100)", side='left', showgrid=True, gridcolor='#ebebeb'),
-        yaxis2=dict(title="미국 지표 누적 수익률 (Base 100)", side='right', overlaying='y', showgrid=False),
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Inter", color="#222222")
+        xaxis=dict(tickformat="%m월"),
+        yaxis=dict(title="KODEX 200 누적 수익률 (Base 100)", side='left'),
+        yaxis2=dict(title="미국 지표 누적 수익률 (Base 100)", side='right', overlaying='y', showgrid=False)
     )
     
     st.plotly_chart(fig4, use_container_width=True)
