@@ -511,7 +511,7 @@ with st.sidebar:
     if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
         st.rerun()
-    if st.button("📺 실시간 종목 탐색 (인기/수급)", use_container_width=True):
+    if st.button("📺 실시간 종목 탐색", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
     if st.button("🔥 과열 국면 시그널", use_container_width=True):

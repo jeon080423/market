@@ -503,18 +503,16 @@ def render_naver_sise_table(df: pd.DataFrame):
         </div>
         """
         
-    st.markdown(f"""
-    <style>
-    .airbnb-card-sise:hover {{
-        transform: translateY(-2px);
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 10px, rgba(0, 0, 0, 0.1) 0 6px 12px !important;
-        border-color: #ff385c !important;
-    }}
-    </style>
-    <div>
-        {cards_html}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<style>
+.airbnb-card-sise:hover {{
+    transform: translateY(-2px);
+    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 10px, rgba(0, 0, 0, 0.1) 0 6px 12px !important;
+    border-color: #ff385c !important;
+}}
+</style>
+<div>
+{cards_html}
+</div>""", unsafe_allow_html=True)
 
 
 def render_analyst_reports_table(df: pd.DataFrame):
@@ -574,21 +572,19 @@ def render_analyst_reports_table(df: pd.DataFrame):
         </div>
         """
         
-    st.markdown(f"""
-    <style>
-    .airbnb-card-report:hover {{
-        transform: translateY(-2px);
-        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.12) 0 8px 16px !important;
-        border-color: #ff385c !important;
-    }}
-    .airbnb-card-report a:hover {{
-        background-color: #e00b41 !important;
-    }}
-    </style>
-    <div>
-        {cards_html}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<style>
+.airbnb-card-report:hover {{
+    transform: translateY(-2px);
+    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.12) 0 8px 16px !important;
+    border-color: #ff385c !important;
+}}
+.airbnb-card-report a:hover {{
+    background-color: #e00b41 !important;
+}}
+</style>
+<div>
+{cards_html}
+</div>""", unsafe_allow_html=True)
 
 def render_youtube_rank_page():
     """
