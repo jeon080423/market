@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 import re
 import concurrent.futures
+import textwrap
+
 
 # Header for crawler requests
 HEADERS = {
@@ -484,35 +486,37 @@ def render_naver_sise_table(df: pd.DataFrame):
         elif "거래량" in row:
             meta_html = f'<div style="font-size:13px; color:#6a6a6a; margin-top:4px;">거래량: {row["거래량"]} 주</div>'
             
-        cards_html += f"""
-        <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:16px; margin-bottom:12px; 
-                    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease; cursor:pointer;" 
-             class="airbnb-card-sise">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="display:flex; align-items:center;">
-                    {rank_html}
-                    <span style="font-weight:600; font-size:15px; color:#222222;">{name}</span>
-                    <span style="font-size:11px; color:#929292; margin-left:6px;">{ticker}</span>
+        cards_html += textwrap.dedent(f"""\
+            <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:16px; margin-bottom:12px; 
+                        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease; cursor:pointer;" 
+                 class="airbnb-card-sise">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center;">
+                        {rank_html}
+                        <span style="font-weight:600; font-size:15px; color:#222222;">{name}</span>
+                        <span style="font-size:11px; color:#929292; margin-left:6px;">{ticker}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:600; font-size:15px; color:#222222;">{price} 원</div>
+                        <div style="font-weight:500; font-size:13px; color:{text_color};">{change_rate}</div>
+                    </div>
                 </div>
-                <div style="text-align:right;">
-                    <div style="font-weight:600; font-size:15px; color:#222222;">{price} 원</div>
-                    <div style="font-weight:500; font-size:13px; color:{text_color};">{change_rate}</div>
-                </div>
+                {meta_html}
             </div>
-            {meta_html}
-        </div>
-        """
+        """)
         
-    st.markdown(f"""<style>
-.airbnb-card-sise:hover {{
-    transform: translateY(-2px);
-    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 10px, rgba(0, 0, 0, 0.1) 0 6px 12px !important;
-    border-color: #ff385c !important;
-}}
-</style>
-<div>
-{cards_html}
-</div>""", unsafe_allow_html=True)
+    st.markdown(textwrap.dedent(f"""\
+        <style>
+        .airbnb-card-sise:hover {{
+            transform: translateY(-2px);
+            box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 10px, rgba(0, 0, 0, 0.1) 0 6px 12px !important;
+            border-color: #ff385c !important;
+        }}
+        </style>
+        <div>
+        {cards_html}
+        </div>
+        """), unsafe_allow_html=True)
 
 
 def render_analyst_reports_table(df: pd.DataFrame):
@@ -545,46 +549,48 @@ def render_analyst_reports_table(df: pd.DataFrame):
         
         link_html = f'<a href="{link}" target="_blank" style="display:inline-block; background-color:#ff385c; color:#ffffff; font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px; text-decoration:none; transition: background-color 0.2s;">리포트 열기 ↗️</a>' if link else ''
         
-        cards_html += f"""
-        <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:18px; margin-bottom:14px; 
-                    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease;" 
-             class="airbnb-card-report">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-                <div style="display:flex; align-items:center;">
-                    {rank_html}
-                    <span style="font-weight:700; font-size:16px; color:#222222;">{name}</span>
-                    <span style="font-size:12px; color:#929292; margin-left:6px;">{ticker}</span>
+        cards_html += textwrap.dedent(f"""\
+            <div style="background-color:#ffffff; border:1px solid #dddddd; border-radius:14px; padding:18px; margin-bottom:14px; 
+                        box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 4px; transition: all 0.2s ease;" 
+                 class="airbnb-card-report">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                    <div style="display:flex; align-items:center;">
+                        {rank_html}
+                        <span style="font-weight:700; font-size:16px; color:#222222;">{name}</span>
+                        <span style="font-size:12px; color:#929292; margin-left:6px;">{ticker}</span>
+                    </div>
+                    <div style="background-color:#f7f7f7; border-radius:12px; padding:3px 10px; font-size:12px; font-weight:600; color:#ff385c;">
+                        언급 빈도: {freq}회
+                    </div>
                 </div>
-                <div style="background-color:#f7f7f7; border-radius:12px; padding:3px 10px; font-size:12px; font-weight:600; color:#ff385c;">
-                    언급 빈도: {freq}회
+                <div style="font-size:14px; font-weight:500; color:#222222; margin-top:8px; line-height:1.4;">
+                    {title}
+                </div>
+                <div style="font-size:13px; color:#ff385c; margin-top:6px; font-weight:500;">
+                    🔑 핵심 키워드: {keywords}
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid #ebebeb; padding-top:10px;">
+                    <span style="font-size:12px; color:#6a6a6a;">{broker} | {date}</span>
+                    {link_html}
                 </div>
             </div>
-            <div style="font-size:14px; font-weight:500; color:#222222; margin-top:8px; line-height:1.4;">
-                {title}
-            </div>
-            <div style="font-size:13px; color:#ff385c; margin-top:6px; font-weight:500;">
-                🔑 핵심 키워드: {keywords}
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid #ebebeb; padding-top:10px;">
-                <span style="font-size:12px; color:#6a6a6a;">{broker} | {date}</span>
-                {link_html}
-            </div>
-        </div>
-        """
+        """)
         
-    st.markdown(f"""<style>
-.airbnb-card-report:hover {{
-    transform: translateY(-2px);
-    box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.12) 0 8px 16px !important;
-    border-color: #ff385c !important;
-}}
-.airbnb-card-report a:hover {{
-    background-color: #e00b41 !important;
-}}
-</style>
-<div>
-{cards_html}
-</div>""", unsafe_allow_html=True)
+    st.markdown(textwrap.dedent(f"""\
+        <style>
+        .airbnb-card-report:hover {{
+            transform: translateY(-2px);
+            box-shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 4px 12px, rgba(0, 0, 0, 0.12) 0 8px 16px !important;
+            border-color: #ff385c !important;
+        }}
+        .airbnb-card-report a:hover {{
+            background-color: #e00b41 !important;
+        }}
+        </style>
+        <div>
+        {cards_html}
+        </div>
+        """), unsafe_allow_html=True)
 
 def render_youtube_rank_page():
     """
