@@ -402,8 +402,8 @@ def crawl_pure_foreigner_rankings() -> dict:
                 f_qty = f_buy[ticker]['qty']
                 f_amt = f_buy[ticker]['amt']
             elif ticker in f_sell:
-                f_qty = f_sell[ticker]['qty']
-                f_amt = f_sell[ticker]['amt']
+                f_qty = -f_sell[ticker]['qty']
+                f_amt = -f_sell[ticker]['amt']
             else:
                 f_qty = 0.0
                 f_amt = 0.0
@@ -412,8 +412,8 @@ def crawl_pure_foreigner_rankings() -> dict:
                 p_qty = p_buy[ticker]['qty']
                 p_amt = p_buy[ticker]['amt']
             elif ticker in p_sell:
-                p_qty = p_sell[ticker]['qty']
-                p_amt = p_sell[ticker]['amt']
+                p_qty = -p_sell[ticker]['qty']
+                p_amt = -p_sell[ticker]['amt']
             else:
                 p_qty = 0.0
                 p_amt = 0.0
@@ -711,12 +711,12 @@ def render_pure_foreigner_table(df: pd.DataFrame, sort_by="금액", is_buy=True)
     df_display["순수 외인 수급"] = df_display[sort_col].apply(lambda x: f"{x * sign:,.1f}")
     
     if sort_by == "금액":
-        df_display["전체 외인 수급"] = df_display["외인순매수_금액"].apply(lambda x: f"{x * sign:,.1f}")
-        df_display["프로그램 수급"] = df_display["프로그램순매수_금액"].apply(lambda x: f"{x * sign:,.1f}")
+        df_display["전체 외인 수급"] = df_display["외인순매수_금액"].apply(lambda x: f"{x:,.1f}")
+        df_display["프로그램 수급"] = df_display["프로그램순매수_금액"].apply(lambda x: f"{x:,.1f}")
         unit = "백만원"
     else:
-        df_display["전체 외인 수급"] = df_display["외인순매수_수량"].apply(lambda x: f"{x * sign:,.1f}")
-        df_display["프로그램 수급"] = df_display["프로그램순매수_수량"].apply(lambda x: f"{x * sign:,.1f}")
+        df_display["전체 외인 수급"] = df_display["외인순매수_수량"].apply(lambda x: f"{x:,.1f}")
+        df_display["프로그램 수급"] = df_display["프로그램순매수_수량"].apply(lambda x: f"{x:,.1f}")
         unit = "천주"
         
     df_display = df_display.reset_index(drop=True)
