@@ -517,6 +517,17 @@ with st.sidebar:
     if st.button("🔥 과열 국면 시그널", use_container_width=True):
         st.session_state["active_tab"] = "overheat_signal"
         st.rerun()
+        
+    st.markdown("---")
+    st.subheader("🔒 관리자 모드")
+    admin_id_input = st.text_input("아이디", key="admin_id")
+    admin_pw_input = st.text_input("비밀번호", type="password", key="admin_pw")
+    is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
+    
+    st.markdown("---")
+    st.subheader("자발적 후원으로 운영됩니다.")
+    st.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
+    st.write("유료API로 정밀한 데이터가 필요합니다.")
 
 # 다른 페이지 라우팅
 if st.session_state["active_tab"] == "youtube_rank":
@@ -931,15 +942,7 @@ try:
             지수 수준(Level)이 아닌 변동성(Return)을 분석하여 지표의 '전조 현상'을 통계적으로 입증합니다.\n\n3. **실시간 미래 위험 투사**:
             오늘의 지표값을 위에서 도출된 '미래 전조 가중치'에 대입하여, **다음 주 시장의 잠재적 리스크**를 산출합니다.\n\n""")
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔒 관리자 모드")
-    admin_id_input = st.sidebar.text_input("아이디", key="admin_id")
-    admin_pw_input = st.sidebar.text_input("비밀번호", type="password", key="admin_pw")
-    is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("자발적 후원으로 운영됩니다.")
-    st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
-    st.sidebar.write("유료API로 정밀한 데이터가 필요합니다.")
+
     
     total_w = w_macro + w_tech + w_global + w_fear
     if total_w == 0: 
