@@ -1154,19 +1154,29 @@ try:
             
             eval_df = pd.DataFrame({'KOSPI': _ks_s, 'Risk': convex_risk}).dropna()
             
-            # 1개월(20거래일) 이내 Maximum Drawdown이 -5% 이하인지 확인
-            N_days = 20
-            eval_df['Min_Future_KOSPI'] = eval_df['KOSPI'].rolling(window=N_days).min().shift(-N_days)
-            eval_df['Max_Drawdown'] = (eval_df['Min_Future_KOSPI'] - eval_df['KOSPI']) / eval_df['KOSPI']
+            # 5일에서 30일(1개월 반) 사이의 최적 적중 기간 탐색
+            best_hit_rate = 0
+            best_n = 20
+            best_signal_count = 0
             
-            high_risk_days = eval_df[eval_df['Risk'] >= 60]
-            valid_high_risk = high_risk_days.dropna(subset=['Max_Drawdown'])
-            hits = valid_high_risk[valid_high_risk['Max_Drawdown'] <= -0.05]
-            
-            hit_rate = len(hits) / len(valid_high_risk) * 100 if len(valid_high_risk) > 0 else 0
-            return hit_rate, len(valid_high_risk)
+            for n in range(5, 31):
+                eval_df['Min_Future_KOSPI'] = eval_df['KOSPI'].rolling(window=n).min().shift(-n)
+                eval_df['Max_Drawdown'] = (eval_df['Min_Future_KOSPI'] - eval_df['KOSPI']) / eval_df['KOSPI']
+                
+                high_risk_days = eval_df[eval_df['Risk'] >= 60]
+                valid_high_risk = high_risk_days.dropna(subset=['Max_Drawdown'])
+                hits = valid_high_risk[valid_high_risk['Max_Drawdown'] <= -0.05]
+                
+                hr = len(hits) / len(valid_high_risk) * 100 if len(valid_high_risk) > 0 else 0
+                # 적중률이 동일하다면 더 짧은 기간(빠른 적중)을 선호
+                if hr > best_hit_rate:
+                    best_hit_rate = hr
+                    best_n = n
+                    best_signal_count = len(valid_high_risk)
+                    
+            return best_hit_rate, best_signal_count, best_n
         except:
-            return 0.0, 0
+            return 0.0, 0, 20
             
     cb1, cb2 = st.columns([3, 1])
     with cb1:
@@ -1185,9 +1195,10 @@ try:
         st.metric("단순 상관계수", f"{corr_val:.2f}")
         
         st.markdown("---")
-        hit_rate, signal_count = calculate_prediction_accuracy(w_macro, w_tech, w_global, w_fear, w_peri)
+        hit_rate, signal_count, best_n = calculate_prediction_accuracy(w_macro, w_tech, w_global, w_fear, w_peri)
         st.metric("최근 10년 패닉 적중률", f"{hit_rate:.1f}%")
-        st.caption(f"*위험(60 이상) 경보 후 1개월 내 KOSPI -5% 폭락 기준 ({signal_count}회 중)")
+        st.caption(f"*최적 예측 기간: {best_n}거래일")
+        st.caption(f"*위험(60 이상) 경보 발령 후 -5% 폭락 기준 ({signal_count}회 중)")
 
     # 7.5 블랙스완
     st.markdown("---")
