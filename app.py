@@ -1263,11 +1263,23 @@ try:
         )
         return fig, sim_score, 0
 
-    col_bs1, col_bs2 = st.columns(2)
+    col_bs1, col_bs2, col_bs3 = st.columns(3)
     avg_current_risk = np.mean(hist_df['Risk'].iloc[-30:])
     current_series = hist_df['Risk'].iloc[-120:]
     
     with col_bs1:
+        st.info("**2000 닷컴 버블 vs 현재**")
+        bs_2000 = get_true_historical_risk("2000-01-01", "2001-01-01", w_macro, w_tech, w_global, w_fear, w_peri)
+        fig_bs0, sim_00, d_day_00 = create_black_swan_chart(bs_2000, current_series, "2000 닷컴 버블")
+        st.plotly_chart(fig_bs0, use_container_width=True)
+        if sim_00 > 70 and d_day_00 > 0 and d_day_00 <= 30:
+            st.warning(f"⚠️ 2000년 버블 직전(D-{int(d_day_00)})과 패턴이 {sim_00:.1f}% 일치하여 주의가 필요합니다.")
+        elif avg_current_risk > 60:
+            st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 높아 버블 붕괴 초기 단계일 수 있습니다.")
+        else:
+            st.success(f"✅ 현재 위험 지수 흐름은 닷컴 버블 붕괴 경로와 거리가 있습니다.")
+
+    with col_bs2:
         st.info("**2008 금융위기 vs 현재**")
         bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_macro, w_tech, w_global, w_fear, w_peri)
         fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
@@ -1279,7 +1291,7 @@ try:
         else:
             st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
             
-    with col_bs2:
+    with col_bs3:
         st.info("**2020 코로나 폭락 vs 현재**")
         bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_macro, w_tech, w_global, w_fear, w_peri)
         fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
