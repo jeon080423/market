@@ -1112,6 +1112,62 @@ try:
     st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
     st.info("과거 데이터를 사용하여 모델의 유효성을 검증합니다.")
     hist_df = pd.DataFrame({'Date': dates, 'Risk': hist_risks, 'KOSPI': ks_s.loc[dates].values})
+    
+    @st.cache_data(ttl=86400, show_spinner=False)
+    def calculate_prediction_accuracy(w_m, w_t, w_g, w_f, w_p):
+        start_date = "2010-01-01"
+        end_date = pd.Timestamp.now().strftime('%Y-%m-%d')
+        tickers = ['^KS11', '^GSPC', 'KRW=X', '^TNX', 'HG=F', '^VIX', 'EEM']
+        try:
+            df = yf.download(tickers, start=start_date, end=end_date, progress=False)['Close'].ffill()
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            
+            _ks_s = df['^KS11'].ffill()
+            _sp_s = df['^GSPC'].ffill()
+            _fx_s = df['KRW=X'].ffill()
+            _b10_s = df['^TNX'].ffill()
+            _cp_s = df['HG=F'].ffill()
+            _vx_s = df['^VIX'].ffill()
+            _em_s = df['EEM'].ffill() if 'EEM' in df.columns else _sp_s
+            _ma20 = _ks_s.rolling(window=20).mean()
+            
+            def calc_rolling_z_score(s, inverse=False):
+                mu = s.rolling(window=252).mean()
+                std = s.rolling(window=252).std().replace(0, 1e-9)
+                z = (s - mu) / std
+                score = 100 / (1 + np.exp(-z))
+                return 100 - score if inverse else score
+            
+            m = (calc_rolling_z_score(_fx_s) + calc_rolling_z_score(_b10_s) + calc_rolling_z_score(_cp_s, True)) / 3.0
+            t = np.clip(100.0 - (_ks_s / _ma20 - 0.9) * 500.0, 0, 100.0)
+            s_sp = calc_rolling_z_score(_sp_s, True)
+            s_vx = calc_rolling_z_score(_vx_s)
+            s_em = calc_rolling_z_score(_em_s, True)
+            
+            tot_w = w_m + w_t + w_g + w_f + w_p
+            if tot_w == 0: tot_w = 1.0
+            
+            base = (m * w_m + t * w_t + s_sp * w_g + s_vx * w_f + s_em * w_p) / tot_w
+            k_val = 0.5
+            convex_risk = ((np.exp(k_val * base / 100.0) - 1.0) / (np.exp(k_val) - 1.0)) * 100.0
+            
+            eval_df = pd.DataFrame({'KOSPI': _ks_s, 'Risk': convex_risk}).dropna()
+            
+            # 1개월(20거래일) 이내 Maximum Drawdown이 -5% 이하인지 확인
+            N_days = 20
+            eval_df['Min_Future_KOSPI'] = eval_df['KOSPI'].rolling(window=N_days).min().shift(-N_days)
+            eval_df['Max_Drawdown'] = (eval_df['Min_Future_KOSPI'] - eval_df['KOSPI']) / eval_df['KOSPI']
+            
+            high_risk_days = eval_df[eval_df['Risk'] >= 60]
+            valid_high_risk = high_risk_days.dropna(subset=['Max_Drawdown'])
+            hits = valid_high_risk[valid_high_risk['Max_Drawdown'] <= -0.05]
+            
+            hit_rate = len(hits) / len(valid_high_risk) * 100 if len(valid_high_risk) > 0 else 0
+            return hit_rate, len(valid_high_risk)
+        except:
+            return 0.0, 0
+            
     cb1, cb2 = st.columns([3, 1])
     with cb1:
         fig_bt = go.Figure()
@@ -1126,8 +1182,12 @@ try:
 
     with cb2:
         corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
-        st.metric("상관계수 (Corr)", f"{corr_val:.2f}")
-        st.write("- -1.0~-0.7: 우수\n- -0.7~-0.3: 유의미\n- 0.0이상: 모델 왜곡")
+        st.metric("단순 상관계수", f"{corr_val:.2f}")
+        
+        st.markdown("---")
+        hit_rate, signal_count = calculate_prediction_accuracy(w_macro, w_tech, w_global, w_fear, w_peri)
+        st.metric("최근 10년 패닉 적중률", f"{hit_rate:.1f}%")
+        st.caption(f"*위험(60 이상) 경보 후 1개월 내 KOSPI -5% 폭락 기준 ({signal_count}회 중)")
 
     # 7.5 블랙스완
     st.markdown("---")
@@ -1164,8 +1224,11 @@ try:
             past_1y = past_data[past_data.index >= (date - pd.Timedelta(days=365))]
             if len(past_1y) < 30: return 50.0
             val = float(series.loc[date]) if date in series.index else float(past_data.iloc[-1])
-            z = (val - past_1y.mean()) / (past_1y.std() + 1e-9)
-            return max(0.0, min(100.0, 50.0 + z * 15.0 * (-1 if inverse else 1)))
+            std_val = past_1y.std()
+            if std_val == 0: return 50.0
+            z = (val - past_1y.mean()) / std_val
+            score = 100 / (1 + np.exp(-z))
+            return max(0.0, min(100.0, (100.0 - score) if inverse else score))
 
         for d in analyze_dates:
             m = (calc_z_score(_fx_s, d) + calc_z_score(_b10_s, d) + calc_z_score(_cp_s, d, True)) / 3.0
@@ -1173,8 +1236,11 @@ try:
             val_ma = float(_ma20.loc[d]) if pd.notna(_ma20.loc[d]) else val_ks
             s_tech = max(0.0, min(100.0, 100.0 - (val_ks / val_ma - 0.9) * 500.0)) if val_ma != 0 else 50.0
             
-            risk = (m * w_m + s_tech * w_t + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f + calc_z_score(_em_s, d, True) * w_p) / tot_w
-            hist_risks.append(risk)
+            base_risk = (m * w_m + s_tech * w_t + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f + calc_z_score(_em_s, d, True) * w_p) / tot_w
+            # 볼록성(Convexity) 추가
+            k_val = 0.5
+            convex_risk = ((np.exp(k_val * base_risk / 100.0) - 1.0) / (np.exp(k_val) - 1.0)) * 100.0
+            hist_risks.append(convex_risk)
             
         return pd.Series(hist_risks, index=analyze_dates)
     
