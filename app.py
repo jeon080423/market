@@ -433,7 +433,8 @@ def load_data():
     tickers = {
         "kospi": "^KS11", "sp500": "^GSPC", "fx": "KRW=X", 
         "us10y": "^TNX", "us2y": "^IRX", "vix": "^VIX", 
-        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB"
+        "copper": "HG=F", "freight": "BDRY", "wti": "CL=F", "dxy": "DX-Y.NYB",
+        "eem": "EEM"
     }
     
     # 패닉 감지용 실시간 티커 (안전자산 및 VIX 변동성)
@@ -556,6 +557,7 @@ def load_data():
         data[[panic_tickers["jpy_krw"]]] if panic_tickers["jpy_krw"] in data.columns else pd.DataFrame(columns=[panic_tickers["jpy_krw"]]),
         data[[panic_tickers["usd_chf"]]] if panic_tickers["usd_chf"] in data.columns else pd.DataFrame(columns=[panic_tickers["usd_chf"]]),
         data[[panic_tickers["vvix"]]] if panic_tickers["vvix"] in data.columns else pd.DataFrame(columns=[panic_tickers["vvix"]]),
+        data[[tickers["eem"]]] if tickers["eem"] in data.columns else pd.DataFrame(columns=[tickers["eem"]]),
         sector_raw, sector_tickers, sp500_sector_raw, sp500_sector_tickers
     )
 
@@ -654,7 +656,7 @@ ai_indicator_container = None
 try:
     with st.spinner('시차 상관관계 및 가중치 분석 중...'):
         (kospi, sp500, fx, bond10, bond2, vix_data, copper_data, freight_data, wti_data, dxy_data,
-         gold_data, jpy_krw_data, usd_chf_data, vvix_data,
+         gold_data, jpy_krw_data, usd_chf_data, vvix_data, eem_data,
          sector_raw, sector_map, sp500_sector_raw, sp500_sector_map) = load_data()
 
     def get_clean_series(df):
@@ -675,6 +677,7 @@ try:
     fr_s = get_clean_series(freight_data).reindex(ks_s.index).ffill()
     wt_s = get_clean_series(wti_data).reindex(ks_s.index).ffill()
     dx_s = get_clean_series(dxy_data).reindex(ks_s.index).ffill()
+    em_s = get_clean_series(eem_data).reindex(ks_s.index).ffill()
     
     # 패닉 데이터 
     gd_s = get_clean_series(gold_data).reindex(ks_s.index).ffill()
@@ -705,7 +708,7 @@ try:
         except: return 50.0
 
     @st.cache_data(ttl=3600)
-    def calculate_ml_lagged_weights(_ks_s, _sp_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s):
+    def calculate_ml_lagged_weights(_ks_s, _sp_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s, _em_s):
         # 1. 수익률(pct_change) 기반으로 변환하여 통계적 정상성 확보
         def get_ret(s): return s.pct_change().dropna()
         
@@ -723,7 +726,8 @@ try:
             'FX': find_best_lag_ret(_fx_s, target_ret), 
             'B10': find_best_lag_ret(_b10_s, target_ret), 
             'CP': find_best_lag_ret(_cp_s, target_ret), 
-            'VX': find_best_lag_ret(_vx_s, target_ret)
+            'VX': find_best_lag_ret(_vx_s, target_ret),
+            'EM': find_best_lag_ret(_em_s, target_ret)
         }
         
         data_rows = []
@@ -736,15 +740,16 @@ try:
             s_b10 = get_hist_score_val(_b10_s.shift(best_lags['B10']), d)
             s_cp = get_hist_score_val(_cp_s.shift(best_lags['CP']), d, True)
             s_vx = get_hist_score_val(_vx_s.shift(best_lags['VX']), d)
+            s_em = get_hist_score_val(_em_s.shift(best_lags['EM']), d, True)
             s_tech = max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500))
             
-            data_rows.append([ (s_fx + s_b10 + s_cp) / 3, s_sp, s_vx, s_tech, target_ret.loc[d] ])
+            data_rows.append([ (s_fx + s_b10 + s_cp) / 3, s_sp, s_vx, s_tech, s_em, target_ret.loc[d] ])
         
-        df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'KOSPI_Ret']).replace([np.inf, -np.inf], np.nan).dropna()
+        df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'Peri', 'KOSPI_Ret']).replace([np.inf, -np.inf], np.nan).dropna()
         if df_reg.empty:
-            return np.array([0.25, 0.25, 0.25, 0.25])
+            return np.array([0.20, 0.20, 0.20, 0.20, 0.20])
             
-        X = df_reg.iloc[:, :4]
+        X = df_reg.iloc[:, :5]
         Y = df_reg['KOSPI_Ret']
         
         try:
@@ -752,9 +757,9 @@ try:
             adjusted_importance = (np.abs(coeffs) * X.std().values) + 1e-6 
             return adjusted_importance / np.sum(adjusted_importance)
         except:
-            return np.array([0.25, 0.25, 0.25, 0.25])
+            return np.array([0.20, 0.20, 0.20, 0.20, 0.20])
 
-    sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s)
+    sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s, em_s)
 
     # 5. 사이드바 - 가중치 설정
     st.sidebar.header("⚙️ 지표별 가중치 설정")
@@ -762,14 +767,17 @@ try:
     if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
     if 'slider_f' not in st.session_state: st.session_state.slider_f = float(round(sem_w[2], 2))
     if 'slider_t' not in st.session_state: st.session_state.slider_t = float(round(sem_w[3], 2))
+    if 'slider_p' not in st.session_state: st.session_state.slider_p = float(round(sem_w[4], 2))
 
     if st.sidebar.button("🔄 권장 최적 가중치로 복귀"):
         st.session_state.slider_m = float(round(sem_w[0], 2)); st.session_state.slider_g = float(round(sem_w[1], 2))
         st.session_state.slider_f = float(round(sem_w[2], 2)); st.session_state.slider_t = float(round(sem_w[3], 2))
+        st.session_state.slider_p = float(round(sem_w[4], 2))
         st.rerun()
 
     w_macro = st.sidebar.slider("매크로 (환율/금리/물동량)", 0.0, 1.0, key="slider_m", step=0.01)
-    w_global = st.sidebar.slider("글로벌 시장 위험 (미국 지수)", 0.0, 1.0, key="slider_g", step=0.01)
+    w_global = st.sidebar.slider("미국 시장 위험 (S&P 500)", 0.0, 1.0, key="slider_g", step=0.01)
+    w_peri = st.sidebar.slider("주변부 이탈 위험 (신흥국 EEM 하락)", 0.0, 1.0, key="slider_p", step=0.01)
     w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, key="slider_f", step=0.01)
     w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
 
@@ -782,15 +790,15 @@ try:
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔒 관리자 모드")
-    admin_id_input = st.sidebar.text_input("아이디", key="admin_id")
-    admin_pw_input = st.sidebar.text_input("비밀번호", type="password", key="admin_pw")
+    admin_id_input = st.sidebar.text_input("아이디", key="admin_id_bottom")
+    admin_pw_input = st.sidebar.text_input("비밀번호", type="password", key="admin_pw_bottom")
     is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
     st.sidebar.markdown("---")
     st.sidebar.subheader("자발적 후원으로 운영됩니다.")
     st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
     st.sidebar.write("유료API로 정밀한 데이터가 필요합니다.")
-    
-    total_w = w_macro + w_tech + w_global + w_fear
+
+    total_w = w_macro + w_tech + w_global + w_fear + w_peri
     if total_w == 0: 
         st.error("가중치 합이 0일 수 없습니다."); st.stop()
 
@@ -806,9 +814,10 @@ try:
 
     m_now = (calculate_score(fx_s, fx_s) + calculate_score(b10_s, b10_s) + calculate_score(cp_s, cp_s, True)) / 3
     t_now = max(0.0, min(100.0, float(100 - (float(ks_s.iloc[-1]) / float(ma20.iloc[-1]) - 0.9) * 500)))
+    p_now = calculate_score(em_s, em_s, True)
     
     # 기초 위험 지수 계산 (가중 평균)
-    base_risk = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear) / total_w
+    base_risk = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear + p_now * w_peri) / total_w
     
     # -------------------------------------------------------------
     # [신규] 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)
@@ -885,8 +894,9 @@ try:
         t = max(0.0, min(100.0, float(100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500))) if d in ma20.index and pd.notna(ma20.loc[d]) and ma20.loc[d] != 0 else 50.0
         s_sp = get_hist_score_val(sp_s, d, True)
         s_vx = get_hist_score_val(vx_s, d)
+        s_em = get_hist_score_val(em_s, d, True)
         
-        base = (m * w_macro + t * w_tech + s_sp * w_global + s_vx * w_fear) / total_w
+        base = (m * w_macro + t * w_tech + s_sp * w_global + s_vx * w_fear + s_em * w_peri) / total_w
         
         p_g = get_hist_panic_score(gd_s, d)
         p_j = get_hist_panic_score(jk_s, d)
@@ -958,9 +968,10 @@ try:
         st.markdown("**📊 예측 컴포넌트별 위험도**")
         comp_data = {
             '🌍 매크로 (금리/환율)': m_now,
-            '📈 글로벌 시장 (S&P 500)': calculate_score(sp_s, sp_s, True),
+            '📈 미국 시장 (S&P 500)': calculate_score(sp_s, sp_s, True),
             '😱 시장 공포 (VIX)': calculate_score(vx_s, vx_s),
             '📉 기술적 과매수': t_now,
+            '📉 주변부 이탈 (신흥국 하락)': p_now,
         }
         for label, score in comp_data.items():
             bar_color = "#e74c3c" if score >= 80 else ("#f39c12" if score >= 60 else ("#f1c40f" if score >= 40 else "#27ae60"))
@@ -1122,10 +1133,10 @@ try:
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     @st.cache_data(ttl=86400, show_spinner=False)
-    def get_true_historical_risk(start_date, end_date, w_m, w_t, w_g, w_f):
+    def get_true_historical_risk(start_date, end_date, w_m, w_t, w_g, w_f, w_p):
         # 과거 데이터는 분석 기간보다 1년 전부터 가져와야 z-score 계산(과거 1년 롤링)이 가능합니다.
         fetch_start = (pd.to_datetime(start_date) - pd.Timedelta(days=365)).strftime('%Y-%m-%d')
-        tickers = ['^KS11', '^GSPC', 'KRW=X', '^TNX', 'HG=F', '^VIX']
+        tickers = ['^KS11', '^GSPC', 'KRW=X', '^TNX', 'HG=F', '^VIX', 'EEM']
         
         # yf.download (진행률 표시 숨김)
         df = yf.download(tickers, start=fetch_start, end=end_date, progress=False)['Close'].ffill()
@@ -1138,12 +1149,13 @@ try:
         _b10_s = df['^TNX'].ffill()
         _cp_s = df['HG=F'].ffill()
         _vx_s = df['^VIX'].ffill()
+        _em_s = df['EEM'].ffill() if 'EEM' in df.columns else _sp_s
         
         _ma20 = _ks_s.rolling(window=20).mean()
         
         analyze_dates = _ks_s[_ks_s.index >= start_date].index
         hist_risks = []
-        tot_w = w_m + w_t + w_g + w_f
+        tot_w = w_m + w_t + w_g + w_f + w_p
         
         if tot_w == 0: tot_w = 1.0 # 0 나누기 방지
         
@@ -1161,7 +1173,7 @@ try:
             val_ma = float(_ma20.loc[d]) if pd.notna(_ma20.loc[d]) else val_ks
             s_tech = max(0.0, min(100.0, 100.0 - (val_ks / val_ma - 0.9) * 500.0)) if val_ma != 0 else 50.0
             
-            risk = (m * w_m + s_tech * w_t + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f) / tot_w
+            risk = (m * w_m + s_tech * w_t + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f + calc_z_score(_em_s, d, True) * w_p) / tot_w
             hist_risks.append(risk)
             
         return pd.Series(hist_risks, index=analyze_dates)
@@ -1257,7 +1269,7 @@ try:
     
     with col_bs1:
         st.info("**2008 금융위기 vs 현재**")
-        bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_macro, w_tech, w_global, w_fear)
+        bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_macro, w_tech, w_global, w_fear, w_peri)
         fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
         st.plotly_chart(fig_bs1, use_container_width=True)
         if sim_08 > 70 and d_day_08 > 0 and d_day_08 <= 30:
@@ -1269,7 +1281,7 @@ try:
             
     with col_bs2:
         st.info("**2020 코로나 폭락 vs 현재**")
-        bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_macro, w_tech, w_global, w_fear)
+        bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_macro, w_tech, w_global, w_fear, w_peri)
         fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
         st.plotly_chart(fig_bs2, use_container_width=True)
         if sim_20 > 70 and d_day_20 > 0 and d_day_20 <= 30:
@@ -1285,11 +1297,14 @@ try:
     
     # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
+    [김효진 박사 코스피 위험 분석 포인트: "주변부(신흥국 등)가 식는지 주목하라", "경제가 가열되며 물가/금리가 핵심 리스크로 부상"]
+    - 신흥국 EEM 현재가: {em_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((em_s.iloc[-1]/em_s[em_s.index >= (em_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
     - S&P 500 현재가: {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
     - 원/달러 환율: {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
     - 구리 가격: {cp_s.iloc[-1]:.2f} (최근 추세: {'상승' if cp_s.iloc[-1] > cp_s.iloc[-5] else '하락'})
     - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
     - 미 국채 10년물 금리: {b10_s.iloc[-1]:.3f}% (위험 수준: {'높음' if b10_s.iloc[-1] > 4.5 else '낮음'})
+    - 유가(WTI): {wt_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((wt_s.iloc[-1]/wt_s[wt_s.index >= (wt_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
