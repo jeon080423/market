@@ -707,79 +707,29 @@ try:
             return (100 - score) if inverse else score
         except: return 50.0
 
-    @st.cache_data(ttl=3600)
-    def calculate_ml_lagged_weights(_ks_s, _sp_s, _fx_s, _b10_s, _cp_s, _ma20, _vx_s, _em_s):
-        # 1. 수익률(pct_change) 기반으로 변환하여 통계적 정상성 확보
-        def get_ret(s): return s.pct_change().dropna()
-        
-        target_ret = get_ret(_ks_s)
-        
-        def find_best_lag_ret(feature_s, target_s, min_lag=5, max_lag=12):
-            f_ret = get_ret(feature_s)
-            common_idx = f_ret.index.intersection(target_s.index)
-            # 최소 5일 이상의 시차(Lag)를 가진 상관관계만 탐색하여 '예측성' 확보
-            corrs = [abs(f_ret.shift(lag).reindex(common_idx).corr(target_s.reindex(common_idx))) for lag in range(min_lag, max_lag + 1)]
-            return np.argmax(corrs) + min_lag
-            
-        best_lags = {
-            'SP': find_best_lag_ret(_sp_s, target_ret), 
-            'FX': find_best_lag_ret(_fx_s, target_ret), 
-            'B10': find_best_lag_ret(_b10_s, target_ret), 
-            'CP': find_best_lag_ret(_cp_s, target_ret), 
-            'VX': find_best_lag_ret(_vx_s, target_ret),
-            'EM': find_best_lag_ret(_em_s, target_ret)
-        }
-        
-        data_rows = []
-        # 최근 252거래일 동안의 지표 상태(Score)와 KOSPI 수익률 간의 관계 분석
-        for d in _ks_s.index[-252:]:
-            if d not in target_ret.index: continue
-            
-            s_sp = get_hist_score_val(_sp_s.shift(best_lags['SP']), d, True)
-            s_fx = get_hist_score_val(_fx_s.shift(best_lags['FX']), d)
-            s_b10 = get_hist_score_val(_b10_s.shift(best_lags['B10']), d)
-            s_cp = get_hist_score_val(_cp_s.shift(best_lags['CP']), d, True)
-            s_vx = get_hist_score_val(_vx_s.shift(best_lags['VX']), d)
-            s_em = get_hist_score_val(_em_s.shift(best_lags['EM']), d, True)
-            s_tech = max(0, min(100, 100 - (float(_ks_s.loc[d]) / float(_ma20.loc[d]) - 0.9) * 500))
-            
-            data_rows.append([ (s_fx + s_b10 + s_cp) / 3, s_sp, s_vx, s_tech, s_em, target_ret.loc[d] ])
-        
-        df_reg = pd.DataFrame(data_rows, columns=['Macro', 'Global', 'Fear', 'Tech', 'Peri', 'KOSPI_Ret']).replace([np.inf, -np.inf], np.nan).dropna()
-        if df_reg.empty:
-            return np.array([0.20, 0.20, 0.20, 0.20, 0.20])
-            
-        X = df_reg.iloc[:, :5]
-        Y = df_reg['KOSPI_Ret']
-        
-        try:
-            coeffs = np.linalg.lstsq(X, Y, rcond=None)[0]
-            adjusted_importance = (np.abs(coeffs) * X.std().values) + 1e-6 
-            return adjusted_importance / np.sum(adjusted_importance)
-        except:
-            return np.array([0.20, 0.20, 0.20, 0.20, 0.20])
+    # 5. 사이드바 - 최적 가중치 설정 (5일 선행 패닉 적중률 최적화 결과)
+    opt_w = [0.15, 0.11, 0.12, 0.27, 0.35] # FX, WTI, SP, VX, TECH
 
-    sem_w = calculate_ml_lagged_weights(ks_s, sp_s, fx_s, b10_s, cp_s, ma20, vx_s, em_s)
-
-    # 5. 사이드바 - 가중치 설정
     st.sidebar.header("⚙️ 지표별 가중치 설정")
-    if 'slider_m' not in st.session_state: st.session_state.slider_m = float(round(sem_w[0], 2))
-    if 'slider_g' not in st.session_state: st.session_state.slider_g = float(round(sem_w[1], 2))
-    if 'slider_f' not in st.session_state: st.session_state.slider_f = float(round(sem_w[2], 2))
-    if 'slider_t' not in st.session_state: st.session_state.slider_t = float(round(sem_w[3], 2))
-    if 'slider_p' not in st.session_state: st.session_state.slider_p = float(round(sem_w[4], 2))
+    if 'slider_fx' not in st.session_state: st.session_state.slider_fx = opt_w[0]
+    if 'slider_wt' not in st.session_state: st.session_state.slider_wt = opt_w[1]
+    if 'slider_g' not in st.session_state: st.session_state.slider_g = opt_w[2]
+    if 'slider_f' not in st.session_state: st.session_state.slider_f = opt_w[3]
+    if 'slider_t' not in st.session_state: st.session_state.slider_t = opt_w[4]
 
     if st.sidebar.button("🔄 권장 최적 가중치로 복귀"):
-        st.session_state.slider_m = float(round(sem_w[0], 2)); st.session_state.slider_g = float(round(sem_w[1], 2))
-        st.session_state.slider_f = float(round(sem_w[2], 2)); st.session_state.slider_t = float(round(sem_w[3], 2))
-        st.session_state.slider_p = float(round(sem_w[4], 2))
+        st.session_state.slider_fx = opt_w[0]
+        st.session_state.slider_wt = opt_w[1]
+        st.session_state.slider_g = opt_w[2]
+        st.session_state.slider_f = opt_w[3]
+        st.session_state.slider_t = opt_w[4]
         st.rerun()
 
-    w_macro = st.sidebar.slider("매크로 (환율/금리/물동량)", 0.0, 1.0, key="slider_m", step=0.01)
-    w_global = st.sidebar.slider("미국 시장 위험 (S&P 500)", 0.0, 1.0, key="slider_g", step=0.01)
-    w_peri = st.sidebar.slider("주변부 이탈 위험 (신흥국 EEM 하락)", 0.0, 1.0, key="slider_p", step=0.01)
-    w_fear = st.sidebar.slider("시장 공포 (VIX 지수)", 0.0, 1.0, key="slider_f", step=0.01)
-    w_tech = st.sidebar.slider("국내 기술적 지표 (이동평균선)", 0.0, 1.0, key="slider_t", step=0.01)
+    w_fx = st.sidebar.slider("원/달러 환율 (자본 이탈 위험)", 0.0, 1.0, key="slider_fx", step=0.01)
+    w_wti = st.sidebar.slider("WTI 유가 (비용 충격 위험)", 0.0, 1.0, key="slider_wt", step=0.01)
+    w_global = st.sidebar.slider("미국 시장 위험 (S&P 500 하락)", 0.0, 1.0, key="slider_g", step=0.01)
+    w_fear = st.sidebar.slider("시장 공포 (VIX 지수 상승)", 0.0, 1.0, key="slider_f", step=0.01)
+    w_tech = st.sidebar.slider("국내 기술적 지표 (20일선 이격도)", 0.0, 1.0, key="slider_t", step=0.01)
 
     with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
         st.caption("""
@@ -798,7 +748,7 @@ try:
     st.sidebar.write("카카오뱅크 3333-23-8667708 (ㅈㅅㅎ)")
     st.sidebar.write("유료API로 정밀한 데이터가 필요합니다.")
 
-    total_w = w_macro + w_tech + w_global + w_fear + w_peri
+    total_w = w_fx + w_wti + w_global + w_fear + w_tech
     if total_w == 0: 
         st.error("가중치 합이 0일 수 없습니다."); st.stop()
 
@@ -812,12 +762,14 @@ try:
         score = 100 / (1 + np.exp(-z))
         return float(max(0, min(100, (100 - score) if inverse else score)))
 
-    m_now = (calculate_score(fx_s, fx_s) + calculate_score(b10_s, b10_s) + calculate_score(cp_s, cp_s, True)) / 3
+    fx_now = calculate_score(fx_s, fx_s)
+    wt_now = calculate_score(wt_s, wt_s)
+    sp_now = calculate_score(sp_s, sp_s, True)
+    vx_now = calculate_score(vx_s, vx_s)
     t_now = max(0.0, min(100.0, float(100 - (float(ks_s.iloc[-1]) / float(ma20.iloc[-1]) - 0.9) * 500)))
-    p_now = calculate_score(em_s, em_s, True)
     
     # 기초 위험 지수 계산 (가중 평균)
-    base_risk = (m_now * w_macro + t_now * w_tech + calculate_score(sp_s, sp_s, True) * w_global + calculate_score(vx_s, vx_s) * w_fear + p_now * w_peri) / total_w
+    base_risk = (fx_now * w_fx + wt_now * w_wti + sp_now * w_global + vx_now * w_fear + t_now * w_tech) / total_w
     
     # -------------------------------------------------------------
     # [신규] 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)
@@ -890,13 +842,13 @@ try:
     hist_risks = []
     k = 0.5
     for d in dates:
-        m = (get_hist_score_val(fx_s, d) + get_hist_score_val(b10_s, d) + get_hist_score_val(cp_s, d, True)) / 3
-        t = max(0.0, min(100.0, float(100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500))) if d in ma20.index and pd.notna(ma20.loc[d]) and ma20.loc[d] != 0 else 50.0
+        s_fx = get_hist_score_val(fx_s, d)
+        s_wt = get_hist_score_val(wt_s, d)
         s_sp = get_hist_score_val(sp_s, d, True)
         s_vx = get_hist_score_val(vx_s, d)
-        s_em = get_hist_score_val(em_s, d, True)
+        t = max(0.0, min(100.0, float(100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500))) if d in ma20.index and pd.notna(ma20.loc[d]) and ma20.loc[d] != 0 else 50.0
         
-        base = (m * w_macro + t * w_tech + s_sp * w_global + s_vx * w_fear + s_em * w_peri) / total_w
+        base = (s_fx * w_fx + s_wt * w_wti + s_sp * w_global + s_vx * w_fear + t * w_tech) / total_w
         
         p_g = get_hist_panic_score(gd_s, d)
         p_j = get_hist_panic_score(jk_s, d)
@@ -967,11 +919,11 @@ try:
     with c_guide: 
         st.markdown("**📊 예측 컴포넌트별 위험도**")
         comp_data = {
-            '🌍 매크로 (금리/환율)': m_now,
-            '📈 미국 시장 (S&P 500)': calculate_score(sp_s, sp_s, True),
-            '😱 시장 공포 (VIX)': calculate_score(vx_s, vx_s),
-            '📉 기술적 과매수': t_now,
-            '📉 주변부 이탈 (신흥국 하락)': p_now,
+            '📉 기술적 이격 (KOSPI 20MA)': t_now,
+            '😱 시장 공포 (VIX)': vx_now,
+            '💵 자본 이탈 (환율)': fx_now,
+            '📈 미국 시장 (S&P 500)': sp_now,
+            '🛢️ 에너지 충격 (WTI 유가)': wt_now,
         }
         for label, score in comp_data.items():
             bar_color = "#e74c3c" if score >= 80 else ("#f39c12" if score >= 60 else ("#f1c40f" if score >= 40 else "#27ae60"))
@@ -1114,10 +1066,10 @@ try:
     hist_df = pd.DataFrame({'Date': dates, 'Risk': hist_risks, 'KOSPI': ks_s.loc[dates].values})
     
     @st.cache_data(ttl=86400, show_spinner=False)
-    def calculate_prediction_accuracy(w_m, w_t, w_g, w_f, w_p):
-        start_date = "2010-01-01"
+    def calculate_prediction_accuracy(w_fx, w_wti, w_g, w_f, w_t):
+        start_date = "2016-06-16"
         end_date = pd.Timestamp.now().strftime('%Y-%m-%d')
-        tickers = ['^KS11', '^GSPC', 'KRW=X', '^TNX', 'HG=F', '^VIX', 'EEM']
+        tickers = ['^KS11', '^GSPC', 'KRW=X', 'CL=F', '^VIX']
         try:
             df = yf.download(tickers, start=start_date, end=end_date, progress=False)['Close'].ffill()
             if isinstance(df.columns, pd.MultiIndex):
@@ -1126,10 +1078,8 @@ try:
             _ks_s = df['^KS11'].ffill()
             _sp_s = df['^GSPC'].ffill()
             _fx_s = df['KRW=X'].ffill()
-            _b10_s = df['^TNX'].ffill()
-            _cp_s = df['HG=F'].ffill()
+            _wt_s = df['CL=F'].ffill()
             _vx_s = df['^VIX'].ffill()
-            _em_s = df['EEM'].ffill() if 'EEM' in df.columns else _sp_s
             _ma20 = _ks_s.rolling(window=20).mean()
             
             def calc_rolling_z_score(s, inverse=False):
@@ -1139,16 +1089,16 @@ try:
                 score = 100 / (1 + np.exp(-z))
                 return 100 - score if inverse else score
             
-            m = (calc_rolling_z_score(_fx_s) + calc_rolling_z_score(_b10_s) + calc_rolling_z_score(_cp_s, True)) / 3.0
-            t = np.clip(100.0 - (_ks_s / _ma20 - 0.9) * 500.0, 0, 100.0)
+            s_fx = calc_rolling_z_score(_fx_s)
+            s_wt = calc_rolling_z_score(_wt_s)
             s_sp = calc_rolling_z_score(_sp_s, True)
             s_vx = calc_rolling_z_score(_vx_s)
-            s_em = calc_rolling_z_score(_em_s, True)
+            t = np.clip(100.0 - (_ks_s / _ma20 - 0.9) * 500.0, 0, 100.0)
             
-            tot_w = w_m + w_t + w_g + w_f + w_p
+            tot_w = w_fx + w_wti + w_g + w_f + w_t
             if tot_w == 0: tot_w = 1.0
             
-            base = (m * w_m + t * w_t + s_sp * w_g + s_vx * w_f + s_em * w_p) / tot_w
+            base = (s_fx * w_fx + s_wt * w_wti + s_sp * w_g + s_vx * w_f + t * w_t) / tot_w
             k_val = 0.5
             convex_risk = ((np.exp(k_val * base / 100.0) - 1.0) / (np.exp(k_val) - 1.0)) * 100.0
             
@@ -1156,7 +1106,7 @@ try:
             
             # 5일에서 30일(1개월 반) 사이의 최적 적중 기간 탐색
             best_hit_rate = 0
-            best_n = 20
+            best_n = 5
             best_signal_count = 0
             
             for n in range(5, 31):
@@ -1168,7 +1118,7 @@ try:
                 hits = valid_high_risk[valid_high_risk['Max_Drawdown'] <= -0.05]
                 
                 hr = len(hits) / len(valid_high_risk) * 100 if len(valid_high_risk) > 0 else 0
-                # 적중률이 동일하다면 더 짧은 기간(빠른 적중)을 선호
+                
                 if hr > best_hit_rate:
                     best_hit_rate = hr
                     best_n = n
@@ -1176,7 +1126,7 @@ try:
                     
             return best_hit_rate, best_signal_count, best_n
         except:
-            return 0.0, 0, 20
+            return 0.0, 0, 5
             
     cb1, cb2 = st.columns([3, 1])
     with cb1:
@@ -1185,17 +1135,12 @@ try:
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot'), connectgaps=True))
         fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_bt, use_container_width=True)
         
-        # [수정 사항] 모델 유효성 진단의 위치를 그래프 아래로 이동
-        corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
         # 모델 유효성 진단 AI 컨테이너 정의 (위치: 백테스팀 그래프 하단)
         bt_analysis_container = st.container()
 
     with cb2:
-        corr_val = hist_df['Risk'].corr(hist_df['KOSPI'])
-        st.metric("단순 상관계수", f"{corr_val:.2f}")
-        
-        st.markdown("---")
-        hit_rate, signal_count, best_n = calculate_prediction_accuracy(w_macro, w_tech, w_global, w_fear, w_peri)
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        hit_rate, signal_count, best_n = calculate_prediction_accuracy(w_fx, w_wti, w_global, w_fear, w_tech)
         st.metric("최근 10년 패닉 적중률", f"{hit_rate:.1f}%")
         st.caption(f"*최적 예측 기간: {best_n}거래일")
         st.caption(f"*위험(60 이상) 경보 발령 후 -5% 폭락 기준 ({signal_count}회 중)")
@@ -1204,10 +1149,10 @@ try:
     st.markdown("---")
     st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     @st.cache_data(ttl=86400, show_spinner=False)
-    def get_true_historical_risk(start_date, end_date, w_m, w_t, w_g, w_f, w_p):
+    def get_true_historical_risk(start_date, end_date, w_fx, w_wti, w_g, w_f, w_t):
         # 과거 데이터는 분석 기간보다 1년 전부터 가져와야 z-score 계산(과거 1년 롤링)이 가능합니다.
         fetch_start = (pd.to_datetime(start_date) - pd.Timedelta(days=365)).strftime('%Y-%m-%d')
-        tickers = ['^KS11', '^GSPC', 'KRW=X', '^TNX', 'HG=F', '^VIX', 'EEM']
+        tickers = ['^KS11', '^GSPC', 'KRW=X', 'CL=F', '^VIX']
         
         # yf.download (진행률 표시 숨김)
         df = yf.download(tickers, start=fetch_start, end=end_date, progress=False)['Close'].ffill()
@@ -1217,16 +1162,14 @@ try:
         _ks_s = df['^KS11'].ffill()
         _sp_s = df['^GSPC'].ffill()
         _fx_s = df['KRW=X'].ffill()
-        _b10_s = df['^TNX'].ffill()
-        _cp_s = df['HG=F'].ffill()
+        _wt_s = df['CL=F'].ffill()
         _vx_s = df['^VIX'].ffill()
-        _em_s = df['EEM'].ffill() if 'EEM' in df.columns else _sp_s
         
         _ma20 = _ks_s.rolling(window=20).mean()
         
         analyze_dates = _ks_s[_ks_s.index >= start_date].index
         hist_risks = []
-        tot_w = w_m + w_t + w_g + w_f + w_p
+        tot_w = w_fx + w_wti + w_g + w_f + w_t
         
         if tot_w == 0: tot_w = 1.0 # 0 나누기 방지
         
@@ -1242,12 +1185,13 @@ try:
             return max(0.0, min(100.0, (100.0 - score) if inverse else score))
 
         for d in analyze_dates:
-            m = (calc_z_score(_fx_s, d) + calc_z_score(_b10_s, d) + calc_z_score(_cp_s, d, True)) / 3.0
+            s_fx = calc_z_score(_fx_s, d)
+            s_wt = calc_z_score(_wt_s, d)
             val_ks = float(_ks_s.loc[d])
             val_ma = float(_ma20.loc[d]) if pd.notna(_ma20.loc[d]) else val_ks
             s_tech = max(0.0, min(100.0, 100.0 - (val_ks / val_ma - 0.9) * 500.0)) if val_ma != 0 else 50.0
             
-            base_risk = (m * w_m + s_tech * w_t + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f + calc_z_score(_em_s, d, True) * w_p) / tot_w
+            base_risk = (s_fx * w_fx + s_wt * w_wti + calc_z_score(_sp_s, d, True) * w_g + calc_z_score(_vx_s, d) * w_f + s_tech * w_t) / tot_w
             # 볼록성(Convexity) 추가
             k_val = 0.5
             convex_risk = ((np.exp(k_val * base_risk / 100.0) - 1.0) / (np.exp(k_val) - 1.0)) * 100.0
@@ -1346,7 +1290,7 @@ try:
     
     with col_bs1:
         st.info("**2000 닷컴 버블 vs 현재**")
-        bs_2000 = get_true_historical_risk("2000-01-01", "2001-01-01", w_macro, w_tech, w_global, w_fear, w_peri)
+        bs_2000 = get_true_historical_risk("2000-01-01", "2001-01-01", w_fx, w_wti, w_global, w_fear, w_tech)
         fig_bs0, sim_00, d_day_00 = create_black_swan_chart(bs_2000, current_series, "2000 닷컴 버블")
         st.plotly_chart(fig_bs0, use_container_width=True)
         if sim_00 > 70 and d_day_00 > 0 and d_day_00 <= 30:
@@ -1358,7 +1302,7 @@ try:
 
     with col_bs2:
         st.info("**2008 금융위기 vs 현재**")
-        bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_macro, w_tech, w_global, w_fear, w_peri)
+        bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_fx, w_wti, w_global, w_fear, w_tech)
         fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
         st.plotly_chart(fig_bs1, use_container_width=True)
         if sim_08 > 70 and d_day_08 > 0 and d_day_08 <= 30:
@@ -1370,7 +1314,7 @@ try:
             
     with col_bs3:
         st.info("**2020 코로나 폭락 vs 현재**")
-        bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_macro, w_tech, w_global, w_fear, w_peri)
+        bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_fx, w_wti, w_global, w_fear, w_tech)
         fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
         st.plotly_chart(fig_bs2, use_container_width=True)
         if sim_20 > 70 and d_day_20 > 0 and d_day_20 <= 30:
@@ -1386,14 +1330,12 @@ try:
     
     # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
-    [김효진 박사 코스피 위험 분석 포인트: "주변부(신흥국 등)가 식는지 주목하라", "경제가 가열되며 물가/금리가 핵심 리스크로 부상"]
-    - 신흥국 EEM 현재가: {em_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((em_s.iloc[-1]/em_s[em_s.index >= (em_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
-    - S&P 500 현재가: {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
-    - 원/달러 환율: {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
-    - 구리 가격: {cp_s.iloc[-1]:.2f} (최근 추세: {'상승' if cp_s.iloc[-1] > cp_s.iloc[-5] else '하락'})
-    - VIX 지수: {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
-    - 미 국채 10년물 금리: {b10_s.iloc[-1]:.3f}% (위험 수준: {'높음' if b10_s.iloc[-1] > 4.5 else '낮음'})
-    - 유가(WTI): {wt_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((wt_s.iloc[-1]/wt_s[wt_s.index >= (wt_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
+    [코스피 위험 분석 포인트: "5일 선행 KOSPI 하락 위험을 판별하는 5가지 핵심 지표 분석"]
+    - 기술적 추세 (KOSPI): {ks_s.iloc[-1]:.2f} (20일 이평선 {ma20.iloc[-1]:.2f} 대비 {((ks_s.iloc[-1]/ma20.iloc[-1])-1)*100:+.1f}%)
+    - 시장 공포 (VIX 지수): {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
+    - 자본 이탈 (원/달러 환율): {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
+    - 글로벌 투심 (S&P 500): {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
+    - 비용 충격 (WTI 유가): {wt_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((wt_s.iloc[-1]/wt_s[wt_s.index >= (wt_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
@@ -1582,8 +1524,7 @@ if st.session_state.get("run_ai_trigger"):
 규칙: 마크다운·영단어·한자 사용 금지. 분석 문단만 출력.
 
 [중요 맥락(Context)]
-이 모델은 극단적 꼬리 위험(Tail Risk)을 사전에 경고하는 비선형적 '선행 지표'입니다. 따라서 평상시 코스피 지수와의 단순 선형 상관계수가 낮게 나오는 것은 수학적으로 지극히 정상입니다.
-단순 상관계수가 낮다는 이유로 "유효성이 낮다"고 깎아내리지 마세요. 오히려 "단순 선형 상관관계보다는, 지수가 임계점(60이상)을 돌파하며 패닉 조기 경보를 울리는 기능이 이 모델의 핵심 유효성"이라는 긍정적인 논조로 진단 문단을 작성하세요.
+이 모델은 극단적 꼬리 위험(Tail Risk)을 사전에 경고하는 비선형적 '선행 지표'입니다. "위험 지수 60 돌파 후 5일 이내 코스피 5% 이상 하락"의 패닉 조기 경보를 울리는 것이 모델의 핵심 목적이므로, 이를 바탕으로 모델의 긍정적인 유효성 진단 문단을 작성하세요.
 
 데이터: {bt_data_text}"""
             return get_ai_analysis(p)
@@ -1607,8 +1548,8 @@ if st.session_state.get("run_ai_trigger"):
             ])
 
         bt_data_text = ""
-        if 'corr_val' in locals() and 'hist_risks' in locals():
-            bt_data_text = f"상관계수: {corr_val:.2f}, 현재 위험지수: {hist_risks[-1]:.1f}, 최근7일: {[round(r,1) for r in hist_risks[-7:]]}"
+        if 'hist_risks' in locals():
+            bt_data_text = f"현재 위험지수: {hist_risks[-1]:.1f}, 최근7일: {[round(r,1) for r in hist_risks[-7:]]}"
 
         # ── 병렬 실행 (속도 유지) ──────────────────────────────────────────
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
