@@ -183,12 +183,28 @@ def render_vincent_valuation_page():
         st.error("거래소 종목 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
         return
 
+    # 시장 분리 선택 및 검색 필터링
+    col_filter1, col_filter2 = st.columns([1, 2])
+    with col_filter1:
+        market_type = st.radio("🏢 시장 구분", ["KOSPI", "KOSDAQ"], horizontal=True)
+    with col_filter2:
+        search_query = st.text_input("🔍 종목명 검색 (예: 삼성, 에코프로 - 공백 입력 시 전체 목록)", value="")
+
+    # 데이터 필터링
+    df_filtered = df_stocks[df_stocks['Market'] == market_type]
+    if search_query.strip():
+        df_filtered = df_filtered[df_filtered['Name'].str.contains(search_query.strip(), case=False, na=False)]
+
+    if df_filtered.empty:
+        st.warning(f"⚠️ {market_type} 시장에서 '{search_query}'(이)가 포함된 종목 검색 결과가 없습니다. 다른 검색어를 입력해 주세요.")
+        return
+
     # 종목 선택 selectbox 구성
-    stock_options = [f"{row['Name']} ({row['Code']}) [{row['Market']}]" for _, row in df_stocks.iterrows()]
+    stock_options = [f"{row['Name']} ({row['Code']})" for _, row in df_filtered.iterrows()]
     
-    col_sel1, col_sel2 = st.columns([2, 1])
+    col_sel1, col_sel2 = st.columns([3, 1])
     with col_sel1:
-        selected_option = st.selectbox("🔍 분석할 종목 선택", stock_options, index=0)
+        selected_option = st.selectbox("📦 분석할 종목 선택", stock_options, index=0)
         # 선택된 종목의 티커 추출
         ticker = re.search(r'\(([0-9]{6})\)', selected_option).group(1)
         company_name = selected_option.split(" (")[0]
@@ -197,7 +213,7 @@ def render_vincent_valuation_page():
         st.write("")
         st.write("")
         # 새로고침 버튼
-        if st.button("🔄 데이터 최신화", use_container_width=True):
+        if st.button("🔄 캐시 초기화", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
