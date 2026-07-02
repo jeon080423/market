@@ -24,6 +24,7 @@ except Exception:
 
 from pages.종목탐색 import render_youtube_rank_page
 from pages.overheat import render_overheat_page
+from pages.vincent_valuation import render_vincent_valuation_page
 
 # 1. 페이지 설정
 st.set_page_config(page_title="코스피(KOSPI) 전망 및 시장 과열 위험 모니터링 대시보드", layout="wide")
@@ -366,6 +367,9 @@ with st.sidebar:
     if st.button("🔥 과열 국면 시그널", use_container_width=True):
         st.session_state["active_tab"] = "overheat_signal"
         st.rerun()
+    if st.button("📈 종목 가치(빈센트)", use_container_width=True):
+        st.session_state["active_tab"] = "vincent_valuation"
+        st.rerun()
 
 # 다른 페이지 라우팅
 if st.session_state["active_tab"] == "youtube_rank":
@@ -373,6 +377,9 @@ if st.session_state["active_tab"] == "youtube_rank":
     st.stop()
 elif st.session_state["active_tab"] == "overheat_signal":
     render_overheat_page()
+    st.stop()
+elif st.session_state["active_tab"] == "vincent_valuation":
+    render_vincent_valuation_page()
     st.stop()
 
 # 3. 제목 및 설명
