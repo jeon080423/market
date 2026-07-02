@@ -525,7 +525,9 @@ def render_vincent_valuation_page():
 
                     # 상세 테이블
                     with st.expander(f"📋 {company_name} 연간 기업실적분석 데이터 상세 보기", expanded=False):
-                        df_fin = pd.DataFrame(financials, index=cols).T
+                        # 연간 컬럼과 분기 컬럼의 중복 명칭 방지 (분기 컬럼명 뒤에 접미사 추가)
+                        cols_unique = [col if i < 4 else f"{col}(분기)" for i, col in enumerate(cols)]
+                        df_fin = pd.DataFrame(financials, index=cols_unique).T
                         df_fin_annual = df_fin[cols_annual]
                         
                         # PyArrow 변환 에러(ValueError) 방지 및 가독성 향상을 위해 데이터 포맷팅
