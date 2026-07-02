@@ -527,7 +527,27 @@ def render_vincent_valuation_page():
                     with st.expander(f"📋 {company_name} 연간 기업실적분석 데이터 상세 보기", expanded=False):
                         df_fin = pd.DataFrame(financials, index=cols).T
                         df_fin_annual = df_fin[cols_annual]
-                        st.dataframe(df_fin_annual, use_container_width=True)
+                        
+                        # PyArrow 변환 에러(ValueError) 방지 및 가독성 향상을 위해 데이터 포맷팅
+                        def format_val(val, idx_name):
+                            if val is None or pd.isna(val) or val == '-':
+                                return "-"
+                            try:
+                                val_float = float(val)
+                                if '률' in idx_name or '%' in idx_name or '성향' in idx_name or 'ROE' in idx_name:
+                                    return f"{val_float:.2f}%"
+                                elif '배' in idx_name or 'PER' in idx_name or 'PBR' in idx_name:
+                                    return f"{val_float:.2f}배"
+                                else:
+                                    return f"{int(val_float):,}"
+                            except:
+                                return str(val)
+                                
+                        df_formatted = df_fin_annual.copy()
+                        for idx in df_formatted.index:
+                            df_formatted.loc[idx] = df_formatted.loc[idx].apply(lambda x: format_val(x, idx))
+                            
+                        st.dataframe(df_formatted, use_container_width=True)
                         st.caption("※ 네이버 금융에서 제공하는 연간 실적 지표를 기반으로 집계된 데이터입니다. (E)는 예상 전망치(컨센서스)를 의미합니다.")
 
     # --- 탭 2: KOSPI 상승 여력 랭킹 ---
