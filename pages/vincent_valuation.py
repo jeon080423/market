@@ -121,8 +121,8 @@ def get_stock_financials_naver(ticker: str) -> dict:
 @st.cache_data(ttl=3600)
 def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFrame:
     """
-    KOSPI 또는 KOSDAQ 시장의 시가총액 상위 top_n개 종목에 대해 빈센트 적정 가치(PER 10배 기준)를 계산하고,
-    상승 여력(괴리율)이 높은 순으로 정렬된 DataFrame을 반환
+    KOSPI 또는 KOSDAQ 시장의 시가총액 상위 top_n개 종목에 대해 
+    종목별 적정 기준선(최근 3개년 평균 PER)을 동적으로 반영해 상승 여력(괴리율)이 높은 순으로 정렬된 DataFrame을 반환
     """
     try:
         # 1. KRX 상장 정보 로드 및 시총 정렬
@@ -145,6 +145,7 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
             cols_annual = cols[:4]
             
             eps_key = next((k for k in financials.keys() if 'EPS' in k), None)
+            per_key = next((k for k in financials.keys() if 'PER' in k), None)
             e_years = [y for y in cols_annual if '(E)' in y]
             
             # 예상 EPS 추출
@@ -166,12 +167,24 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
             if expected_eps is None or not isinstance(expected_eps, (int, float)):
                 expected_eps = 0
                 
-            # 빈센트 적정 주가 (PER 10배 기준)
-            vincent_fair_price = expected_eps * 10.0
+            # 과거 평균 PER 구하기 (E가 아닌 연도들의 양수 PER 값 평균)
+            avg_past_per = 10.0
+            if per_key and per_key in financials:
+                past_pers = []
+                for i, y in enumerate(cols_annual):
+                    if '(E)' not in y and i < len(financials[per_key]):
+                        val = financials[per_key][i]
+                        if val is not None and isinstance(val, (int, float)) and val > 0:
+                            past_pers.append(val)
+                if past_pers:
+                    avg_past_per = sum(past_pers) / len(past_pers)
+            
+            # 종목별 역사적 적정 주가 (3년 평균 PER 기준)
+            historical_fair_price = expected_eps * avg_past_per
             
             # 괴리율 (상승 여력)
-            if curr_price and curr_price > 0 and vincent_fair_price > 0:
-                divergence = ((vincent_fair_price - curr_price) / curr_price) * 100
+            if curr_price and curr_price > 0 and historical_fair_price > 0:
+                divergence = ((historical_fair_price - curr_price) / curr_price) * 100
             else:
                 divergence = -100.0  # 산정 불가
                 
@@ -180,7 +193,8 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
                 "티커": ticker,
                 "현재가": f"{curr_price:,.0f}원" if curr_price else "정보 없음",
                 "예상 EPS(1년뒤)": f"{expected_eps:,.0f}원" if expected_eps else "정보 없음",
-                "빈센트 적정가(10배)": f"{vincent_fair_price:,.0f}원" if vincent_fair_price else "정보 없음",
+                "적정 PER (3년 평균)": f"{avg_past_per:.1f}배",
+                "적정 가치 (목표가)": f"{historical_fair_price:,.0f}원" if historical_fair_price else "정보 없음",
                 "상승 여력(괴리율)": divergence,
                 "_raw_div": divergence
             }
@@ -556,8 +570,7 @@ def render_vincent_valuation_page():
     with tab_kospi:
         st.subheader("🏆 KOSPI 시가총액 상위 상승 여력 랭킹")
         st.markdown("""
-        코스피 시가총액 상위 종목의 **1년 뒤 예상 실적(컨센서스)**을 크롤링하여, 
-        빈센트 기준 적정 가치(PER 10배 × 미래 EPS) 대비 **상승 여력(괴리율)이 높은 종목부터 내림차순**으로 정렬하여 제공합니다.
+        코스피 시가총액 상위 종목의 **1년 뒤 예상 실적(컨센서스)**을 크롤링하고, 일괄적 기준선의 한계를 극복하기 위해 **각 종목 고유의 역사적 적정 기준선(최근 3개년 평균 PER)**을 동적 대입하여 **상승 여력(괴리율)이 높은 종목부터 내림차순**으로 정렬하여 제공합니다.
         """)
         
         top_n_kospi = st.slider("조회할 시가총액 상위 종목 수", min_value=10, max_value=50, value=30, step=5, key="slider_top_n_kospi")
@@ -569,7 +582,7 @@ def render_vincent_valuation_page():
         if not df_kospi_rank.empty:
             # 스타일링된 데이터프레임 노출
             st.dataframe(df_kospi_rank, use_container_width=True, hide_index=True)
-            st.info("💡 **상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 빈센트 공식으로 도출된 적정 가치(PER 10배) 대비 극심하게 저평가되어 있음을 뜻합니다.")
+            st.info("💡 **상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
         else:
             st.warning("데이터를 불러오지 못했습니다. 새로고침을 시도해 보세요.")
 
@@ -577,8 +590,7 @@ def render_vincent_valuation_page():
     with tab_kosdaq:
         st.subheader("🏆 KOSDAQ 시가총액 상위 상승 여력 랭킹")
         st.markdown("""
-        코스닥 시가총액 상위 종목의 **1년 뒤 예상 실적(컨센서스)**을 크롤링하여, 
-        빈센트 기준 적정 가치(PER 10배 × 미래 EPS) 대비 **상승 여력(괴리율)이 높은 종목부터 내림차순**으로 정렬하여 제공합니다.
+        코스닥 시가총액 상위 종목의 **1년 뒤 예상 실적(컨센서스)**을 크롤링하고, 일괄적 기준선의 한계를 극복하기 위해 **각 종목 고유의 역사적 적정 기준선(최근 3개년 평균 PER)**을 동적 대입하여 **상승 여력(괴리율)이 높은 종목부터 내림차순**으로 정렬하여 제공합니다.
         """)
         
         top_n_kosdaq = st.slider("조회할 시가총액 상위 종목 수", min_value=10, max_value=50, value=30, step=5, key="slider_top_n_kosdaq")
@@ -588,7 +600,7 @@ def render_vincent_valuation_page():
             
         if not df_kosdaq_rank.empty:
             st.dataframe(df_kosdaq_rank, use_container_width=True, hide_index=True)
-            st.info("💡 **상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 빈센트 공식으로 도출된 적정 가치(PER 10배) 대비 극심하게 저평가되어 있음을 뜻합니다.")
+            st.info("💡 **상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
         else:
             st.warning("데이터를 불러오지 못했습니다. 새로고침을 시도해 보세요.")
 
