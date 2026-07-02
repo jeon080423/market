@@ -543,7 +543,7 @@ def render_vincent_valuation_page():
                             except:
                                 return str(val)
                                 
-                        df_formatted = df_fin_annual.copy()
+                        df_formatted = df_fin_annual.astype(object)
                         for idx in df_formatted.index:
                             df_formatted.loc[idx] = df_formatted.loc[idx].apply(lambda x: format_val(x, idx))
                             
