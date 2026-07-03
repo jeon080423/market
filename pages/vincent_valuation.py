@@ -181,6 +181,16 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
                 if past_pers:
                     avg_past_per = sum(past_pers) / len(past_pers)
             
+            # 우선주 가치 보정 (보통주 대비 할인율 반영)
+            is_preferred = not ticker.endswith('0')
+            if is_preferred and curr_price and curr_price > 0:
+                common_ticker = ticker[:-1] + '0'
+                common_data = get_stock_financials_naver(common_ticker)
+                if not ("error" in common_data) and common_data.get("current_price"):
+                    common_price = common_data["current_price"]
+                    price_ratio = curr_price / common_price
+                    avg_past_per = avg_past_per * price_ratio
+
             # 종목별 역사적 적정 주가 (3년 평균 PER 기준)
             historical_fair_price = expected_eps * avg_past_per
             
@@ -373,6 +383,17 @@ def render_vincent_valuation_page():
                         if past_pers:
                             avg_past_per = sum(past_pers) / len(past_pers)
 
+                    # 우선주 가치 보정 (보통주 대비 할인율 반영)
+                    is_preferred = not ticker.endswith('0')
+                    price_ratio = 1.0
+                    if is_preferred and curr_price and curr_price > 0:
+                        common_ticker = ticker[:-1] + '0'
+                        common_data = get_stock_financials_naver(common_ticker)
+                        if not ("error" in common_data) and common_data.get("current_price"):
+                            common_price = common_data["current_price"]
+                            price_ratio = curr_price / common_price
+                            avg_past_per = avg_past_per * price_ratio
+
                     # EPS 백업값
                     backup_eps = 1000
                     non_e_years = [y for y in cols_annual if '(E)' not in y]
@@ -396,6 +417,8 @@ def render_vincent_valuation_page():
                                 expected_eps = financials[eps_key][year_idx]
                             if per_key and year_idx < len(financials[per_key]):
                                 expected_per = financials[per_key][year_idx]
+                                if expected_per is not None:
+                                    expected_per = expected_per * price_ratio
                                 
                         if expected_eps is None:
                             st.warning(f"⚠️ {selected_year}의 예상 EPS(이익) 공시 데이터가 존재하지 않습니다. 최근 확정 실적의 EPS({backup_eps:,.0f}원)를 대체 적용하여 평가합니다.")
@@ -417,6 +440,8 @@ def render_vincent_valuation_page():
                                 expected_eps = financials[eps_key][year_idx]
                             if per_key and year_idx < len(financials[per_key]):
                                 expected_per = financials[per_key][year_idx]
+                                if expected_per is not None:
+                                    expected_per = expected_per * price_ratio
                         
                         expected_eps_val = expected_eps if expected_eps is not None else backup_eps
                         expected_per = expected_per if expected_per is not None else 10.0
