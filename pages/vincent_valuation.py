@@ -432,15 +432,21 @@ def render_vincent_valuation_page():
                             st.metric("적용 예상 EPS", f"{user_eps:,.0f} 원", help="크롤링된 재무제표의 미래 예상 EPS가 자동 대입되었습니다.")
                             
                     with col_sim2:
-                        default_per_val = float(expected_per) if expected_per is not None else (float(avg_past_per) if avg_past_per else 10.0)
-                        default_per_val = max(1.0, min(50.0, default_per_val))
+                        # 랭킹 탭과의 일관성을 위해 3개년 평균 PER를 우선 기본값으로 적용
+                        default_per_val = float(avg_past_per) if avg_past_per is not None else (float(expected_per) if expected_per else 10.0)
+                        
+                        # 고PER 종목을 고려하여 슬라이더 상한선을 동적으로 조절 (최소 100.0, 필요 시 기본값에 맞춰 확장)
+                        max_per_limit = float(max(100.0, default_per_val))
+                        default_per_val = max(1.0, min(max_per_limit, default_per_val))
+                        
+                        expected_per_str = f"{expected_per:.1f}배" if expected_per is not None else "정보 없음"
                         user_per = st.slider(
                             "⚙️ 적용할 Target PER (밸류에이션 멀티플 배수)", 
                             min_value=1.0, 
-                            max_value=50.0, 
+                            max_value=max_per_limit, 
                             value=round(default_per_val, 1),
                             step=0.1,
-                            help="빈센트 애널리스트의 코스피 기준은 10배입니다. 종목 고유의 특성에 맞춰 조절해 보세요."
+                            help=f"종목 고유의 3개년 평균 PER는 {avg_past_per:.1f}배이며, 시장 예상 PER는 {expected_per_str}(공시 기준)입니다."
                         )
 
                     # 5. 가치 평가 계산
