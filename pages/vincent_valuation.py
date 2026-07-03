@@ -169,13 +169,15 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
                 
             # 과거 평균 PER 구하기 (E가 아닌 연도들의 양수 PER 값 평균)
             avg_past_per = 10.0
+            per_cap = 50.0 if market_type == "KOSPI" else 100.0
             if per_key and per_key in financials:
                 past_pers = []
                 for i, y in enumerate(cols_annual):
                     if '(E)' not in y and i < len(financials[per_key]):
                         val = financials[per_key][i]
                         if val is not None and isinstance(val, (int, float)) and val > 0:
-                            past_pers.append(val)
+                            # 이상치 방지를 위해 상한선 적용 (Winsorization)
+                            past_pers.append(min(per_cap, val))
                 if past_pers:
                     avg_past_per = sum(past_pers) / len(past_pers)
             
@@ -361,11 +363,13 @@ def render_vincent_valuation_page():
                     # 과거 평균 PER 구하기
                     if per_key and per_key in financials:
                         past_pers = []
+                        per_cap = 50.0 if market_type == "KOSPI" else 100.0
                         for i, y in enumerate(cols_annual):
                             if '(E)' not in y and i < len(financials[per_key]):
                                 val = financials[per_key][i]
                                 if val is not None and isinstance(val, (int, float)):
-                                    past_pers.append(val)
+                                    # 이상치 방지를 위해 상한선 적용 (Winsorization)
+                                    past_pers.append(min(per_cap, val))
                         if past_pers:
                             avg_past_per = sum(past_pers) / len(past_pers)
 
