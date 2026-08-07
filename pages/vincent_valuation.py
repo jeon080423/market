@@ -220,10 +220,43 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
     종목별 적정 기준선(최근 3개년 평균 PER)을 동적으로 반영해 상승 여력(괴리율)이 높은 순으로 정렬된 DataFrame을 반환
     """
     try:
-        # 1. KRX 상장 정보 로드 및 시총 정렬
-        df = fdr.StockListing('KRX')
-        df = df[df['Market'] == market_type].dropna(subset=['Marcap', 'Name', 'Code'])
-        df = df.sort_values(by='Marcap', ascending=False).head(top_n)
+        # 1. KRX 상장 정보 로드 및 시총 정렬 (다단계 폴백 적용)
+        df = None
+        try:
+            df = fdr.StockListing('KRX')
+        except Exception:
+            df = None
+
+        if df is None or df.empty:
+            try:
+                df = fdr.StockListing('KRX-MARCAP')
+            except Exception:
+                df = None
+
+        fallback_path = os.path.join("data", "krx_stocks.csv")
+        if (df is None or df.empty) and os.path.exists(fallback_path):
+            try:
+                df = pd.read_csv(fallback_path, dtype={'Code': str, 'ticker': str})
+            except Exception:
+                df = None
+
+        if df is None or df.empty:
+            df = get_krx_stock_list()
+
+        code_col = 'Code' if 'Code' in df.columns else ('ticker' if 'ticker' in df.columns else 'Code')
+        name_col = 'Name' if 'Name' in df.columns else ('name' if 'name' in df.columns else 'Name')
+        market_col = 'Market' if 'Market' in df.columns else ('market' if 'market' in df.columns else 'Market')
+
+        df = df.rename(columns={code_col: 'Code', name_col: 'Name', market_col: 'Market'})
+        df['Market'] = df['Market'].replace({'KOSDAQ GLOBAL': 'KOSDAQ'})
+        df = df[df['Market'] == market_type].dropna(subset=['Name', 'Code'])
+        df['Code'] = df['Code'].astype(str).str.zfill(6)
+
+        if 'Marcap' in df.columns:
+            df['Marcap'] = pd.to_numeric(df['Marcap'], errors='coerce').fillna(0)
+            df = df.sort_values(by='Marcap', ascending=False)
+
+        df = df.head(top_n)
         
         records = []
         
