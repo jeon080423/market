@@ -498,14 +498,14 @@ def render_vincent_valuation_page():
                     avg_past_per = 10.0
                     has_consensus = len(e_years) > 0
 
-                    # 과거 평균 PER 구하기
+                    # 과거 평균 PER 구하기 (적자 연도 val > 0 조건 필수 적용으로 사이클 착시 제거)
                     if per_key and per_key in financials:
                         past_pers = []
                         per_cap = 50.0 if market_type == "KOSPI" else 100.0
                         for i, y in enumerate(cols_annual):
                             if '(E)' not in y and i < len(financials[per_key]):
                                 val = financials[per_key][i]
-                                if val is not None and isinstance(val, (int, float)):
+                                if val is not None and isinstance(val, (int, float)) and val > 0:
                                     # 이상치 방지를 위해 상한선 적용 (Winsorization)
                                     past_pers.append(min(per_cap, val))
                         if past_pers:
@@ -589,22 +589,47 @@ def render_vincent_valuation_page():
                             st.metric("적용 예상 EPS", f"{user_eps:,.0f} 원", help="크롤링된 재무제표의 미래 예상 EPS가 자동 대입되었습니다.")
                             
                     with col_sim2:
-                        # 랭킹 탭과의 일관성을 위해 3개년 평균 PER를 우선 기본값으로 적용
+                        # PER 프리셋 세션 키 관리
+                        per_state_key = f"target_per_val_{ticker}"
                         default_per_val = float(avg_past_per) if avg_past_per is not None else (float(expected_per) if expected_per else 10.0)
                         
-                        # 고PER 종목을 고려하여 슬라이더 상한선을 동적으로 조절 (최소 100.0, 필요 시 기본값에 맞춰 확장)
-                        max_per_limit = float(max(100.0, default_per_val))
-                        default_per_val = max(1.0, min(max_per_limit, default_per_val))
-                        
+                        if per_state_key not in st.session_state:
+                            st.session_state[per_state_key] = round(default_per_val, 1)
+
+                        # PER 프리셋 퀵 선택 버튼
+                        st.caption("🎯 **Target PER 퀵 프리셋 원클릭 적용:**")
+                        pb_col1, pb_col2, pb_col3 = st.columns(3)
+                        with pb_col1:
+                            if st.button(f"🏛️ 역사적 ({avg_past_per:.1f}배)", use_container_width=True, key=f"btn_hist_{ticker}", help="과거 3개년 정제 흑자 평균 PER"):
+                                st.session_state[per_state_key] = round(avg_past_per, 1)
+                                st.rerun()
+                        with pb_col2:
+                            cons_btn_label = f"📈 컨센서스 ({expected_per:.1f}배)" if expected_per is not None else "📈 컨센서스 (N/A)"
+                            if st.button(cons_btn_label, use_container_width=True, key=f"btn_cons_{ticker}", disabled=(expected_per is None), help="네이버 공시 기준 미래 예상 PER"):
+                                if expected_per is not None:
+                                    st.session_state[per_state_key] = round(expected_per, 1)
+                                    st.rerun()
+                        with pb_col3:
+                            std_per = 10.0 if market_type == "KOSPI" else 15.0
+                            if st.button(f"⚖️ 시장 표준 ({std_per:.1f}배)", use_container_width=True, key=f"btn_std_{ticker}", help="빈센트 주가 방정식 표준 PER"):
+                                st.session_state[per_state_key] = std_per
+                                st.rerun()
+
+                        # 고PER 종목 고려 슬라이더 범위 설정
+                        max_per_limit = float(max(100.0, st.session_state[per_state_key]))
+                        curr_target_per = max(1.0, min(max_per_limit, float(st.session_state[per_state_key])))
+
                         expected_per_str = f"{expected_per:.1f}배" if expected_per is not None else "정보 없음"
                         user_per = st.slider(
                             "⚙️ 적용할 Target PER (밸류에이션 멀티플 배수)", 
                             min_value=1.0, 
                             max_value=max_per_limit, 
-                            value=round(default_per_val, 1),
+                            value=round(curr_target_per, 1),
                             step=0.1,
-                            help=f"종목 고유의 3개년 평균 PER는 {avg_past_per:.1f}배이며, 시장 예상 PER는 {expected_per_str}(공시 기준)입니다."
+                            key=f"slider_{per_state_key}",
+                            help=f"종목 역사적 3년 평균 PER: {avg_past_per:.1f}배 | 시장 예상 PER: {expected_per_str}"
                         )
+                        st.session_state[per_state_key] = user_per
 
                     # 5. 가치 평가 계산
                     vincent_fair_price = 10.0 * user_eps
