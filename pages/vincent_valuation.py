@@ -589,9 +589,9 @@ def render_vincent_valuation_page():
                             st.metric("적용 예상 EPS", f"{user_eps:,.0f} 원", help="크롤링된 재무제표의 미래 예상 EPS가 자동 대입되었습니다.")
                             
                     with col_sim2:
-                        # PER 프리셋 세션 키 관리
+                        # PER 프리셋 세션 키 관리 (시장 컨센서스 PER를 최우선 디폴트로 설정)
                         per_state_key = f"target_per_val_{ticker}"
-                        default_per_val = float(avg_past_per) if avg_past_per is not None else (float(expected_per) if expected_per else 10.0)
+                        default_per_val = float(expected_per) if expected_per is not None else (float(avg_past_per) if avg_past_per is not None else 10.0)
                         
                         if per_state_key not in st.session_state:
                             st.session_state[per_state_key] = round(default_per_val, 1)
