@@ -456,12 +456,18 @@ def render_vincent_valuation_page():
             if df_filtered.empty:
                 st.warning(f"⚠️ {market_type} 시장에서 '{search_query}'(이)가 포함된 종목 검색 결과가 없습니다. 다른 검색어를 입력해 주세요.")
             else:
-                # 종목 선택 selectbox 구성
+                # 종목 선택 selectbox 구성 (SK하이닉스 000660를 기본 선택)
                 stock_options = [f"{row['Name']} ({row['Code']})" for _, row in df_filtered.iterrows()]
+                
+                default_idx = 0
+                for idx, opt in enumerate(stock_options):
+                    if "000660" in opt or "SK하이닉스" in opt:
+                        default_idx = idx
+                        break
                 
                 col_sel1, col_sel2 = st.columns([3, 1])
                 with col_sel1:
-                    selected_option = st.selectbox("📦 분석할 종목 선택", stock_options, index=0)
+                    selected_option = st.selectbox("📦 분석할 종목 선택", stock_options, index=default_idx)
                     ticker = re.search(r'\(([0-9]{6})\)', selected_option).group(1)
                     company_name = selected_option.split(" (")[0]
                     
