@@ -7,6 +7,9 @@ import plotly.graph_objects as go
 import FinanceDataReader as fdr
 import concurrent.futures
 
+import os
+import io
+
 # 브라우저 헤더 설정
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -16,16 +19,108 @@ HEADERS = {
 def get_krx_stock_list() -> pd.DataFrame:
     """
     한국거래소(KRX) 상장 종목 목록을 가져와 코스피/코스닥 종목만 필터링 후 반환
+    - KRX API 장애 시 MARCAP, 로컬 CSV, KIND 다운로드, 비상 하드코딩 종목 순으로 폴백
     """
+    os.makedirs("data", exist_ok=True)
+    fallback_path = os.path.join("data", "krx_stocks.csv")
+    df = None
+
+    # 1. fdr.StockListing('KRX') 시도
     try:
         df = fdr.StockListing('KRX')
-        df = df[['Code', 'Name', 'Market']].dropna()
-        df = df[df['Market'].isin(['KOSPI', 'KOSDAQ'])]
-        df = df.sort_values(by='Name')
-        return df
-    except Exception as e:
-        st.error(f"종목 목록을 불러오는 중 오류 발생: {e}")
-        return pd.DataFrame(columns=['Code', 'Name', 'Market'])
+    except Exception:
+        df = None
+
+    # 2. fdr.StockListing('KRX-MARCAP') 시도 (GitHub 백업 저장소)
+    if df is None or df.empty:
+        try:
+            df = fdr.StockListing('KRX-MARCAP')
+        except Exception:
+            df = None
+
+    # 3. 로컬 CSV 파일 백업 시도
+    if (df is None or df.empty) and os.path.exists(fallback_path):
+        try:
+            df_csv = pd.read_csv(fallback_path, dtype={'Code': str, 'ticker': str})
+            if 'Code' not in df_csv.columns and 'ticker' in df_csv.columns:
+                df_csv = df_csv.rename(columns={'ticker': 'Code', 'name': 'Name', 'market': 'Market'})
+            df_csv['Code'] = df_csv['Code'].astype(str).str.zfill(6)
+            df_csv['Market'] = df_csv['Market'].replace({'KOSDAQ GLOBAL': 'KOSDAQ'})
+            return df_csv[['Code', 'Name', 'Market']].dropna().sort_values(by='Name')
+        except Exception:
+            pass
+
+    # 4. KRX KIND 다운로드 시도
+    if df is None or df.empty:
+        try:
+            url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
+            res = requests.get(url, headers=HEADERS, timeout=5)
+            kind_df = pd.read_html(io.BytesIO(res.content), encoding='euc-kr')[0]
+            kind_df['Code'] = kind_df['종목코드'].astype(str).str.zfill(6)
+            kind_df['Name'] = kind_df['회사명']
+            kind_df['Market'] = 'KOSPI'
+            df = kind_df
+        except Exception:
+            df = None
+
+    if df is not None and not df.empty:
+        try:
+            code_col = 'Code' if 'Code' in df.columns else ('ticker' if 'ticker' in df.columns else None)
+            name_col = 'Name' if 'Name' in df.columns else ('name' if 'name' in df.columns else None)
+            market_col = 'Market' if 'Market' in df.columns else ('market' if 'market' in df.columns else None)
+            
+            if code_col and name_col:
+                res_df = pd.DataFrame()
+                res_df['Code'] = df[code_col].astype(str).str.zfill(6)
+                res_df['Name'] = df[name_col]
+                res_df['Market'] = df[market_col] if market_col else 'KOSPI'
+                res_df['Market'] = res_df['Market'].replace({'KOSDAQ GLOBAL': 'KOSDAQ'})
+                res_df = res_df.dropna()
+                res_df = res_df[res_df['Market'].isin(['KOSPI', 'KOSDAQ'])]
+                res_df = res_df.sort_values(by='Name')
+                
+                # 백업 CSV 저장
+                try:
+                    res_df.to_csv(fallback_path, index=False, encoding="utf-8-sig")
+                except Exception:
+                    pass
+                return res_df
+        except Exception:
+            pass
+
+    # 5. 최종 비상용 하드코딩 종목 목록 (주요 종목)
+    minimal_stocks = [
+        {"Code": "005930", "Name": "삼성전자", "Market": "KOSPI"},
+        {"Code": "000660", "Name": "SK하이닉스", "Market": "KOSPI"},
+        {"Code": "373220", "Name": "LG에너지솔루션", "Market": "KOSPI"},
+        {"Code": "207940", "Name": "삼성바이오로직스", "Market": "KOSPI"},
+        {"Code": "005380", "Name": "현대차", "Market": "KOSPI"},
+        {"Code": "000270", "Name": "기아", "Market": "KOSPI"},
+        {"Code": "068270", "Name": "셀트리온", "Market": "KOSPI"},
+        {"Code": "005490", "Name": "POSCO홀딩스", "Market": "KOSPI"},
+        {"Code": "035420", "Name": "NAVER", "Market": "KOSPI"},
+        {"Code": "035720", "Name": "카카오", "Market": "KOSPI"},
+        {"Code": "006400", "Name": "삼성SDI", "Market": "KOSPI"},
+        {"Code": "051910", "Name": "LG화학", "Market": "KOSPI"},
+        {"Code": "012330", "Name": "현대모비스", "Market": "KOSPI"},
+        {"Code": "055550", "Name": "신한지주", "Market": "KOSPI"},
+        {"Code": "105560", "Name": "KB금융", "Market": "KOSPI"},
+        {"Code": "086790", "Name": "하나금융지주", "Market": "KOSPI"},
+        {"Code": "028260", "Name": "삼성물산", "Market": "KOSPI"},
+        {"Code": "066570", "Name": "LG전자", "Market": "KOSPI"},
+        {"Code": "096770", "Name": "SK이노베이션", "Market": "KOSPI"},
+        {"Code": "015760", "Name": "한국전력", "Market": "KOSPI"},
+        {"Code": "086520", "Name": "에코프로", "Market": "KOSDAQ"},
+        {"Code": "247540", "Name": "에코프로비엠", "Market": "KOSDAQ"},
+        {"Code": "066970", "Name": "엘앤에프", "Market": "KOSDAQ"},
+        {"Code": "028300", "Name": "HLB", "Market": "KOSDAQ"},
+        {"Code": "196170", "Name": "알테오젠", "Market": "KOSDAQ"},
+        {"Code": "403870", "Name": "HPSP", "Market": "KOSDAQ"},
+        {"Code": "387320", "Name": "레인보우로보틱스", "Market": "KOSDAQ"},
+        {"Code": "034020", "Name": "두산에너빌리티", "Market": "KOSPI"},
+        {"Code": "307900", "Name": "한화에어로스페이스", "Market": "KOSPI"}
+    ]
+    return pd.DataFrame(minimal_stocks)
 
 @st.cache_data(ttl=600)
 def get_stock_financials_naver(ticker: str) -> dict:

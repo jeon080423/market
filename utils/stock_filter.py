@@ -89,6 +89,35 @@ def load_krx_stocks() -> pd.DataFrame:
         df.to_csv(fallback_path, index=False, encoding="utf-8-sig")
         return df
     except Exception as e:
+        # 1. 로컬 CSV 백업 확인
+        if os.path.exists(fallback_path):
+            try:
+                df_csv = pd.read_csv(fallback_path, dtype={"ticker": str, "Code": str})
+                if "ticker" not in df_csv.columns and "Code" in df_csv.columns:
+                    df_csv = df_csv.rename(columns={"Code": "ticker", "Name": "name", "Market": "market"})
+                df_csv["ticker"] = df_csv["ticker"].astype(str).str.zfill(6)
+                if "changes" not in df_csv.columns: df_csv["changes"] = 0
+                if "chg_rate" not in df_csv.columns: df_csv["chg_rate"] = 0.0
+                return df_csv[["ticker", "name", "market", "changes", "chg_rate"]]
+            except Exception:
+                pass
+                
+        # 2. KRX-MARCAP 시도
+        try:
+            marcap_df = fdr.StockListing("KRX-MARCAP")
+            if not marcap_df.empty:
+                marcap_df = marcap_df.rename(columns={"Code": "ticker", "Name": "name", "Market": "market", "Changes": "changes", "ChgRate": "chg_rate"})
+                marcap_df["market"] = marcap_df["market"].replace({"KOSDAQ GLOBAL": "KOSDAQ"})
+                marcap_df = marcap_df[marcap_df["market"].isin(["KOSPI", "KOSDAQ"])]
+                marcap_df["ticker"] = marcap_df["ticker"].astype(str).str.zfill(6)
+                marcap_df["changes"] = pd.to_numeric(marcap_df.get("changes", 0), errors="coerce").fillna(0)
+                marcap_df["chg_rate"] = pd.to_numeric(marcap_df.get("chg_rate", 0.0), errors="coerce").fillna(0.0)
+                res_df = marcap_df[["ticker", "name", "market", "changes", "chg_rate"]]
+                res_df.to_csv(fallback_path, index=False, encoding="utf-8-sig")
+                return res_df
+        except Exception:
+            pass
+
         # Absolute minimal fallback (Top 50 major stocks to ensure wide coverage)
         minimal_stocks = [
             {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "changes": 0, "chg_rate": 0.0},
