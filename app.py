@@ -1094,9 +1094,10 @@ try:
         end_date = pd.Timestamp.now().strftime('%Y-%m-%d')
         tickers = ['^KS11', '^GSPC', 'KRW=X', 'CL=F', '^VIX']
         try:
-            df = yf.download(tickers, start=start_date, end=end_date, progress=False)['Close'].ffill()
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
+            df = yf.download(tickers, start=start_date, end=end_date, progress=False)
+            if isinstance(df.columns, pd.MultiIndex) and 'Close' in df.columns.levels[0]:
+                df = df['Close']
+            df = df.ffill()
             
             _ks_s = df['^KS11'].ffill()
             _sp_s = df['^GSPC'].ffill()
@@ -1127,29 +1128,33 @@ try:
             
             eval_df = pd.DataFrame({'KOSPI': _ks_s, 'Risk': convex_risk}).dropna()
             
-            # 5일에서 30일(1개월 반) 사이의 최적 적중 기간 탐색
+            # 5일에서 30일(1개월 반) 사이, 그리고 위험 임계값을 다각도로 탐색하여 최적 적중 기간/임계값 도출
             best_hit_rate = 0
             best_n = 5
             best_signal_count = 0
+            best_threshold = 60
             
-            for n in range(5, 31):
-                eval_df['Min_Future_KOSPI'] = eval_df['KOSPI'].rolling(window=n).min().shift(-n)
-                eval_df['Max_Drawdown'] = (eval_df['Min_Future_KOSPI'] - eval_df['KOSPI']) / eval_df['KOSPI']
-                
-                high_risk_days = eval_df[eval_df['Risk'] >= 60]
-                valid_high_risk = high_risk_days.dropna(subset=['Max_Drawdown'])
-                hits = valid_high_risk[valid_high_risk['Max_Drawdown'] <= -0.05]
-                
-                hr = len(hits) / len(valid_high_risk) * 100 if len(valid_high_risk) > 0 else 0
-                
-                if hr > best_hit_rate:
-                    best_hit_rate = hr
-                    best_n = n
-                    best_signal_count = len(valid_high_risk)
+            for threshold in [60, 70, 75, 80]:
+                for n in range(5, 31):
+                    eval_df['Min_Future_KOSPI'] = eval_df['KOSPI'].rolling(window=n).min().shift(-n)
+                    eval_df['Max_Drawdown'] = (eval_df['Min_Future_KOSPI'] - eval_df['KOSPI']) / eval_df['KOSPI']
                     
-            return best_hit_rate, best_signal_count, best_n
+                    high_risk_days = eval_df[eval_df['Risk'] >= threshold]
+                    valid_high_risk = high_risk_days.dropna(subset=['Max_Drawdown'])
+                    hits = valid_high_risk[valid_high_risk['Max_Drawdown'] <= -0.05]
+                    
+                    # 최소 5번 이상 신호가 발생했을 때만 통계적으로 유의미하다고 판단 (과최적화 방지)
+                    hr = len(hits) / len(valid_high_risk) * 100 if len(valid_high_risk) >= 5 else 0
+                    
+                    if hr > best_hit_rate:
+                        best_hit_rate = hr
+                        best_n = n
+                        best_signal_count = len(valid_high_risk)
+                        best_threshold = threshold
+                        
+            return best_hit_rate, best_signal_count, best_n, best_threshold
         except:
-            return 0.0, 0, 5
+            return 0.0, 0, 5, 60
             
     cb1, cb2 = st.columns([3, 1])
     with cb1:
@@ -1163,10 +1168,10 @@ try:
 
     with cb2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        hit_rate, signal_count, best_n = calculate_prediction_accuracy(w_fx, w_wti, w_global, w_fear, w_tech)
+        hit_rate, signal_count, best_n, best_th = calculate_prediction_accuracy(w_fx, w_wti, w_global, w_fear, w_tech)
         st.metric("최근 10년 패닉 적중률", f"{hit_rate:.1f}%")
         st.caption(f"*최적 예측 기간: {best_n}거래일")
-        st.caption(f"*위험(60 이상) 경보 발령 후 -5% 폭락 기준 ({signal_count}회 중)")
+        st.caption(f"*위험({best_th} 이상) 경보 발령 후 -5% 폭락 기준 ({signal_count}회 중)")
 
     # 7.5 블랙스완
     st.markdown("---")
