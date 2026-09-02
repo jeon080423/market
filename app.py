@@ -1674,3 +1674,5 @@ if ai_indicator_container:
                     {clean_indicator}
                 </div>
                 """, unsafe_allow_html=True)
+
+# Cache invalidation push (2026-09-02)
