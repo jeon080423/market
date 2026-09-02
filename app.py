@@ -432,6 +432,15 @@ with st.expander("📖 지수 가이드북"):
 # 4. 데이터 수집 함수 (최적화: 일괄 다운로드)
 @st.cache_data(ttl=900) # 15분으로 연장
 def load_data():
+    import time
+    for attempt in range(3):
+        try:
+            return _load_data_internal()
+        except Exception as e:
+            if attempt == 2: raise e
+            time.sleep(2)
+
+def _load_data_internal():
     # 오늘 데이터를 포함하기 위해 내일 날짜로 end_date 설정
     end_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     start_date = "2019-01-01"
@@ -459,9 +468,22 @@ def load_data():
         else:
             data = raw_data
         if data.empty:
-            data = pd.DataFrame(columns=other_tickers)
-    except:
-        data = pd.DataFrame(columns=other_tickers)
+            raise ValueError("other_tickers data is empty")
+    except Exception as e:
+        raise ValueError(f"other_tickers download failed: {e}")
+        
+    # FinanceDataReader fallback for FX if missing from data
+    if tickers["fx"] not in data.columns or data[tickers["fx"]].dropna().empty:
+        import FinanceDataReader as fdr
+        try:
+            fdr_fx = fdr.DataReader("USD/KRW", start_date, end_date)
+            if not fdr_fx.empty:
+                fdr_fx = fdr_fx[['Close']]
+                fdr_fx.columns = [tickers["fx"]]
+                if tickers["fx"] in data.columns:
+                    data = data.drop(columns=[tickers["fx"]])
+                data = data.join(fdr_fx, how='outer')
+        except: pass
         
     try:
         # KOSPI 단독 다운로드 (타임존/결측치 병합 오류 방지)
@@ -475,9 +497,18 @@ def load_data():
         
         kospi_data.columns = [tickers["kospi"]]
         if kospi_data.empty:
-            kospi_data = pd.DataFrame(columns=[tickers["kospi"]])
-    except:
-        kospi_data = pd.DataFrame(columns=[tickers["kospi"]])
+            raise ValueError("KOSPI data is empty")
+    except Exception as e:
+        import FinanceDataReader as fdr
+        try:
+            fdr_ks = fdr.DataReader("KS11", start_date, end_date)
+            if not fdr_ks.empty:
+                kospi_data = fdr_ks[['Close']]
+                kospi_data.columns = [tickers["kospi"]]
+            else:
+                raise ValueError("FDR KOSPI is empty")
+        except Exception as e2:
+            raise ValueError(f"KOSPI download failed: {e} | {e2}")
         
     if not kospi_data.empty:
         try:
@@ -492,7 +523,7 @@ def load_data():
     try:
         raw_dxy = yf.download(tickers["dxy"], start=start_date, end=end_date)
         if raw_dxy.empty:
-            dxy_standalone = pd.DataFrame(columns=[tickers["dxy"]])
+            raise ValueError("DXY data is empty")
         elif isinstance(raw_dxy.columns, pd.MultiIndex) and 'Close' in raw_dxy.columns.levels[0]:
             dxy_standalone = raw_dxy['Close']
         elif 'Close' in raw_dxy.columns:
@@ -507,9 +538,8 @@ def load_data():
         if tickers["dxy"] in data.columns:
             data = data.drop(columns=[tickers["dxy"]])
         data = data.join(dxy_standalone, how='outer')
-    except:
-        if tickers["dxy"] not in data.columns:
-            data[tickers["dxy"]] = np.nan
+    except Exception as e:
+        raise ValueError(f"DXY download failed: {e}")
     
     sector_tickers = {
         "반도체": "005930.KS", "자동차": "005380.KS", "2차전지": "051910.KS",
