@@ -711,6 +711,7 @@ try:
             # Sigmoid 정규화: Z-score를 0~100 사이로 매핑 (이상치에 강건함)
             # z=0일 때 50, z=2일 때 약 88, z=-2일 때 약 12
             score = 100 / (1 + np.exp(-z))
+            if np.isnan(score): return 50.0
             return (100 - score) if inverse else score
         except: return 50.0
 
@@ -840,7 +841,7 @@ try:
             std = past_1y.std()
             if std == 0: return 0.0
             z_score = (recent_5d_mean - mu) / std
-            if z_score <= 1.0: return 0.0
+            if np.isnan(z_score) or z_score <= 1.0: return 0.0
             return min(100.0, max(0.0, (z_score - 1.0) * 40))
         except:
             return 0.0
@@ -853,7 +854,14 @@ try:
         s_wt = get_hist_score_val(wt_s, d)
         s_sp = get_hist_score_val(sp_s, d, True)
         s_vx = get_hist_score_val(vx_s, d)
-        t = max(0.0, min(100.0, float(100 - (float(ks_s.loc[d]) / float(ma20.loc[d]) - 0.9) * 500))) if d in ma20.index and pd.notna(ma20.loc[d]) and ma20.loc[d] != 0 else 50.0
+        
+        try:
+            val_ks = float(ks_s.loc[d].iloc[0] if isinstance(ks_s.loc[d], pd.Series) else ks_s.loc[d])
+            val_ma = float(ma20.loc[d].iloc[0] if isinstance(ma20.loc[d], pd.Series) else ma20.loc[d])
+            t = max(0.0, min(100.0, float(100 - (val_ks / val_ma - 0.9) * 500))) if val_ma != 0 and pd.notna(val_ma) else 50.0
+            if np.isnan(t): t = 50.0
+        except:
+            t = 50.0
         
         base = (s_fx * w_fx + s_wt * w_wti + s_sp * w_global + s_vx * w_fear + t * w_tech) / total_w
         
@@ -871,8 +879,14 @@ try:
         convex_risk = ((np.exp(k * app_base / 100) - 1) / (np.exp(k) - 1)) * 100
         hist_risks.append(convex_risk)
 
-    total_risk_index = hist_risks[-1]
+    total_risk_index = hist_risks[-1] if hist_risks else applied_base_risk
+    if np.isnan(total_risk_index):
+        total_risk_index = applied_base_risk
+        
     prev_idx = hist_risks[-6] if len(hist_risks) > 5 else 50.0
+    if np.isnan(prev_idx):
+        prev_idx = 50.0
+        
     delta_5d = total_risk_index - prev_idx
 
     # [신규] 패닉 경보 배너 표시
