@@ -729,7 +729,7 @@ def render_vincent_valuation_page():
                         plot_bgcolor='rgba(0,0,0,0)',
                         showlegend=False
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="chart_1")
 
                     # 상세 테이블
                     with st.expander(f"📋 {company_name} 연간 기업실적분석 데이터 상세 보기", expanded=False):

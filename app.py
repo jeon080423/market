@@ -921,7 +921,7 @@ try:
         ))
         fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.plotly_chart(fig_gauge, use_container_width=True, key="chart_1")
 
     with c_guide: 
         st.markdown("**📊 예측 컴포넌트별 위험도**")
@@ -1140,7 +1140,7 @@ try:
         fig_bt = go.Figure()
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Risk'], name="위험 지수", line=dict(color='red'), connectgaps=True)) # connectgaps 추가
         fig_bt.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['KOSPI'], name="KOSPI", yaxis="y2", line=dict(color='gray', dash='dot'), connectgaps=True))
-        fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_bt, use_container_width=True)
+        fig_bt.update_layout(yaxis=dict(title="위험 지수", range=[0, 100]), yaxis2=dict(overlaying="y", side="right"), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_bt, use_container_width=True, key="chart_2")
         
         # 모델 유효성 진단 AI 컨테이너 정의 (위치: 백테스팀 그래프 하단)
         bt_analysis_container = st.container()
@@ -1299,7 +1299,7 @@ try:
         st.info("**2000 닷컴 버블 vs 현재**")
         bs_2000 = get_true_historical_risk("2000-01-01", "2001-01-01", w_fx, w_wti, w_global, w_fear, w_tech)
         fig_bs0, sim_00, d_day_00 = create_black_swan_chart(bs_2000, current_series, "2000 닷컴 버블")
-        st.plotly_chart(fig_bs0, use_container_width=True)
+        st.plotly_chart(fig_bs0, use_container_width=True, key="chart_3")
         if sim_00 > 70 and d_day_00 > 0 and d_day_00 <= 30:
             st.warning(f"⚠️ 2000년 버블 직전(D-{int(d_day_00)})과 패턴이 {sim_00:.1f}% 일치하여 주의가 필요합니다.")
         elif avg_current_risk > 60:
@@ -1311,7 +1311,7 @@ try:
         st.info("**2008 금융위기 vs 현재**")
         bs_2008 = get_true_historical_risk("2008-01-01", "2009-01-01", w_fx, w_wti, w_global, w_fear, w_tech)
         fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
-        st.plotly_chart(fig_bs1, use_container_width=True)
+        st.plotly_chart(fig_bs1, use_container_width=True, key="chart_4")
         if sim_08 > 70 and d_day_08 > 0 and d_day_08 <= 30:
             st.warning(f"⚠️ 2008년 위기 직전(D-{int(d_day_08)})과 패턴이 {sim_08:.1f}% 일치하여 주의가 필요합니다.")
         elif avg_current_risk > 60:
@@ -1323,7 +1323,7 @@ try:
         st.info("**2020 코로나 폭락 vs 현재**")
         bs_2020 = get_true_historical_risk("2020-01-01", "2020-06-01", w_fx, w_wti, w_global, w_fear, w_tech)
         fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
-        st.plotly_chart(fig_bs2, use_container_width=True)
+        st.plotly_chart(fig_bs2, use_container_width=True, key="chart_5")
         if sim_20 > 70 and d_day_20 > 0 and d_day_20 <= 30:
             st.error(f"🚨 2020년 팬데믹 폭락(D-{int(d_day_20)})과 패턴이 {sim_20:.1f}% 일치하며 매우 위험합니다.")
         elif avg_current_risk > 50:
@@ -1364,23 +1364,23 @@ try:
     r1_c1, r1_c2, r1_c3 = st.columns(3)
     with r1_c1:
         st.subheader("미국 S&P 500")
-        st.plotly_chart(create_chart(sp_s, "S&P 500", sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "평균 대비 -10% 하락 시"), use_container_width=True)
+        st.plotly_chart(create_chart(sp_s, "S&P 500", sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "평균 대비 -10% 하락 시"), use_container_width=True, key="chart_6")
         st.info("**미국 지수**: KOSPI와 강한 정(+)의 상관성  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
     with r1_c2:
         st.subheader("원/달러 환율")
         fx_th = float(fx_s[fx_s.index >= (fx_s.index.max() - pd.Timedelta(days=365))].mean() * 1.02)
-        st.plotly_chart(create_chart(fx_s, "원/달러 환율", fx_th, f"{fx_th:.1f}원 돌파 시 위험"), use_container_width=True)
+        st.plotly_chart(create_chart(fx_s, "원/달러 환율", fx_th, f"{fx_th:.1f}원 돌파 시 위험"), use_container_width=True, key="chart_7")
         st.info("**환율**: +2% 상회 시 외국인 자본 유출 심화  \n**빨간선 기준**: 최근 1년 평균 환율 대비 +2% 상승 지점")
     with r1_c3:
         st.subheader("실물 경기 지표 (Copper)")
-        st.plotly_chart(create_chart(cp_s, "Copper", cp_s[cp_s.index >= (cp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "수요 위축 시 위험"), use_container_width=True)
+        st.plotly_chart(create_chart(cp_s, "Copper", cp_s[cp_s.index >= (cp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "수요 위축 시 위험"), use_container_width=True, key="chart_8")
         st.info("**실물 경기**: 구리 가격 하락은 수요 둔화 선행 신호  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
 
     r2_c1, r2_c2, r2_c3 = st.columns(3)
     with r2_c1:
         st.subheader("장단기 금리차")
         # 금리차 그래프 생성
-        st.plotly_chart(create_chart(yield_curve, "금리차", 0.0, "0 이하 역전 시 위험"), use_container_width=True)
+        st.plotly_chart(create_chart(yield_curve, "금리차", 0.0, "0 이하 역전 시 위험"), use_container_width=True, key="chart_9")
         st.info("**금리차**: 금리 역전은 경기 침체 강력 전조  \n**빨간선 기준**: 금리차가 0(수평)이 되는 역전 한계 지점")
     with r2_c2:
         st.subheader("KOSPI 기술적 분석")
@@ -1404,11 +1404,11 @@ try:
             bordercolor="red"
         )
         fig_ks.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig_ks, use_container_width=True)
+        st.plotly_chart(fig_ks, use_container_width=True, key="chart_10")
         st.info("**기술적 분석**: 20일선 하회 시 단기 추세 하락")
     with r2_c3:
         st.subheader("VIX 공포 지수")
-        st.plotly_chart(create_chart(vx_s, "VIX", 30, "30 돌파 시 패닉"), use_container_width=True)
+        st.plotly_chart(create_chart(vx_s, "VIX", 30, "30 돌파 시 패닉"), use_container_width=True, key="chart_11")
         st.info("**VIX 지수**: 지수 급등은 투매 가능성 시사  \n**빨간선 기준**: 시장의 극단적 공포를 상징하는 지수 30 지점")
 
     st.markdown("---")
@@ -1417,19 +1417,19 @@ try:
         st.subheader("글로벌 물동량 지표 (BDRY)")
         if not fr_s.empty:
             fr_th = round(float(fr_s[fr_s.index >= (fr_s.index.max() - pd.Timedelta(days=365))].mean() * 0.85), 2)
-            st.plotly_chart(create_chart(fr_s, "교역량", fr_th, "물동량 급감 시 위험"), use_container_width=True)
+            st.plotly_chart(create_chart(fr_s, "교역량", fr_th, "물동량 급감 시 위험"), use_container_width=True, key="chart_12")
             st.info("**물동량(BDRY)**: 해상 운송 지수는 실물 경제 회복의 선행 지표")
     with r3_c2:
         st.subheader("유가 (WTI)")
         if not wt_s.empty:
             wt_th = round(float(wt_s[wt_s.index >= (wt_s.index.max() - pd.Timedelta(days=365))].mean() * 1.2), 2)
-            st.plotly_chart(create_chart(wt_s, "유가", wt_th, "에너지 비용 급증 시 위험"), use_container_width=True)
+            st.plotly_chart(create_chart(wt_s, "유가", wt_th, "에너지 비용 급증 시 위험"), use_container_width=True, key="chart_13")
             st.info("**유가**: 급격한 유가 상승은 인플레이션 및 비용 압박 요인")
     with r3_c3:
         st.subheader("달러 인덱스 (DXY)")
         if not dx_s.empty:
             dx_th = round(float(dx_s[dx_s.index >= (dx_s.index.max() - pd.Timedelta(days=365))].mean() * 1.05), 2)
-            st.plotly_chart(create_chart(dx_s, "달러 인덱스", dx_th, "달러 강세 시 신흥국 매도 압력"), use_container_width=True)
+            st.plotly_chart(create_chart(dx_s, "달러 인덱스", dx_th, "달러 강세 시 신흥국 매도 압력"), use_container_width=True, key="chart_14")
             st.info("**달러 강세**: 글로벌 안전자산 선호 심리는 KOSPI 하락 요인")
 
     r4_c1, r4_c2, r4_c3 = st.columns(3)
@@ -1439,7 +1439,7 @@ try:
             # 위험 기준선 판별: 
             # 4.5% 이상이면 주식시장에 상당한 할인율 부담으로 작용하므로 위험 기준선으로 설정
             b10_th = 4.5 
-            st.plotly_chart(create_chart(b10_s, "10년물 국채 금리", b10_th, "4.5% 돌파 시 주식 밸류에이션 부담"), use_container_width=True)
+            st.plotly_chart(create_chart(b10_s, "10년물 국채 금리", b10_th, "4.5% 돌파 시 주식 밸류에이션 부담"), use_container_width=True, key="chart_15")
             st.info("**국채 금리**: 4.5% 이상 상승 시 무위험 대안 수익률이 높아져 주식 밸류에이션 부담이 커짐")
 
     # 현재 시장 지표 종합 진단 AI 컨테이너 정의 (위치: 모든 지표 차트 하단)
@@ -1452,7 +1452,7 @@ try:
     fig_norm.add_trace(go.Scatter(x=ks_norm.index, y=ks_norm.values, name="KOSPI (Std)", line=dict(color='red'), connectgaps=True))
     fig_norm.add_trace(go.Scatter(x=sp_norm.index, y=sp_norm.values, name="S&P 500 (Std)", line=dict(color='blue'), connectgaps=True))
     fig_norm.add_trace(go.Scatter(x=fr_norm.index, y=fr_norm.values, name="BDRY (Std)", line=dict(color='orange'), connectgaps=True))
-    fig_norm.update_layout(title="Z-Score 동조화 추세", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_norm, use_container_width=True)
+    fig_norm.update_layout(title="Z-Score 동조화 추세", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_norm, use_container_width=True, key="chart_16")
     st.info("""
 **[현재 상황 상세 해석 가이드]**
 * **KOSPI(Red) vs S&P 500(Blue) 디커플링**: S&P 500 지수가 KOSPI보다 확연히 높이 위치할 경우, 글로벌 증시 상승에서 한국이 소외되는 현상(외자 이탈, 구조적 우려 등)을 시사할 수 있습니다.\n\n반대의 경우는 KOSPI의 단기 과열이나 강한 독자 모멘텀을 뜻합니다.\n\n* **주가지수(Red, Blue)가 물동량(Orange)보다 위에 있을 때**: 실물 경기 뒷받침 없이 기대감만으로 지수가 과열된 상태일 수 있습니다.\n\n하락 가능성이 높습니다.\n\n* **지표들이 비슷한 위치일 때**: KOSPI, 글로벌 증시, 실물 경기가 동조화되어 움직이는 매우 안정적인 추세입니다.\n\n* **글로벌 물동량(Orange)이 주가지수보다 위에 있을 때**: 실물 경기는 회복되었으나 주가가 저평가된 상태입니다.\n\n우상향 가능성을 시사합니다.\n\n""")
@@ -1472,7 +1472,7 @@ try:
             df_p = pd.DataFrame(sector_perf)
             fig_h = px.bar(df_p, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률")
             fig_h.update_layout(height=400, margin=dict(l=0, r=0, t=30, b=0))
-            st.plotly_chart(fig_h, use_container_width=True)
+            st.plotly_chart(fig_h, use_container_width=True, key="chart_17")
 
     with sc2:
         st.subheader("🇺🇸 S&P 500 섹터별 대표 등락 (ETF)")
@@ -1486,7 +1486,7 @@ try:
             df_sp_p = pd.DataFrame(sp500_sector_perf)
             fig_sp_h = px.bar(df_sp_p, x="섹터", y="등락률", color="등락률", color_continuous_scale='RdBu_r', text="등락률")
             fig_sp_h.update_layout(height=400, margin=dict(l=0, r=0, t=30, b=0))
-            st.plotly_chart(fig_sp_h, use_container_width=True)
+            st.plotly_chart(fig_sp_h, use_container_width=True, key="chart_18")
 
 except Exception as e:
     st.error(f"오류 발생: {str(e)}")

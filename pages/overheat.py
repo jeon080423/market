@@ -234,7 +234,7 @@ def render_overheat_page():
         ))
         fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.plotly_chart(fig_gauge, use_container_width=True, key="chart_1")
 
     with col_c:
         # 4개 컴포넌트 점수 카드
@@ -335,7 +335,7 @@ def render_overheat_page():
         yaxis=dict(range=[0, 100], title="과열 지수 (0~100점)"),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
     )
-    st.plotly_chart(fig_trend, use_container_width=True)
+    st.plotly_chart(fig_trend, use_container_width=True, key="chart_2")
 
     st.info(f"""💡 **과열 지수(MOI) 해석 가이드**
 {grade_emoji} **현재 {latest_idx:.1f}점 ({grade})** | 5일 전 대비 **{delta_5d:+.1f}점**
@@ -540,7 +540,7 @@ def render_overheat_page():
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(tickformat="%m월")
     )
-    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(fig1, use_container_width=True, key="chart_3")
     st.info("💡 **차트 읽는 법:** 주도주(삼성전자, SK하이닉스) 선과 나머지 비주도 섹터/동일가중 선의 위아래 격차가 무섭게 벌어질수록 극소수 종목으로 자금이 몰리는 '압착(Compression)'이 극심함을 의미합니다.\n\n📊 **데이터 가공 기준:** 6개월 전(조회 기간 첫 날)의 가격을 '100'으로 고정(Base 100)하여, 현재까지 누적해서 몇 % 상승/하락했는지 직관적으로 비교합니다.")
 
     # 2. 채권 자경단의 출현
@@ -594,7 +594,7 @@ def render_overheat_page():
         yaxis2=dict(title="국채 금리 (%)", side='right', overlaying='y', showgrid=False)
     )
     
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True, key="chart_4")
     st.info("💡 **차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200과 WTI 유가의 누적 수익률을, 우측 Y축은 미 국채 10년물 금리의 실제 수치(%)를 표시합니다. KODEX 200이 고점을 높이는데도 불구하고, 금리(우축)가 4%→5% 같이 가파르게 오른다면 '채권 자경단'의 출현을 암시하는 강력한 위험 신호입니다.\n\n📊 **데이터 가공 기준:** KODEX 200/WTI는 6개월 전 = 100 기준(Base 100), 국채 금리는 실제 만기수익률(%)을 우측 Y축에 직접 표시합니다.")
 
     # 3. 사모 크레딧 환매 리스크
@@ -638,7 +638,7 @@ def render_overheat_page():
         yaxis2=dict(title="HYG 실제 가격 ($)", side='right', overlaying='y', showgrid=False)
     )
     
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig3, use_container_width=True, key="chart_5")
     st.info("💡 **차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200 누적 수익률을, 우측 Y축은 하이일드 ETF(HYG)의 실제 달러 가격을 표시합니다. 증시(좌축)는 평온해 보여도 HYG(우축)가 $80→$79처럼 미세하게 하락하기 시작하면, 수면 아래 비우량 신용 시장의 자금 이탈이 시작된 것으로 해석합니다.\n\n📊 **데이터 가공 기준:** KODEX 200은 Base 100 누적 수익률(좌축), HYG는 실제 달러($) 가격(우축)으로 직접 표시합니다.")
 
     # 4. 대형 IPO와 위험 선호도
@@ -691,7 +691,7 @@ def render_overheat_page():
         yaxis2=dict(title="미국 지표 누적 수익률 (Base 100)", side='right', overlaying='y', showgrid=False)
     )
     
-    st.plotly_chart(fig4, use_container_width=True)
+    st.plotly_chart(fig4, use_container_width=True, key="chart_6")
     st.info("💡 **차트 읽는 법:** 좌측 Y축은 KODEX 200(국내 증시), 우측 Y축은 미국 IPO ETF와 S&P 500을 각각 Base 100으로 표시합니다. 우측 축 안에서 IPO ETF(연두)가 S&P 500(주황)보다 가파르게 벌어진다면 투기적 과열의 신호입니다. 국내 주가의 큰 스케일에 미국 지표가 묻히지 않도록 좌우 축을 분리했습니다.\n\n📊 **데이터 가공 기준:** 세 지표 모두 6개월 전 첫 날 = 100 기준(Base 100). KODEX 200은 좌축, IPO ETF / S&P 500은 우축으로 정밀 비교합니다.")
 
     # 하단 여백 추가 (화면 잘림 방지)
