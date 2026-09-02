@@ -491,7 +491,9 @@ def load_data():
     # DXY 단독 다운로드 (데이터 정렬 오류 방지)
     try:
         raw_dxy = yf.download(tickers["dxy"], start=start_date, end=end_date)
-        if isinstance(raw_dxy.columns, pd.MultiIndex) and 'Close' in raw_dxy.columns.levels[0]:
+        if raw_dxy.empty:
+            dxy_standalone = pd.DataFrame(columns=[tickers["dxy"]])
+        elif isinstance(raw_dxy.columns, pd.MultiIndex) and 'Close' in raw_dxy.columns.levels[0]:
             dxy_standalone = raw_dxy['Close']
         elif 'Close' in raw_dxy.columns:
             dxy_standalone = raw_dxy[['Close']]
@@ -1351,12 +1353,16 @@ try:
     
     # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
-    [코스피 위험 분석 포인트: "5일 선행 KOSPI 하락 위험을 판별하는 5가지 핵심 지표 분석"]
+    [코스피 위험 분석 포인트: "주요 거시 경제 및 상관관계 지표 종합 분석"]
     - 기술적 추세 (KOSPI): {ks_s.iloc[-1]:.2f} (20일 이평선 {ma20.iloc[-1]:.2f} 대비 {((ks_s.iloc[-1]/ma20.iloc[-1])-1)*100:+.1f}%)
     - 시장 공포 (VIX 지수): {vx_s.iloc[-1]:.2f} (위험 수준: {'높음' if vx_s.iloc[-1] > 20 else '낮음'})
     - 자본 이탈 (원/달러 환율): {fx_s.iloc[-1]:.1f}원 (전일 대비 {fx_s.iloc[-1]-fx_s.iloc[-2]:+.1f}원)
     - 글로벌 투심 (S&P 500): {sp_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((sp_s.iloc[-1]/sp_s[sp_s.index >= (sp_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
-    - 비용 충격 (WTI 유가): {wt_s.iloc[-1]:.2f} (최근 1년 평균 대비 {((wt_s.iloc[-1]/wt_s[wt_s.index >= (wt_s.index.max() - pd.Timedelta(days=365))].mean())-1)*100:+.1f}%)
+    - 비용 충격 (WTI 유가): {f"{wt_s.iloc[-1]:.2f}" if not wt_s.empty else '데이터 없음'}
+    - 실물 경기 (Copper): {f"{cp_s.iloc[-1]:.2f}" if not cp_s.empty else '데이터 없음'}
+    - 물동량 (BDRY): {f"{fr_s.iloc[-1]:.2f}" if not fr_s.empty else '데이터 없음'}
+    - 달러 가치 (DXY): {f"{dx_s.iloc[-1]:.2f}" if not dx_s.empty else '데이터 없음'}
+    - 장단기 금리차 (10년물-2년물): {f"{yield_curve.iloc[-1]:.2f}%" if not yield_curve.empty else '데이터 없음'}
     """
     
     # 가독성 높은 레이아웃 조정을 위한 프롬프트 수정
@@ -1387,15 +1393,17 @@ try:
         st.info("**환율**: +2% 상회 시 외국인 자본 유출 심화  \n**빨간선 기준**: 최근 1년 평균 환율 대비 +2% 상승 지점")
     with r1_c3:
         st.subheader("실물 경기 지표 (Copper)")
-        st.plotly_chart(create_chart(cp_s, "Copper", cp_s[cp_s.index >= (cp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "수요 위축 시 위험"), use_container_width=True, key="chart_8")
-        st.info("**실물 경기**: 구리 가격 하락은 수요 둔화 선행 신호  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
+        if not cp_s.empty:
+            st.plotly_chart(create_chart(cp_s, "Copper", cp_s[cp_s.index >= (cp_s.index.max() - pd.Timedelta(days=365))].mean()*0.9, "수요 위축 시 위험"), use_container_width=True, key="chart_8")
+            st.info("**실물 경기**: 구리 가격 하락은 수요 둔화 선행 신호  \n**빨간선 기준**: 최근 1년 평균 가격 대비 -10% 하락 지점")
 
     r2_c1, r2_c2, r2_c3 = st.columns(3)
     with r2_c1:
         st.subheader("장단기 금리차")
         # 금리차 그래프 생성
-        st.plotly_chart(create_chart(yield_curve, "금리차", 0.0, "0 이하 역전 시 위험"), use_container_width=True, key="chart_9")
-        st.info("**금리차**: 금리 역전은 경기 침체 강력 전조  \n**빨간선 기준**: 금리차가 0(수평)이 되는 역전 한계 지점")
+        if not yield_curve.empty:
+            st.plotly_chart(create_chart(yield_curve, "금리차", 0.0, "0 이하 역전 시 위험"), use_container_width=True, key="chart_9")
+            st.info("**금리차**: 금리 역전은 경기 침체 강력 전조  \n**빨간선 기준**: 금리차가 0(수평)이 되는 역전 한계 지점")
     with r2_c2:
         st.subheader("KOSPI 기술적 분석")
         ks_recent = ks_s[ks_s.index >= (ks_s.index.max() - pd.Timedelta(days=30))]
