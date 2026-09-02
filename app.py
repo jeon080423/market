@@ -921,7 +921,7 @@ try:
         ))
         fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_gauge, use_container_width=True, key="chart_1")
+        st.plotly_chart(fig_gauge, use_container_width=True, key="chart_1", config={'displayModeBar': False})
 
     with c_guide: 
         st.markdown("**📊 예측 컴포넌트별 위험도**")
