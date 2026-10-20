@@ -12,11 +12,12 @@ ACCENT = "#1f4e79"  # 강조 색상
 COMMON_CSS = """
 <style>
 /* ===== 메뉴 공통 타이포그래피·컬러 기준 ===== */
-h1 { font-size: 1.75rem !important; font-weight: 700 !important; color: #2c3e50 !important; line-height: 1.3 !important; }
-h2 { font-size: 1.35rem !important; font-weight: 700 !important; color: #2c3e50 !important; }
-h3 { font-size: 1.12rem !important; font-weight: 600 !important; color: #2c3e50 !important; }
-h5 { font-size: 1.0rem !important; font-weight: 700 !important; color: #2c3e50 !important; }
-.stMarkdown p, .stMarkdown li { font-size: 0.95rem; color: #2c3e50; line-height: 1.65; }
+h1 { font-size: 1.75rem !important; font-weight: 700 !important; color: #2c3e50; line-height: 1.3 !important; }
+h2 { font-size: 1.35rem !important; font-weight: 700 !important; color: #2c3e50; }
+h3 { font-size: 1.12rem !important; font-weight: 600 !important; color: #2c3e50; }
+h5 { font-size: 1.0rem !important; font-weight: 700 !important; color: #2c3e50; }
+.stMarkdown { color: #2c3e50; }
+.stMarkdown p, .stMarkdown li { font-size: 0.95rem; line-height: 1.65; }
 div[data-testid="stCaptionContainer"] p { font-size: 0.8rem !important; color: #6c757d !important; }
 /* 공통 지표 카드 */
 .metric-card { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 10px; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
