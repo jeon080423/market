@@ -426,19 +426,19 @@ with st.expander("지수 가이드북"):
     st.divider()
 
     st.subheader("2. 예측적 선행 알고리즘 (Predictive Lead Intelligence)")
-    st.markdown("#### **① 1주일 선행 상관 분석 (5-10 Days Predictive Lead)**")
+    st.markdown("#### **1. 1주일 선행 상관 분석 (5-10 Days Predictive Lead)**")
     st.write("""
     * **선행성 강제화**: 본 모델은 모든 지표와 KOSPI 간의 시차를 **최소 5일에서 최대 12일** 범위에서 탐색합니다.\n\n이는 현재의 지표 변화가 최소 1주일 뒤의 증시에 미치는 영향을 추정하기 위함입니다.\n\n* **동시성 배제**: 당일의 시장 등락에 의한 '사후 설명'을 배제하고, 순수하게 미래의 리스크 전조를 포착하는 데 집중합니다.\n\n""")
     
-    st.markdown("#### **② 하이브리드 정규화 및 볼록성 (Hybrid Normalization & Convexity)**")
+    st.markdown("#### **2. 하이브리드 정규화 및 볼록성 (Hybrid Normalization & Convexity)**")
     st.write("""
     * **시그모이드 정규화**: Z-Score(표준점수)를 시그모이드 함수에 통과시켜 0~100 사이로 변환합니다.\n\n이는 극단적인 이상치(Black Swan) 발생 시 지수가 상한선에 막혀 변동을 포착하지 못하는 문제를 해결합니다.\n\n* **위험 볼록성(Convexity)**: 시장의 공포는 선형적으로 증가하지 않습니다.\n\n본 모델은 지수함수적 가중치를 적용하여, 위험 지수가 70점을 넘어서는 국면에서 더욱 민감하고 빠르게 반응하도록 설계되었습니다.\n\n""")
     
-    st.markdown("#### **③ 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)**")
+    st.markdown("#### **3. 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)**")
     st.write("""
     * **안전자산 및 공포 심리 급등 감지**: 전쟁, 금융위기 등 블랙스완 발생 시 가장 먼저 반응하는 **금(Gold), 스위스 프랑(CHF), 엔/원 환율, VVIX(공포 변동성)** 지표의 최근 5일 이상 급등세를 모니터링합니다.\n\n* **뉴스 공포 키워드 밀집도**: 글로벌 뉴스 헤드라인에서 'War', 'Bankrupt', 'Default'등 치명적 키워드 발생 빈도를 실시간으로 추적합니다.\n\n* **위험 지수 강제 오버라이딩**: 위 지표들이 동시다발적으로 임계치를 돌파하면, 기존 거시 지표 기반의 위험 점수를 무시하고 **최종 위험 지수를 강제로 상향(Panic Override)** 시켜 즉각적인 경보를 발송합니다.\n\n""")
     
-    st.markdown("#### **④ 요약**")
+    st.markdown("#### **4. 요약**")
     st.info("본 모델은 통계적 정상성을 확보한 수익률 기반 분석과 이상치에 강건한 시그모이드 정규화를 통해 **구조적 위험**을 선행 포착하며, 동시에 실시간 패닉 감지 모듈을 통해 **돌발적 블랙스완**에도 즉각 대응할 수 있는 **하이브리드 조기 경보 시스템**입니다.")
 
     st.divider()
@@ -446,11 +446,11 @@ with st.expander("지수 가이드북"):
     st.subheader("3. 고도화된 수리적 산출 공식")
     @st.cache_data
     def get_math_formulas():
-        st.markdown("#### **① 시차 수익률 상관관계 (Lagged Return Correlation)**")
+        st.markdown("#### **1. 시차 수익률 상관관계 (Lagged Return Correlation)**")
         st.latex(r"\rho(k) = Corr(r_{X, t-k}, r_{Y, t}) \quad (r: \text{Return})")
-        st.markdown("#### **② 하이브리드 정규화 (Hybrid Normalization: Z-Score + Sigmoid)**")
+        st.markdown("#### **2. 하이브리드 정규화 (Hybrid Normalization: Z-Score + Sigmoid)**")
         st.latex(r"Z = \frac{x - \mu}{\sigma}, \quad Score = \frac{1}{1 + e^{-Z}} \times 100")
-        st.markdown("#### **③ 위험 가중치 복합 기여도 (Weighted Convexity)**")
+        st.markdown("#### **3. 위험 가중치 복합 기여도 (Weighted Convexity)**")
         st.latex(r"Risk = \frac{\sum (w_i \times S_i)}{\sum w_i}, \quad Adjusted = \frac{e^{k \cdot Risk} - 1}{e^k - 1}")
     get_math_formulas()
 

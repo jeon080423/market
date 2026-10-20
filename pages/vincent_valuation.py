@@ -784,7 +784,8 @@ def render_vincent_valuation_page():
             
         if not df_kospi_rank.empty:
             # 스타일링된 데이터프레임 노출
-            st.dataframe(df_kospi_rank, use_container_width=True, hide_index=True)
+            from utils.ui_style import strip_df_emojis
+            st.dataframe(strip_df_emojis(df_kospi_rank), use_container_width=True, hide_index=True)
             st.info("**상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
         else:
             st.warning("데이터를 불러오지 못했습니다. 새로고침을 시도해 보세요.")
@@ -802,7 +803,8 @@ def render_vincent_valuation_page():
             df_kosdaq_rank = get_market_valuation_ranking("KOSDAQ", top_n=top_n_kosdaq)
             
         if not df_kosdaq_rank.empty:
-            st.dataframe(df_kosdaq_rank, use_container_width=True, hide_index=True)
+            from utils.ui_style import strip_df_emojis
+            st.dataframe(strip_df_emojis(df_kosdaq_rank), use_container_width=True, hide_index=True)
             st.info("**상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
         else:
             st.warning("데이터를 불러오지 못했습니다. 새로고침을 시도해 보세요.")

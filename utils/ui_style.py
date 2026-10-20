@@ -39,3 +39,29 @@ def style_fig(fig, title_size=15):
         title_font=dict(size=title_size, color=INK),
     )
     return fig
+
+
+import re as _re
+
+_EMOJI_RE = _re.compile(
+    r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF"
+    r"\uFE0F\u20E3\u203C\u2049\u3297\u3299]"
+)
+
+
+def strip_emojis(text):
+    """동적 텍스트(외부 API·캐시 등)에서 이모지 제거"""
+    if not isinstance(text, str):
+        return text
+    return _EMOJI_RE.sub("", text)
+
+
+def strip_df_emojis(df):
+    """DataFrame의 모든 문자열 셀에서 이모지 제거 (표시 직전 적용)"""
+    if df is None or getattr(df, "empty", True):
+        return df
+    df = df.copy()
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].map(lambda v: strip_emojis(v) if isinstance(v, str) else v)
+    return df

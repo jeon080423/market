@@ -314,6 +314,9 @@ def render_naver_sise_table(df: pd.DataFrame):
         st.info("실시간 데이터를 불러올 수 없습니다.")
         return
 
+    from utils.ui_style import strip_df_emojis
+    df = strip_df_emojis(df)
+
     df_display = df.head(10).copy()
     
     # 순위 텍스트 정리
@@ -386,6 +389,9 @@ def render_analyst_reports_table(df: pd.DataFrame):
     if df.empty:
         st.info("리포트 데이터를 불러올 수 없습니다.")
         return
+
+    from utils.ui_style import strip_df_emojis
+    df = strip_df_emojis(df)
 
     df_display = df.head(10).copy()
 
