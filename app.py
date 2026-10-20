@@ -355,7 +355,13 @@ st.markdown("""
 def get_kst_now():
     return datetime.now() + timedelta(hours=9)
 
-# active_tab 초기화
+# active_tab 초기화 (새로고침 시에도 현재 메뉴 유지: URL 쿼리 파라미터 ?tab= 와 동기화)
+_VALID_TABS = {"risk_monitor", "youtube_rank", "overheat_signal", "vincent_valuation"}
+_qp_tab = st.query_params.get("tab")
+if isinstance(_qp_tab, list):
+    _qp_tab = _qp_tab[0] if _qp_tab else None
+if _qp_tab in _VALID_TABS:
+    st.session_state["active_tab"] = _qp_tab
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "risk_monitor"
 
@@ -371,15 +377,19 @@ with st.sidebar:
     st.subheader("대시보드 메뉴")
     if st.button("KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
+        st.query_params["tab"] = "risk_monitor"
         st.rerun()
     if st.button("실시간 종목 탐색 (인기/수급)", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
+        st.query_params["tab"] = "youtube_rank"
         st.rerun()
     if st.button("과열 국면 시그널", use_container_width=True):
         st.session_state["active_tab"] = "overheat_signal"
+        st.query_params["tab"] = "overheat_signal"
         st.rerun()
     if st.button("종목 가치(빈센트)", use_container_width=True):
         st.session_state["active_tab"] = "vincent_valuation"
+        st.query_params["tab"] = "vincent_valuation"
         st.rerun()
 
 # 다른 페이지 라우팅
