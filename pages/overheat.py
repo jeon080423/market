@@ -417,6 +417,13 @@ def render_overheat_page():
             pass
         return default_models
 
+    def _strip_emojis(text):
+        """AI 분석 결과에서 이모지(그림문자) 제거 - 시트 캐시에 저장된 과거 결과에도 적용"""
+        if not text:
+            return text
+        import re as _re
+        return _re.sub(r'[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF\uFE0F]', '', text)
+
     @st.cache_data(ttl=3600)
     def get_ai_overheat_analysis(data_text):
         if not gemini_key:
@@ -427,7 +434,7 @@ def render_overheat_page():
 {data_text}
 
 지시사항 (CRITICAL RULES):
-1. 당신의 응답은 **무조건** 아래의 출력 템플릿과 100% 동일한 양식으로만 작성되어야 합니다.\n\n2. 프롬프트 내용의 복사, "분석을 시작하겠습니다"등의 서론, 인사말은 일절 금지합니다.\n\n3. 반드시 한국어로만 작성하세요.\n\n[출력 템플릿]
+1. 당신의 응답은 **무조건** 아래의 출력 템플릿과 100% 동일한 양식으로만 작성되어야 합니다.\n\n2. 프롬프트 내용의 복사, "분석을 시작하겠습니다"등의 서론, 인사말은 일절 금지합니다.\n\n3. 반드시 한국어로만 작성하세요.\n\n4. 이모지(그림문자)를 절대 사용하지 마세요.\n\n[출력 템플릿]
 **[종합 분석 결과]**
 (여기에 김효진 박사 관점의 전문가적 분석 내용 2~3문단 작성.\n\n마침표 뒤에는 반드시 줄바꿈 2번 적용할 것)
 
@@ -496,6 +503,7 @@ def render_overheat_page():
             data_text = "\n".join([f"- {k}: {v:.2f} (Base 100)" for k, v in recent_data.items()])
             analysis_result = get_ai_overheat_analysis(data_text)
             analysis_result = analysis_result.replace("```markdown", "").replace("```", "").strip()
+            analysis_result = _strip_emojis(analysis_result)
             
             import re
             match = re.search(r'(\*\*\[종합 분석 결과\]\*\*|\[종합 분석 결과\])(.*)', analysis_result, re.DOTALL | re.IGNORECASE)
@@ -515,7 +523,7 @@ def render_overheat_page():
             
     if st.session_state.get("overheat_ai_result"):
         with st.container(border=True):
-            st.markdown(st.session_state["overheat_ai_result"])
+            st.markdown(_strip_emojis(st.session_state["overheat_ai_result"]))
 
     st.markdown("---")
     

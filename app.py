@@ -218,6 +218,8 @@ def get_ai_analysis(prompt):
 def clean_ai_output(text):
     if not text: return ""
     import re
+    # 이모지(그림문자) 전면 제거 - AI 응답에 섞여 들어오는 경우 포함
+    text = re.sub(r'[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF\uFE0F]', '', text)
     
     # <result> 태그가 있으면 안의 내용만 추출, 없으면 전체 사용
     match = re.search(r'<result>(.*?)</result>', text, re.DOTALL | re.IGNORECASE)
@@ -1594,7 +1596,7 @@ if st.session_state.get("run_ai_trigger"):
             if not bt_data_text:
                 return ""
             p = f"""아래 데이터를 바탕으로 시장 위험 지수의 유효성을 진단하는 3~4문장의 한국어 문단을 작성하세요.
-규칙: 마크다운·영단어·한자 사용 금지. 분석 문단만 출력.
+규칙: 마크다운·영단어·한자·이모지 사용 금지. 분석 문단만 출력.
 
 [중요 맥락(Context)]
 이 모델은 극단적 꼬리 위험(Tail Risk)을 사전에 경고하는 비선형적 '선행 지표'입니다. "위험 지수 60 돌파 후 5일 이내 코스피 5% 이상 하락"의 패닉 조기 경보를 울리는 것이 모델의 핵심 목적이므로, 이를 바탕으로 모델의 긍정적인 유효성 진단 문단을 작성하세요.
@@ -1606,7 +1608,7 @@ if st.session_state.get("run_ai_trigger"):
             if 'latest_data_summary' not in locals() and 'latest_data_summary' not in globals():
                 return ""
             p = f"""아래 시장 지표를 분석하여 현재 한국 증시(코스피) 상황을 진단하는 4문장의 한국어 문단을 작성하세요.
-규칙: 마크다운·영단어·한자 사용 금지. 분석 문단만 출력.
+규칙: 마크다운·영단어·한자·이모지 사용 금지. 분석 문단만 출력.
 
 {latest_data_summary}"""
             return get_ai_analysis(p)
