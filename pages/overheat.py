@@ -9,7 +9,7 @@ from google.genai import types as genai_types
 import time
 
 def render_overheat_page():
-    st.title("🔥 시장 과열 국면 시그널 (김효진 박사)")
+    st.title("시장 과열 국면 시그널 (김효진 박사)")
 
     # Data fetching
     @st.cache_data(ttl=3600)
@@ -95,14 +95,14 @@ def render_overheat_page():
         st.warning("분석할 충분한 데이터가 없습니다.")
         return
 
-    st.header("🌡️ 시장 과열 지수 (Market Overheat Index, 0~100)")
+    st.header("시장 과열 지수 (Market Overheat Index, 0~100)")
     st.markdown("4가지 핵심 리스크 시그널을 **각각 0~100점으로 정규화(Z-Score + Sigmoid)**한 후 가중 평균하여 산출한 단일 복합 과열 지수입니다. 50점이 중립, 70점 이상이면 과열 경보, 85점 이상이면 위험 구간입니다.")
 
     # 닷컴버블 분석 가중치 프리셋 선택부
     col_preset, _ = st.columns([2.5, 1.5])
     with col_preset:
         overheat_model = st.selectbox(
-            "🎯 위기 가중치 분석 모델 선택",
+            "위기 가중치 분석 모델 선택",
             ["2020 코로나 폭락 모델", "2000 닷컴버블 폭락 모델", "하이브리드 균형 모델 (권장)"],
             index=2,
             help="역사적 위기 데이터(2020 코로나 및 2000 닷컴버블)의 특성에 의거해 가중치를 조정합니다."
@@ -189,15 +189,15 @@ def render_overheat_page():
 
     # 등급 판정
     if latest_idx >= 85:
-        grade, grade_color, grade_emoji = "위험 (DANGER)", "#c0392b", "🚨"
+        grade, grade_color = "위험 (DANGER)", "#c0392b"
     elif latest_idx >= 70:
-        grade, grade_color, grade_emoji = "과열 (CAUTION)", "#e67e22", "⚠️"
+        grade, grade_color = "과열 (CAUTION)", "#e67e22"
     elif latest_idx >= 55:
-        grade, grade_color, grade_emoji = "주의 (WATCH)", "#f1c40f", "👀"
+        grade, grade_color = "주의 (WATCH)", "#f1c40f"
     elif latest_idx >= 35:
-        grade, grade_color, grade_emoji = "중립 (NEUTRAL)", "#27ae60", "✅"
+        grade, grade_color = "중립 (NEUTRAL)", "#27ae60"
     else:
-        grade, grade_color, grade_emoji = "냉각 (COOL)", "#2980b9", "❄️"
+        grade, grade_color = "냉각 (COOL)", "#2980b9"
 
     # ─── 레이아웃: 게이지 + 카드 ───
     col_g, col_c = st.columns([1.2, 0.8])
@@ -210,7 +210,7 @@ def render_overheat_page():
             number={'suffix': "점", 'font': {'size': 38}},
             delta={'reference': prev_idx, 'increasing': {'color': "#e74c3c"}, 'decreasing': {'color': "#2ecc71"},
                    'suffix': "pt (5일전 대비)", 'font': {'size': 14}},
-            title={'text': f"시장 과열 지수 (MOI)  {grade_emoji} {grade}", 'font': {'size': 16}},
+            title={'text': f"시장 과열 지수 (MOI) - {grade}", 'font': {'size': 16}},
             gauge={
                 'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#555",
                          'tickvals': [0, 35, 55, 70, 85, 100],
@@ -239,12 +239,12 @@ def render_overheat_page():
 
     with col_c:
         # 4개 컴포넌트 점수 카드
-        st.markdown("**📊 컴포넌트별 현재 점수**")
+        st.markdown("** 컴포넌트별 현재 점수**")
         comp_data = {
-            '🏦 주도주 쏠림': s1_raw.iloc[-1],
-            '📈 채권 자경단': s2_raw.iloc[-1],
-            '💳 크레딧 스트레스': s3_raw.iloc[-1],
-            '🚀 투기적 과열': s4_raw.iloc[-1],
+            '주도주 쏠림': s1_raw.iloc[-1],
+            '채권 자경단': s2_raw.iloc[-1],
+            '크레딧 스트레스': s3_raw.iloc[-1],
+            '투기적 과열': s4_raw.iloc[-1],
         }
         for label, score in comp_data.items():
             bar_color = "#e74c3c" if score >= 70 else ("#f39c12" if score >= 55 else "#27ae60")
@@ -264,12 +264,12 @@ def render_overheat_page():
         # 해석 기준표
         st.markdown("""
         <div style="font-size:0.78rem; color:#666; margin-top:12px; line-height:1.7;">
-        <b>📋 등급 기준</b><br>
-        ❄️ &nbsp;0~35점: 냉각 — 매수 유리<br>
-        ✅ 35~55점: 중립 — 관망<br>
-        👀 55~70점: 주의 — 비중 축소 검토<br>
-        ⚠️ 70~85점: 과열 — 방어적 운용<br>
-        🚨 85~100점: 위험 — 최소화
+        <b> 등급 기준</b><br>
+         &nbsp;0~35점: 냉각 — 매수 유리<br>
+         35~55점: 중립 — 관망<br>
+         55~70점: 주의 — 비중 축소 검토<br>
+         70~85점: 과열 — 방어적 운용<br>
+         85~100점: 위험 — 최소화
         </div>
         """, unsafe_allow_html=True)
 
@@ -277,14 +277,14 @@ def render_overheat_page():
     st.markdown('''
     신영증권 김효진 애널리스트가 제시한 강세장에서 반드시 점검해야 할 **4가지 핵심 체크포인트**를 모니터링합니다.\n\n이러한 리스크들이 무르익지 않으면 추세가 곧장 꺾이지는 않겠지만, 임계점을 넘는 사건이 발생하면 시장이 빠르게 반전될 수 있으므로 사이드미러와 백미러를 함께 확인하는 신중한 투자가 필요한 시점입니다.\n\n''')
 
-    with st.expander("💡 차트 데이터 표준화(Base 100) 및 읽는 법 안내"):
+    with st.expander("차트 데이터 표준화(Base 100) 및 읽는 법 안내"):
         st.markdown('''
-        본 페이지의 모든 차트는 수만 원대의 주식, 80달러대의 유가, 4%대의 국채 금리 등 **서로 단위가 완전히 다른 지표들을 한 화면에서 직관적으로 비교**하기 위해 **'Base 100' 표준화 기법**을 적용했습니다.\n\n* **Base 100 작동 원리**: 조회 기간(최근 6개월)의 첫날 가격을 무조건 '100'으로 환산하여 출발합니다.\n\n* **해석 방법**: 만약 삼성전자의 선이 '110'에 있고 유가 선이 '90'에 있다면, 이는 6개월 전 대비 삼성전자는 정확히 10% 상승했고 유가는 10% 하락했음을 의미합니다.\n\n* **비교의 타당성**: Z-Score(표준편차) 방식과 달리 누적 수익률(성장률)을 그대로 반영하므로, **"주도주로 얼마나 자금이 쏠리고 있는지(압착)", "시장 지표들이 상대적으로 얼마나 과열되었는지"**를 1:1로 비교하는 데 가장 타당하고 직관적인 방식입니다.\n\n차트의 Y축 수치는 단순한 가격이 아닌 **'누적 수익률'**로 읽어주시면 됩니다.\n\n''')
+        본 페이지의 모든 차트는 수만 원대의 주식, 80달러대의 유가, 4%대의 국채 금리 등 **서로 단위가 완전히 다른 지표들을 한 화면에서 직관적으로 비교**하기 위해 **'Base 100'표준화 기법**을 적용했습니다.\n\n* **Base 100 작동 원리**: 조회 기간(최근 6개월)의 첫날 가격을 무조건 '100'으로 환산하여 출발합니다.\n\n* **해석 방법**: 만약 삼성전자의 선이 '110'에 있고 유가 선이 '90'에 있다면, 이는 6개월 전 대비 삼성전자는 정확히 10% 상승했고 유가는 10% 하락했음을 의미합니다.\n\n* **비교의 타당성**: Z-Score(표준편차) 방식과 달리 누적 수익률(성장률)을 그대로 반영하므로, **"주도주로 얼마나 자금이 쏠리고 있는지(압착)", "시장 지표들이 상대적으로 얼마나 과열되었는지"**를 1:1로 비교하는 데 가장 타당하고 직관적인 방식입니다.\n\n차트의 Y축 수치는 단순한 가격이 아닌 **'누적 수익률'**로 읽어주시면 됩니다.\n\n''')
 
     st.markdown("---")
 
     # ─── 6개월 추세 (4개 시그널 + 종합 인덱스) ───
-    st.markdown("**📉 과열 지수 6개월 추세 (시그널별 기여도 분해)**")
+    st.markdown("** 과열 지수 6개월 추세 (시그널별 기여도 분해)**")
 
     fig_trend = go.Figure()
 
@@ -319,7 +319,7 @@ def render_overheat_page():
     # 종합 지수 (굵은 선)
     fig_trend.add_trace(go.Scatter(
         x=df_overheat.index, y=df_overheat['과열_지수'],
-        name='📊 종합 과열 지수', mode='lines',
+        name='종합 과열 지수', mode='lines',
         line=dict(color='#2c3e50', width=3), fill='tozeroy',
         fillcolor='rgba(44,62,80,0.08)'
     ))
@@ -338,8 +338,8 @@ def render_overheat_page():
     )
     st.plotly_chart(fig_trend, use_container_width=True, key="chart_2")
 
-    st.info(f"""💡 **과열 지수(MOI) 해석 가이드**
-{grade_emoji} **현재 {latest_idx:.1f}점 ({grade})** | 5일 전 대비 **{delta_5d:+.1f}점**
+    st.info(f"""**과열 지수(MOI) 해석 가이드**
+**현재 {latest_idx:.1f}점 ({grade})** | 5일 전 대비 **{delta_5d:+.1f}점**
 
 **적용 모델**: {model_desc}
 (가중치: 쏠림 {W1*100:.1f}%, 채권자경단 {W2*100:.1f}%, 크레딧 {W3*100:.1f}%, 투기적 과열 {W4*100:.1f}%)
@@ -349,7 +349,7 @@ def render_overheat_page():
 
 
     st.markdown("---")
-    st.header("🤖 실시간 AI 진단 (김효진 박사 관점)")
+    st.header("실시간 AI 진단 (김효진 박사 관점)")
     
     # AI API 설정
     gemini_key = None
@@ -420,14 +420,14 @@ def render_overheat_page():
     @st.cache_data(ttl=3600)
     def get_ai_overheat_analysis(data_text):
         if not gemini_key:
-            return "⚠️ Gemini API 키가 설정되지 않아 AI 분석을 수행할 수 없습니다.\n\nSecrets 설정을 확인해주세요."
+            return "Gemini API 키가 설정되지 않아 AI 분석을 수행할 수 없습니다.\n\nSecrets 설정을 확인해주세요."
         
         prompt = f'''
 당신은 신영증권 김효진 박사의 관점을 가진 수석 시장 분석가입니다.\n\n현재 코스피 등 증시가 3년 전 대비 세 배 가까이 오른 강세장에서, 시장의 과열과 반전 리스크를 판단하기 위해 다음 4가지 핵심 체크포인트를 분석해야 합니다.\n\n1. 주도주의 압착 현상: 삼성전자, SK하이닉스 등 극소수 주도주만 상승하고 KODEX 200 동일가중 지수 및 비주도 섹터(자동차, 은행, 바이오 등)가 전반적으로 소외/하락하며 자금 쏠림이 극심해지는지 평가하세요.\n\n2. 채권 자경단의 출현: 유가(WTI) 상승과 동반된 미 국채 10년물 금리의 급등이 인플레이션 우려를 자극하고 증시에 금리 부담을 주고 있는지 평가하세요.\n\n3. 사모 크레딧 환매 리스크: 하이일드 ETF(HYG)의 수익률 둔화나 하락을 통해 수면 아래 사모/비우량 신용 시장의 자금 이탈 징후가 있는지 평가하세요.\n\n4. 대형 IPO와 위험 선호도 정점: 글로벌 벤치마크인 S&P 500과 비교하여 미국 IPO ETF가 비정상적으로 가파르게 급등하며 시장의 투기적 과열이 단기 정점에 달했는지 평가하세요.\n\n최근 6개월 데이터 요약 (최초일 Base 100 환산값):
 {data_text}
 
 지시사항 (CRITICAL RULES):
-1. 당신의 응답은 **무조건** 아래의 출력 템플릿과 100% 동일한 양식으로만 작성되어야 합니다.\n\n2. 프롬프트 내용의 복사, "분석을 시작하겠습니다" 등의 서론, 인사말은 일절 금지합니다.\n\n3. 반드시 한국어로만 작성하세요.\n\n[출력 템플릿]
+1. 당신의 응답은 **무조건** 아래의 출력 템플릿과 100% 동일한 양식으로만 작성되어야 합니다.\n\n2. 프롬프트 내용의 복사, "분석을 시작하겠습니다"등의 서론, 인사말은 일절 금지합니다.\n\n3. 반드시 한국어로만 작성하세요.\n\n[출력 템플릿]
 **[종합 분석 결과]**
 (여기에 김효진 박사 관점의 전문가적 분석 내용 2~3문단 작성.\n\n마침표 뒤에는 반드시 줄바꿈 2번 적용할 것)
 
@@ -475,14 +475,14 @@ def render_overheat_page():
 
     if st.session_state.get("overheat_ai_result"):
         saved_at = st.session_state.get("overheat_ai_saved_at", "N/A")
-        st.caption(f"✅ 마지막 AI 분석: {saved_at} (변동이 적을 경우 자동 캐싱 유지)")
+        st.caption(f"마지막 AI 분석: {saved_at} (변동이 적을 경우 자동 캐싱 유지)")
         col_btn1, _ = st.columns([2, 6])
         with col_btn1:
-            run_ai = st.button("🔄 최신 AI 분석 강제 요청", use_container_width=True)
+            run_ai = st.button("최신 AI 분석 강제 요청", use_container_width=True)
     else:
         col_btn1, _ = st.columns([2, 6])
         with col_btn1:
-            run_ai = st.button("🚀 실시간 AI 진단 실행", use_container_width=True)
+            run_ai = st.button("실시간 AI 진단 실행", use_container_width=True)
 
     # 자동 로직
     if not run_ai and st.session_state.get("overheat_ai_result"):
@@ -552,7 +552,7 @@ def render_overheat_page():
         xaxis=dict(tickformat="%m월")
     )
     st.plotly_chart(fig1, use_container_width=True, key="chart_3")
-    st.info("💡 **차트 읽는 법:** 주도주(삼성전자, SK하이닉스) 선과 나머지 비주도 섹터/동일가중 선의 위아래 격차가 무섭게 벌어질수록 극소수 종목으로 자금이 몰리는 '압착(Compression)'이 극심함을 의미합니다.\n\n📊 **데이터 가공 기준:** 6개월 전(조회 기간 첫 날)의 가격을 '100'으로 고정(Base 100)하여, 현재까지 누적해서 몇 % 상승/하락했는지 직관적으로 비교합니다.")
+    st.info("**차트 읽는 법:** 주도주(삼성전자, SK하이닉스) 선과 나머지 비주도 섹터/동일가중 선의 위아래 격차가 무섭게 벌어질수록 극소수 종목으로 자금이 몰리는 '압착(Compression)'이 극심함을 의미합니다.\n\n **데이터 가공 기준:** 6개월 전(조회 기간 첫 날)의 가격을 '100'으로 고정(Base 100)하여, 현재까지 누적해서 몇 % 상승/하락했는지 직관적으로 비교합니다.")
 
     # 2. 채권 자경단의 출현
     st.header("2. 채권 자경단의 출현")
@@ -606,7 +606,7 @@ def render_overheat_page():
     )
     
     st.plotly_chart(fig2, use_container_width=True, key="chart_4")
-    st.info("💡 **차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200과 WTI 유가의 누적 수익률을, 우측 Y축은 미 국채 10년물 금리의 실제 수치(%)를 표시합니다. KODEX 200이 고점을 높이는데도 불구하고, 금리(우축)가 4%→5% 같이 가파르게 오른다면 '채권 자경단'의 출현을 암시하는 강력한 위험 신호입니다.\n\n📊 **데이터 가공 기준:** KODEX 200/WTI는 6개월 전 = 100 기준(Base 100), 국채 금리는 실제 만기수익률(%)을 우측 Y축에 직접 표시합니다.")
+    st.info("**차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200과 WTI 유가의 누적 수익률을, 우측 Y축은 미 국채 10년물 금리의 실제 수치(%)를 표시합니다. KODEX 200이 고점을 높이는데도 불구하고, 금리(우축)가 4%→5% 같이 가파르게 오른다면 '채권 자경단'의 출현을 암시하는 강력한 위험 신호입니다.\n\n **데이터 가공 기준:** KODEX 200/WTI는 6개월 전 = 100 기준(Base 100), 국채 금리는 실제 만기수익률(%)을 우측 Y축에 직접 표시합니다.")
 
     # 3. 사모 크레딧 환매 리스크
     st.header("3. 사모 크레딧 환매 리스크")
@@ -650,7 +650,7 @@ def render_overheat_page():
     )
     
     st.plotly_chart(fig3, use_container_width=True, key="chart_5")
-    st.info("💡 **차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200 누적 수익률을, 우측 Y축은 하이일드 ETF(HYG)의 실제 달러 가격을 표시합니다. 증시(좌축)는 평온해 보여도 HYG(우축)가 $80→$79처럼 미세하게 하락하기 시작하면, 수면 아래 비우량 신용 시장의 자금 이탈이 시작된 것으로 해석합니다.\n\n📊 **데이터 가공 기준:** KODEX 200은 Base 100 누적 수익률(좌축), HYG는 실제 달러($) 가격(우축)으로 직접 표시합니다.")
+    st.info("**차트 읽는 법:** 좌측 Y축(Base 100)은 KODEX 200 누적 수익률을, 우측 Y축은 하이일드 ETF(HYG)의 실제 달러 가격을 표시합니다. 증시(좌축)는 평온해 보여도 HYG(우축)가 $80→$79처럼 미세하게 하락하기 시작하면, 수면 아래 비우량 신용 시장의 자금 이탈이 시작된 것으로 해석합니다.\n\n **데이터 가공 기준:** KODEX 200은 Base 100 누적 수익률(좌축), HYG는 실제 달러($) 가격(우축)으로 직접 표시합니다.")
 
     # 4. 대형 IPO와 위험 선호도
     st.header("4. 대형 IPO와 위험 선호도")
@@ -703,7 +703,7 @@ def render_overheat_page():
     )
     
     st.plotly_chart(fig4, use_container_width=True, key="chart_6")
-    st.info("💡 **차트 읽는 법:** 좌측 Y축은 KODEX 200(국내 증시), 우측 Y축은 미국 IPO ETF와 S&P 500을 각각 Base 100으로 표시합니다. 우측 축 안에서 IPO ETF(연두)가 S&P 500(주황)보다 가파르게 벌어진다면 투기적 과열의 신호입니다. 국내 주가의 큰 스케일에 미국 지표가 묻히지 않도록 좌우 축을 분리했습니다.\n\n📊 **데이터 가공 기준:** 세 지표 모두 6개월 전 첫 날 = 100 기준(Base 100). KODEX 200은 좌축, IPO ETF / S&P 500은 우축으로 정밀 비교합니다.")
+    st.info("**차트 읽는 법:** 좌측 Y축은 KODEX 200(국내 증시), 우측 Y축은 미국 IPO ETF와 S&P 500을 각각 Base 100으로 표시합니다. 우측 축 안에서 IPO ETF(연두)가 S&P 500(주황)보다 가파르게 벌어진다면 투기적 과열의 신호입니다. 국내 주가의 큰 스케일에 미국 지표가 묻히지 않도록 좌우 축을 분리했습니다.\n\n **데이터 가공 기준:** 세 지표 모두 6개월 전 첫 날 = 100 기준(Base 100). KODEX 200은 좌축, IPO ETF / S&P 500은 우축으로 정밀 비교합니다.")
 
     # 하단 여백 추가 (화면 잘림 방지)
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)

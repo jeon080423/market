@@ -77,9 +77,9 @@ def check_secrets():
     
     missing_keys = [k for k, v in secrets_status.items() if not v]
     if missing_keys:
-        st.error(f"⚠️ 다음 Secrets 설정이 누락되었거나 형식이 잘못되었습니다: {', '.join(missing_keys)}")
+        st.error(f"다음 Secrets 설정이 누락되었거나 형식이 잘못되었습니다: {', '.join(missing_keys)}")
         
-        with st.expander("🛠️ 스트리밋 클라우드 시크릿 설정 방법 (중요한 해결책)", expanded=True):
+        with st.expander("스트리밋 클라우드 시크릿 설정 방법 (중요한 해결책)", expanded=True):
             st.markdown(f"""
             ### 원인 분석
             현재 시스템이 다음 필수 설정을 찾을 수 없습니다: **{', '.join(missing_keys)}**
@@ -105,7 +105,7 @@ sheet_id = "구글시트_ID"
             
             try:
                 found_keys = list(st.secrets.keys())
-                st.info(f"🔍 **현재 감지된 최상위 키들:** `{found_keys}`")
+                st.info(f"**현재 감지된 최상위 키들:** `{found_keys}`")
                 # 각 섹션 내부의 키도 보여주기 (값은 제외)
                 for k in found_keys:
                     section = st.secrets[k]
@@ -113,7 +113,7 @@ sheet_id = "구글시트_ID"
                         st.write(f"- `{k}` 섹션 내부 키: `{list(section.keys())}`")
             except: pass
                 
-            st.warning("💡 **참고:** 이미 입력했다고 생각되신다면, `[news_api]`와 같은 섹션 제목이 정확한지 다시 한번 확인 부탁드립니다.")
+            st.warning("**참고:** 이미 입력했다고 생각되신다면, `[news_api]`와 같은 섹션 제목이 정확한지 다시 한번 확인 부탁드립니다.")
         st.stop()
         
     return news_key, gemini_key, admin_id, admin_pw, sheet_id
@@ -211,8 +211,8 @@ def get_ai_analysis(prompt):
                     
     err_msg_lower = last_error_msg.lower()
     if "quota" in err_msg_lower or "429" in err_msg_lower or "exhausted" in err_msg_lower:
-        return "⚠️ Gemini API 무료 사용량(Quota)을 모두 소진했습니다.\n\n내일 다시 시도하시거나, 구글 클라우드에서 결제 정보를 등록해 한도를 늘려주세요."
-    return f"⚠️ 현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다.\n\n잠시 후 다시 시도해 주세요. (에러: {last_error_msg})"
+        return "Gemini API 무료 사용량(Quota)을 모두 소진했습니다.\n\n내일 다시 시도하시거나, 구글 클라우드에서 결제 정보를 등록해 한도를 늘려주세요."
+    return f"현재 AI 모델 서버가 혼잡하여 일시적으로 응답을 받을 수 없습니다.\n\n잠시 후 다시 시도해 주세요. (에러: {last_error_msg})"
 
 # AI 응답 정제 함수 (최소한의 안전 필터만 적용)
 def clean_ai_output(text):
@@ -224,7 +224,7 @@ def clean_ai_output(text):
     if match:
         text = match.group(1).strip()
     
-    # AI가 "Draft 1 (Literal):..." 형태의 단락을 여러 개 뱉으면
+    # AI가 "Draft 1 (Literal):..."형태의 단락을 여러 개 뱉으면
     # 마지막 단락만 사용 (가장 완성된 번역)
     draft_positions = [m.start() for m in re.finditer(r'Draft\s*\d+', text, re.IGNORECASE)]
     if len(draft_positions) >= 2:
@@ -254,7 +254,7 @@ def clean_news_translation(text):
     for line in lines:
         # 마크다운 기호 제거 후 공백 제거
         line_clean = line.strip().replace('**', '').replace('*', '').strip()
-        # "1. ", "2. " 등 숫자로 시작하고 한글을 포함하는 행만 필터링 (영어 프롬프트 설명글 제거)
+        # "1. ", "2. "등 숫자로 시작하고 한글을 포함하는 행만 필터링 (영어 프롬프트 설명글 제거)
         if re.match(r'^\d+\.\s+', line_clean) and re.search(r'[ㄱ-ㅎㅏ-ㅣ가-힣]', line_clean):
             numbered_lines.append(line_clean)
             
@@ -366,17 +366,17 @@ if "run_ai_trigger" not in st.session_state:
 # 사이드바 공통 메뉴 추가
 # 사이드바 공통 메뉴 추가
 with st.sidebar:
-    st.subheader("📋 대시보드 메뉴")
-    if st.button("📊 KOSPI 위험 모니터링", use_container_width=True):
+    st.subheader("대시보드 메뉴")
+    if st.button("KOSPI 위험 모니터링", use_container_width=True):
         st.session_state["active_tab"] = "risk_monitor"
         st.rerun()
-    if st.button("📺 실시간 종목 탐색 (인기/수급)", use_container_width=True):
+    if st.button("실시간 종목 탐색 (인기/수급)", use_container_width=True):
         st.session_state["active_tab"] = "youtube_rank"
         st.rerun()
-    if st.button("🔥 과열 국면 시그널", use_container_width=True):
+    if st.button("과열 국면 시그널", use_container_width=True):
         st.session_state["active_tab"] = "overheat_signal"
         st.rerun()
-    if st.button("📈 종목 가치(빈센트)", use_container_width=True):
+    if st.button("종목 가치(빈센트)", use_container_width=True):
         st.session_state["active_tab"] = "vincent_valuation"
         st.rerun()
 
@@ -392,7 +392,7 @@ elif st.session_state["active_tab"] == "vincent_valuation":
     st.stop()
 
 # 3. 제목 및 설명
-st.title("📊 코스피(KOSPI) 전망 및 시장 과열 위험 모니터링")
+st.title("코스피(KOSPI) 전망 및 시장 과열 위험 모니터링")
 st.markdown(f"""
 이 대시보드는 글로벌 거시 지표와 AI 모델을 융합하여 **향후 1주일(5~10거래일) 후**의 KOSPI 변동 위험 및 시장 과열 지수(MOI)를 예측하고 모니터링합니다. 
 실시간 금융 데이터와 Gemini AI 엔진을 결합한 지능형 마켓 분석 툴킷입니다.
@@ -402,7 +402,7 @@ st.markdown(f"""
 st.markdown("---")
 
 # --- [안내서 섹션] ---
-with st.expander("📖 지수 가이드북"):
+with st.expander("지수 가이드북"):
     st.subheader("1. 지수 산출 핵심 지표 (Core Indicators)")
     st.write("""
     본 모델의 지표들은 KOSPI와의 **통계적 상관관계** 및 **하락 선행성**을 기준으로 선정되었습니다.\n\n* **글로벌 리스크**: 미국 **S&P 500 지수**를 활용하며, 한국 증시와의 강력한 동조화 경향을 반영합니다.\n\n* **통화 및 유동성**: **원/달러 환율** 및 **달러 인덱스(DXY)** 를 통해 외국인 자본 유출 압력을 측정합니다.\n\n* **시장 심리**: **VIX(공포 지수)** 를 통해 투자자의 불안 심리와 변동성 전조를 파악합니다.\n\n* **실물 경제**: 경기 선행 지표인 **구리 가격(Copper)** 과 **장단기 금리차**를 포함합니다.\n\n""")
@@ -420,7 +420,7 @@ with st.expander("📖 지수 가이드북"):
     
     st.markdown("#### **③ 실시간 패닉 이벤트 탐지 (Real-time Panic Detection)**")
     st.write("""
-    * **안전자산 및 공포 심리 급등 감지**: 전쟁, 금융위기 등 블랙스완 발생 시 가장 먼저 반응하는 **금(Gold), 스위스 프랑(CHF), 엔/원 환율, VVIX(공포 변동성)** 지표의 최근 5일 이상 급등세를 모니터링합니다.\n\n* **뉴스 공포 키워드 밀집도**: 글로벌 뉴스 헤드라인에서 'War', 'Bankrupt', 'Default' 등 치명적 키워드 발생 빈도를 실시간으로 추적합니다.\n\n* **위험 지수 강제 오버라이딩**: 위 지표들이 동시다발적으로 임계치를 돌파하면, 기존 거시 지표 기반의 위험 점수를 무시하고 **최종 위험 지수를 강제로 상향(Panic Override)** 시켜 즉각적인 경보를 발송합니다.\n\n""")
+    * **안전자산 및 공포 심리 급등 감지**: 전쟁, 금융위기 등 블랙스완 발생 시 가장 먼저 반응하는 **금(Gold), 스위스 프랑(CHF), 엔/원 환율, VVIX(공포 변동성)** 지표의 최근 5일 이상 급등세를 모니터링합니다.\n\n* **뉴스 공포 키워드 밀집도**: 글로벌 뉴스 헤드라인에서 'War', 'Bankrupt', 'Default'등 치명적 키워드 발생 빈도를 실시간으로 추적합니다.\n\n* **위험 지수 강제 오버라이딩**: 위 지표들이 동시다발적으로 임계치를 돌파하면, 기존 거시 지표 기반의 위험 점수를 무시하고 **최종 위험 지수를 강제로 상향(Panic Override)** 시켜 즉각적인 경보를 발송합니다.\n\n""")
     
     st.markdown("#### **④ 요약**")
     st.info("본 모델은 통계적 정상성을 확보한 수익률 기반 분석과 이상치에 강건한 시그모이드 정규화를 통해 **구조적 위험**을 선행 포착하며, 동시에 실시간 패닉 감지 모듈을 통해 **돌발적 블랙스완**에도 즉각 대응할 수 있는 **하이브리드 조기 경보 시스템**입니다.")
@@ -759,14 +759,14 @@ try:
     # 5. 사이드바 - 최적 가중치 설정 (5일 선행 패닉 적중률 최적화 결과)
     opt_w = [0.15, 0.11, 0.12, 0.27, 0.35] # FX, WTI, SP, VX, TECH
 
-    st.sidebar.header("⚙️ 지표별 가중치 설정")
+    st.sidebar.header("지표별 가중치 설정")
     if 'slider_fx' not in st.session_state: st.session_state.slider_fx = opt_w[0]
     if 'slider_wt' not in st.session_state: st.session_state.slider_wt = opt_w[1]
     if 'slider_g' not in st.session_state: st.session_state.slider_g = opt_w[2]
     if 'slider_f' not in st.session_state: st.session_state.slider_f = opt_w[3]
     if 'slider_t' not in st.session_state: st.session_state.slider_t = opt_w[4]
 
-    if st.sidebar.button("🔄 권장 최적 가중치로 복귀"):
+    if st.sidebar.button("권장 최적 가중치로 복귀"):
         st.session_state.slider_fx = opt_w[0]
         st.session_state.slider_wt = opt_w[1]
         st.session_state.slider_g = opt_w[2]
@@ -780,7 +780,7 @@ try:
     w_fear = st.sidebar.slider("시장 공포 (VIX 지수 상승)", 0.0, 1.0, key="slider_f", step=0.01)
     w_tech = st.sidebar.slider("국내 기술적 지표 (20일선 이격도)", 0.0, 1.0, key="slider_t", step=0.01)
 
-    with st.sidebar.expander("ℹ️ 가중치 산출 알고리즘"):
+    with st.sidebar.expander("가중치 산출 알고리즘"):
         st.caption("""
         본 모델은 **1주일 선행 수익률 분석(Lagged Return Forecasting)** 기법을 사용합니다.\n\n1. **미래 예측성 강제 (Lead Time Enforcement)**:
             모든 지표에 대해 **5~12거래일 전**의 선행 데이터만 사용하여 KOSPI 수익률과의 관계를 정의합니다.\n\n2. **수익률 기반 상관 관계**:
@@ -788,7 +788,7 @@ try:
             오늘의 지표값을 위에서 도출된 '미래 전조 가중치'에 대입하여, **다음 주 시장의 잠재적 리스크**를 산출합니다.\n\n""")
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🔒 관리자 모드")
+    st.sidebar.subheader("관리자 모드")
     admin_id_input = st.sidebar.text_input("아이디", key="admin_id_bottom")
     admin_pw_input = st.sidebar.text_input("비밀번호", type="password", key="admin_pw_bottom")
     is_admin = (admin_id_input == ADMIN_ID and admin_pw_input == ADMIN_PW)
@@ -932,17 +932,17 @@ try:
 
     # [신규] 패닉 경보 배너 표시
     if final_panic_score > 60 and final_panic_score > base_risk:
-        st.error(f"🚨 **[긴급: 실시간 패닉 이벤트 확률 상승]** 🚨\n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다.\n\n(기초 위험 점수: {base_risk:.1f} ➔ **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
+        st.error(f"**[긴급: 실시간 패닉 이벤트 확률 상승]** \n\n단기 안전자산 및 공포 심리 급등이 감지되어 예측 지배 가중치가 오버라이딩 되었습니다.\n\n(기초 위험 점수: {base_risk:.1f} → **패닉 보정 위험 점수: {applied_base_risk:.1f}**)")
 
     # 등급 판정
     if total_risk_index >= 80:
-        grade, grade_color, grade_emoji = "패닉 (PANIC)", "#c0392b", "🚨"
+        grade, grade_color = "패닉 (PANIC)", "#c0392b"
     elif total_risk_index >= 60:
-        grade, grade_color, grade_emoji = "방어 (CAUTION)", "#e67e22", "⚠️"
+        grade, grade_color = "방어 (CAUTION)", "#e67e22"
     elif total_risk_index >= 40:
-        grade, grade_color, grade_emoji = "대비 (READY)", "#f1c40f", "👀"
+        grade, grade_color = "대비 (READY)", "#f1c40f"
     else:
-        grade, grade_color, grade_emoji = "수익 극대화 (GROWTH)", "#27ae60", "✅"
+        grade, grade_color = "수익 극대화 (GROWTH)", "#27ae60"
 
     c_gauge, c_guide = st.columns([1.2, 0.8])
     with c_gauge: 
@@ -952,7 +952,7 @@ try:
             number={'suffix': "점", 'font': {'size': 38}},
             delta={'reference': prev_idx, 'increasing': {'color': "#e74c3c"}, 'decreasing': {'color': "#2ecc71"},
                    'suffix': "pt (5일전 대비)", 'font': {'size': 14}},
-            title={'text': f"KOSPI 예측적 위험  {grade_emoji} {grade}", 'font': {'size': 16}},
+            title={'text': f"KOSPI 예측적 위험 - {grade}", 'font': {'size': 16}},
             gauge={
                 'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#555",
                          'tickvals': [0, 40, 60, 80, 100],
@@ -979,13 +979,13 @@ try:
         st.plotly_chart(fig_gauge, use_container_width=True, key="chart_1", config={'displayModeBar': False})
 
     with c_guide: 
-        st.markdown("**📊 예측 컴포넌트별 위험도**")
+        st.markdown("** 예측 컴포넌트별 위험도**")
         comp_data = {
-            '📉 기술적 이격 (KOSPI 20MA)': t_now,
-            '😱 시장 공포 (VIX)': vx_now,
-            '💵 자본 이탈 (환율)': fx_now,
-            '📈 미국 시장 (S&P 500)': sp_now,
-            '🛢️ 에너지 충격 (WTI 유가)': wt_now,
+            '기술적 이격 (KOSPI 20MA)': t_now,
+            '시장 공포 (VIX)': vx_now,
+            '자본 이탈 (환율)': fx_now,
+            '미국 시장 (S&P 500)': sp_now,
+            '에너지 충격 (WTI 유가)': wt_now,
         }
         for label, score in comp_data.items():
             bar_color = "#e74c3c" if score >= 80 else ("#f39c12" if score >= 60 else ("#f1c40f" if score >= 40 else "#27ae60"))
@@ -1004,11 +1004,11 @@ try:
             
         st.markdown("""
         <div style="font-size:0.78rem; color:#666; margin-top:12px; line-height:1.7;">
-        <b>💡 예측 지수 활용 가이드 (1주 선행)</b><br>
-        ✅ &nbsp;&nbsp;0~40: 수익 극대화 — 상방 압력 우세<br>
-        👀 40~60: 대비 — 변동성 대비, 관망<br>
-        ⚠️ 60~80: 방어 — 주식 비중 축소<br>
-        🚨 80~100: 패닉 — 비상 탈출, 현금 확보
+        <b> 예측 지수 활용 가이드 (1주 선행)</b><br>
+         &nbsp;&nbsp;0~40: 수익 극대화 — 상방 압력 우세<br>
+         40~60: 대비 — 변동성 대비, 관망<br>
+         60~80: 방어 — 주식 비중 축소<br>
+         80~100: 패닉 — 비상 탈출, 현금 확보
         </div>
         """, unsafe_allow_html=True)
 
@@ -1018,7 +1018,7 @@ try:
         st.write("")
         l_col1, l_col2 = st.columns([1, 4])
         with l_col1:
-            if st.button(f"👍 {st.session_state.likes}", use_container_width=True):
+            if st.button(f" {st.session_state.likes}", use_container_width=True):
                 st.session_state.likes += 1
                 st.rerun()
         with l_col2:
@@ -1031,7 +1031,7 @@ try:
     st.markdown("---")
     
     # --- [통합 AI 분석/번역 진단 제어부] ---
-    st.subheader("🚀 AI 통합 번역 및 시장 진단")
+    st.subheader("AI 통합 번역 및 시장 진단")
     st.markdown("""
     Gemini AI 모델을 사용하여 글로벌 경제 뉴스 헤드라인 번역, 트럼프 소셜 브리핑 번역, 
     시장 위험 지수 모델 유효성 진단 및 핵심 시장 지표 종합 진단을 한 번에 수행합니다.
@@ -1059,22 +1059,22 @@ try:
 
     if st.session_state.get("ai_analysis_results") is not None:
         saved_at = st.session_state.get("ai_last_saved_at", "N/A")
-        st.caption(f"✅ 마지막 AI 분석: {saved_at} (변동이 적을 경우 자동 캐싱 유지)")
+        st.caption(f"마지막 AI 분석: {saved_at} (변동이 적을 경우 자동 캐싱 유지)")
         col_btn1, col_btn2, _ = st.columns([1.5, 1.5, 5])
         with col_btn1:
-            if st.button("🔄 최신 AI 분석 강제 요청", key="btn_run_ai_analysis", use_container_width=True):
+            if st.button("최신 AI 분석 강제 요청", key="btn_run_ai_analysis", use_container_width=True):
                 st.session_state["run_ai_trigger"] = True
                 st.session_state["ai_analysis_results"] = None
                 st.rerun()
         with col_btn2:
-            if st.button("❌ 분석 결과 지우기", key="btn_clear_ai_analysis", use_container_width=True):
+            if st.button("분석 결과 지우기", key="btn_clear_ai_analysis", use_container_width=True):
                 st.session_state["run_ai_trigger"] = False
                 st.session_state["ai_analysis_results"] = None
                 st.rerun()
     else:
         col_btn1, _ = st.columns([2, 6])
         with col_btn1:
-            if st.button("🚀 최신 AI 분석 요청", key="btn_run_ai_analysis", use_container_width=True):
+            if st.button("최신 AI 분석 요청", key="btn_run_ai_analysis", use_container_width=True):
                 st.session_state["run_ai_trigger"] = True
                 st.rerun()
 
@@ -1091,7 +1091,7 @@ try:
     c_news_left, c_news_right = st.columns(2)
     with c_news_left:
         # 제목 텍스트 업데이트
-        st.subheader("📰 글로벌 경제 뉴스")
+        st.subheader("글로벌 경제 뉴스")
         news_data, news_panic_count = get_market_news()
         all_titles = ""
         for a in news_data:
@@ -1104,12 +1104,12 @@ try:
         
         # 뉴스 기반 공포 심리 경보
         if 'news_panic_count' in locals() and news_panic_count >= 2:
-            st.error(f"🚨 **[주의] 뉴스 공포 심리 확산 감지**\n\n최근 24시간 내 시장 헤드라인에서 치명적 위험 키워드(War, Default 등)가 **{news_panic_count}회** 감지되었습니다.\n\n투자 심리 악화에 대비하세요.")
+            st.error(f"**[주의] 뉴스 공포 심리 확산 감지**\n\n최근 24시간 내 시장 헤드라인에서 치명적 위험 키워드(War, Default 등)가 **{news_panic_count}회** 감지되었습니다.\n\n투자 심리 악화에 대비하세요.")
 
     st.markdown("---")
     c_trump_left, c_trump_right = st.columns(2)
     with c_trump_left:
-        st.subheader("🇺🇸 트럼프 소셜 최신 브리핑 (Original)")
+        st.subheader("트럼프 소셜 최신 브리핑 (Original)")
         trump_data = get_trump_feed()
         if trump_data:
             for t in trump_data:
@@ -1123,7 +1123,7 @@ try:
 
     # 7. 백테스팅
     st.markdown("---")
-    st.subheader("📉 시장 위험 지수 백테스팅 (최근 1년)")
+    st.subheader("시장 위험 지수 백테스팅 (최근 1년)")
     st.info("과거 데이터를 사용하여 모델의 유효성을 검증합니다.")
     hist_df = pd.DataFrame({'Date': dates, 'Risk': hist_risks, 'KOSPI': ks_s.loc[dates].values})
     
@@ -1214,7 +1214,7 @@ try:
 
     # 7.5 블랙스완
     st.markdown("---")
-    st.subheader("🦢 블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
+    st.subheader("블랙스완(Black Swan) 과거 사례 비교 시뮬레이션")
     @st.cache_data(ttl=86400, show_spinner=False)
     def get_true_historical_risk(start_date, end_date, w_fx, w_wti, w_g, w_f, w_t):
         # 과거 데이터는 분석 기간보다 1년 전부터 가져와야 z-score 계산(과거 1년 롤링)이 가능합니다.
@@ -1324,13 +1324,13 @@ try:
         # 유사도 점수 표시 (우측 상단)
         if best_corr > 0:
             sim_score = best_corr * 100
-            sim_text = f"🚨 폭락 직전 패턴 일치율: {sim_score:.1f}%"
+            sim_text = f"폭락 직전 패턴 일치율: {sim_score:.1f}%"
             bg_color = "rgba(255, 255, 255, 0.8)"
             font_color = "red" if sim_score > 70 else "black"
             border_color = "red" if sim_score > 70 else "gray"
         else:
             sim_score = 0
-            sim_text = f"✅ 패턴 불일치 (위험 징후 없음)"
+            sim_text = f"패턴 불일치 (위험 징후 없음)"
             bg_color = "rgba(230, 255, 230, 0.8)"
             font_color = "green"
             border_color = "green"
@@ -1361,11 +1361,11 @@ try:
         fig_bs0, sim_00, d_day_00 = create_black_swan_chart(bs_2000, current_series, "2000 닷컴 버블")
         st.plotly_chart(fig_bs0, use_container_width=True, key="chart_3")
         if sim_00 > 70 and d_day_00 > 0 and d_day_00 <= 30:
-            st.warning(f"⚠️ 2000년 버블 직전(D-{int(d_day_00)})과 패턴이 {sim_00:.1f}% 일치하여 주의가 필요합니다.")
+            st.warning(f"2000년 버블 직전(D-{int(d_day_00)})과 패턴이 {sim_00:.1f}% 일치하여 주의가 필요합니다.")
         elif avg_current_risk > 60:
-            st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 높아 버블 붕괴 초기 단계일 수 있습니다.")
+            st.warning(f"현재 위험 지수(평균 {avg_current_risk:.1f})가 높아 버블 붕괴 초기 단계일 수 있습니다.")
         else:
-            st.success(f"✅ 현재 위험 지수 흐름은 닷컴 버블 붕괴 경로와 거리가 있습니다.")
+            st.success(f"현재 위험 지수 흐름은 닷컴 버블 붕괴 경로와 거리가 있습니다.")
 
     with col_bs2:
         st.info("**2008 금융위기 vs 현재**")
@@ -1373,11 +1373,11 @@ try:
         fig_bs1, sim_08, d_day_08 = create_black_swan_chart(bs_2008, current_series, "2008 금융위기")
         st.plotly_chart(fig_bs1, use_container_width=True, key="chart_4")
         if sim_08 > 70 and d_day_08 > 0 and d_day_08 <= 30:
-            st.warning(f"⚠️ 2008년 위기 직전(D-{int(d_day_08)})과 패턴이 {sim_08:.1f}% 일치하여 주의가 필요합니다.")
+            st.warning(f"2008년 위기 직전(D-{int(d_day_08)})과 패턴이 {sim_08:.1f}% 일치하여 주의가 필요합니다.")
         elif avg_current_risk > 60:
-            st.warning(f"⚠️ 현재 위험 지수(평균 {avg_current_risk:.1f})가 높아 위기 초기 단계일 수 있습니다.")
+            st.warning(f"현재 위험 지수(평균 {avg_current_risk:.1f})가 높아 위기 초기 단계일 수 있습니다.")
         else:
-            st.success(f"✅ 현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
+            st.success(f"현재 위험 지수(평균 {avg_current_risk:.1f})는 금융위기 경로와 거리가 있습니다.")
             
     with col_bs3:
         st.info("**2020 코로나 폭락 vs 현재**")
@@ -1385,15 +1385,15 @@ try:
         fig_bs2, sim_20, d_day_20 = create_black_swan_chart(bs_2020, current_series, "2020 코로나 폭락")
         st.plotly_chart(fig_bs2, use_container_width=True, key="chart_5")
         if sim_20 > 70 and d_day_20 > 0 and d_day_20 <= 30:
-            st.error(f"🚨 2020년 팬데믹 폭락(D-{int(d_day_20)})과 패턴이 {sim_20:.1f}% 일치하며 매우 위험합니다.")
+            st.error(f"2020년 팬데믹 폭락(D-{int(d_day_20)})과 패턴이 {sim_20:.1f}% 일치하며 매우 위험합니다.")
         elif avg_current_risk > 50:
-            st.error(f"🚨 주의: 현재 위험 지수가 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
+            st.error(f"주의: 현재 위험 지수가 팬데믹 상승 구간과 유사한 패턴을 보입니다.")
         else:
-            st.info(f"💡 현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
+            st.info(f"현재 위험 지수 흐름은 2020년 패닉 궤적보다는 안정적입니다.")
 
     # 9. 지표별 상세 분석 및 AI 설명
     st.markdown("---")
-    st.subheader("🔍 실물 경제 및 주요 상관관계 지표 분석 (AI 해설)")
+    st.subheader("실물 경제 및 주요 상관관계 지표 분석 (AI 해설)")
     
     # 지표 데이터를 AI 프롬프트용으로 생성
     latest_data_summary = f"""
@@ -1512,7 +1512,7 @@ try:
     ai_indicator_container = st.container()
 
     st.markdown("---")
-    st.subheader("📊 지수간 동조화 및 섹터 분석")
+    st.subheader("지수간 동조화 및 섹터 분석")
     sp_norm = (sp_s - sp_s.mean()) / sp_s.std(); fr_norm = (fr_s - fr_s.mean()) / fr_s.std(); ks_norm = (ks_s - ks_s.mean()) / ks_s.std()
     fig_norm = go.Figure()
     fig_norm.add_trace(go.Scatter(x=ks_norm.index, y=ks_norm.values, name="KOSPI (Std)", line=dict(color='red'), connectgaps=True))
@@ -1527,7 +1527,7 @@ try:
     sc1, sc2 = st.columns(2)
     
     with sc1:
-        st.subheader("🇰🇷 KOSPI 섹터별 대표 종목 등락")
+        st.subheader("KOSPI 섹터별 대표 종목 등락")
         sector_perf = []
         for n, t in sector_map.items():
             try:
@@ -1541,7 +1541,7 @@ try:
             st.plotly_chart(fig_h, use_container_width=True, key="chart_17")
 
     with sc2:
-        st.subheader("🇺🇸 S&P 500 섹터별 대표 등락 (ETF)")
+        st.subheader("S&P 500 섹터별 대표 등락 (ETF)")
         sp500_sector_perf = []
         for n, t in sp500_sector_map.items():
             try:
@@ -1657,13 +1657,13 @@ if st.session_state.get("run_ai_trigger"):
 if news_data and ai_news_container:
     with ai_news_container:
         if st.session_state.get("ai_analysis_results") is None:
-            st.info("💡 AI 뉴스 번역/분석을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+            st.info("AI 뉴스 번역/분석을 원하시면 상단의 'AI 분석 시작'버튼을 눌러주세요.")
         else:
             clean_summary = clean_news_translation(st.session_state["ai_analysis_results"].get("news", ""))
             if clean_summary:
                 st.markdown(f"""
                 <div class="ai-analysis-box">
-                    <strong>🔎 AI 뉴스 헤드라인 번역</strong><br><br>
+                    <strong> AI 뉴스 헤드라인 번역</strong><br><br>
                     {clean_summary}
                 </div>
                 """, unsafe_allow_html=True)
@@ -1674,13 +1674,13 @@ if news_data and ai_news_container:
 if 'trump_data' in locals() and trump_data and ai_trump_container:
     with ai_trump_container:
         if st.session_state.get("ai_analysis_results") is None:
-            st.info("💡 트럼프 소셜 최신 브리핑 번역을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+            st.info("트럼프 소셜 최신 브리핑 번역을 원하시면 상단의 'AI 분석 시작'버튼을 눌러주세요.")
         else:
             t_clean = clean_ai_output(st.session_state["ai_analysis_results"].get("trump", ""))
             if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean and t_clean != "번역된 내용이 없습니다.":
                 st.markdown(f"""
                 <div class="ai-analysis-box">
-                    <strong>🇺🇸 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
+                    <strong> 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
                     {t_clean}
                 </div>
                 """, unsafe_allow_html=True)
@@ -1691,25 +1691,25 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
 if bt_analysis_container:
     with bt_analysis_container:
         if st.session_state.get("ai_analysis_results") is None:
-            st.info("💡 AI 모델 유효성 상세 진단을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+            st.info("AI 모델 유효성 상세 진단을 원하시면 상단의 'AI 분석 시작'버튼을 눌러주세요.")
         else:
             clean_bt = clean_ai_output(st.session_state["ai_analysis_results"].get("bt", ""))
             st.markdown(f"""
             <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-                <strong>🤖 모델 유효성 진단:</strong><br>{clean_bt}
+                <strong> 모델 유효성 진단:</strong><br>{clean_bt}
             </div>
             """, unsafe_allow_html=True)
 
 # 3. 현재 시장 지표 종합 진단 출력
 if ai_indicator_container:
     with ai_indicator_container:
-        with st.expander("🤖 현재 시장 지표 종합 진단 (클릭하여 펼치기)", expanded=False):
+        with st.expander("현재 시장 지표 종합 진단 (클릭하여 펼치기)", expanded=False):
             if st.session_state.get("ai_analysis_results") is None:
-                st.info("💡 AI 지표 종합 진단을 원하시면 상단의 '🚀 AI 분석 시작' 버튼을 눌러주세요.")
+                st.info("AI 지표 종합 진단을 원하시면 상단의 'AI 분석 시작'버튼을 눌러주세요.")
             else:
                 clean_indicator = clean_ai_output(st.session_state["ai_analysis_results"].get("indicator", ""))
                 st.markdown(f"""
-                <div class="ai-analysis-box" style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
+                <div class="ai-analysis-box"style="background: #ffffff; color: #31333F !important; border: 1px solid #e0e0e0; border-left: 8px solid #007bff; line-height: 1.5; padding: 15px 20px;">
                     {clean_indicator}
                 </div>
                 """, unsafe_allow_html=True)

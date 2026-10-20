@@ -19,9 +19,9 @@ tickers = {
     "usd_chf": "CHF=X", "vvix": "^VVIX"
 }
 
-print("=" * 70)
-print("🔍 KOSPI 위험 지수 컴포넌트 분석 보고서")
-print("=" * 70)
+print("="* 70)
+print("KOSPI 위험 지수 컴포넌트 분석 보고서")
+print("="* 70)
 print(f"분석 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 print()
 
@@ -73,28 +73,28 @@ t_now = max(0.0, min(100.0, float(100 - (ks_val / ma20_val - 0.9) * 500)))
 s_sp = calculate_score(sp_s, sp_s, True)
 s_vx = calculate_score(vx_s, vx_s)
 
-print("━" * 70)
-print("📊 [1단계] 개별 시그널 점수 (0=안전, 100=위험)")
-print("━" * 70)
+print("━"* 70)
+print("[1단계] 개별 시그널 점수 (0=안전, 100=위험)")
+print("━"* 70)
 
 # 최신 데이터값 출력
-print(f"\n  📈 KOSPI:     {ks_val:,.1f} (20일 이평: {ma20_val:,.1f})")
-print(f"  💵 USD/KRW:   {float(fx_s.iloc[-1]):,.1f}")
-print(f"  📉 S&P 500:   {float(sp_s.iloc[-1]):,.1f}")
-print(f"  🏦 미국 10Y:  {float(b10_s.iloc[-1]):.2f}%")
-print(f"  🔴 VIX:       {float(vx_s.iloc[-1]):.2f}")
-print(f"  🟠 구리:      {float(cp_s.iloc[-1]):,.1f}")
+print(f"\n KOSPI: {ks_val:,.1f} (20일 이평: {ma20_val:,.1f})")
+print(f"USD/KRW: {float(fx_s.iloc[-1]):,.1f}")
+print(f"S&P 500: {float(sp_s.iloc[-1]):,.1f}")
+print(f"미국 10Y: {float(b10_s.iloc[-1]):.2f}%")
+print(f"VIX: {float(vx_s.iloc[-1]):.2f}")
+print(f"구리: {float(cp_s.iloc[-1]):,.1f}")
 print()
 
 print(f"  {'시그널':<30} {'현재 점수':>10}   설명")
 print(f"  {'-'*60}")
-print(f"  🌍 매크로 합산 (환율+금리+구리):  {m_now:>6.1f}점")
+print(f"매크로 합산 (환율+금리+구리): {m_now:>6.1f}점")
 print(f"     ├─ 환율 위험 (↑=위험):        {s_fx:>6.1f}점")
 print(f"     ├─ 금리 위험 (↑=위험):        {s_b10:>6.1f}점")
 print(f"     └─ 구리 위험 (↓=위험):        {s_cp:>6.1f}점")
-print(f"  📈 글로벌 시장 (S&P 역방향):     {s_sp:>6.1f}점   (S&P↑=안전, ↓=위험)")
-print(f"  😱 시장 공포 (VIX):              {s_vx:>6.1f}점   (VIX↑=위험)")
-print(f"  📉 기술적 과매수:                {t_now:>6.1f}점   (KOSPI > MA20 = 위험)")
+print(f"글로벌 시장 (S&P 역방향): {s_sp:>6.1f}점 (S&P↑=안전, ↓=위험)")
+print(f"시장 공포 (VIX): {s_vx:>6.1f}점 (VIX↑=위험)")
+print(f"기술적 과매수: {t_now:>6.1f}점 (KOSPI > MA20 = 위험)")
 
 # 4. ML 가중치 (기본 균등 가중치 사용해서 비교)
 w_macro = 0.25
@@ -105,9 +105,9 @@ total_w = w_macro + w_tech + w_global + w_fear
 
 base_risk = (m_now * w_macro + t_now * w_tech + s_sp * w_global + s_vx * w_fear) / total_w
 
-print(f"\n{'━' * 70}")
-print(f"📊 [2단계] 가중 평균 → 기초 위험 지수 (균등 가중 25%씩 가정)")
-print(f"{'━' * 70}")
+print(f"\n{'━'* 70}")
+print(f"[2단계] 가중 평균 → 기초 위험 지수 (균등 가중 25%씩 가정)")
+print(f"{'━'* 70}")
 print(f"  ({m_now:.1f} × {w_macro:.2f} + {t_now:.1f} × {w_tech:.2f} + {s_sp:.1f} × {w_global:.2f} + {s_vx:.1f} × {w_fear:.2f}) / {total_w:.2f}")
 print(f"  → 기초 위험 지수 (base_risk) = {base_risk:.1f}점")
 
@@ -134,9 +134,9 @@ raw_panic_avg = (panic_gold + panic_jpy + panic_chf + panic_vvix) / 4.0
 panic_multiplier = 1.0 + (active_panics * 0.5)
 final_panic_score = min(100.0, raw_panic_avg * panic_multiplier)
 
-print(f"\n{'━' * 70}")
-print(f"🚨 [3단계] 패닉 이벤트 탐지")
-print(f"{'━' * 70}")
+print(f"\n{'━'* 70}")
+print(f"[3단계] 패닉 이벤트 탐지")
+print(f"{'━'* 70}")
 print(f"  금(Gold):    {panic_gold:>6.1f}점")
 print(f"  엔/원(JPY):  {panic_jpy:>6.1f}점")
 print(f"  스위스프랑:  {panic_chf:>6.1f}점")
@@ -144,23 +144,23 @@ print(f"  VVIX:        {panic_vvix:>6.1f}점")
 print(f"  → 활성 패닉 수: {active_panics}개, 최종 패닉 점수: {final_panic_score:.1f}점")
 
 applied_base_risk = max(base_risk, final_panic_score) if final_panic_score > 60 else base_risk
-print(f"  → 패닉 오버라이드 적용 여부: {'✅ 예' if final_panic_score > 60 else '❌ 아니오 (60점 미만)'}")
+print(f" → 패닉 오버라이드 적용 여부: {'예' if final_panic_score > 60 else '아니오 (60점 미만)'}")
 print(f"  → 적용된 위험 점수 (applied_base_risk): {applied_base_risk:.1f}점")
 
 # 6. 비선형 Convexity 변환
 k = 0.5
 total_risk_index = ((np.exp(k * applied_base_risk / 100) - 1) / (np.exp(k) - 1)) * 100
 
-print(f"\n{'━' * 70}")
-print(f"📊 [4단계] 최종 위험 지수 (비선형 Convexity 변환)")
-print(f"{'━' * 70}")
+print(f"\n{'━'* 70}")
+print(f"[4단계] 최종 위험 지수 (비선형 Convexity 변환)")
+print(f"{'━'* 70}")
 print(f"  Convexity 변환 (k={k}): base {applied_base_risk:.1f} → 최종 {total_risk_index:.1f}")
-print(f"\n  ★★★ 최종 KOSPI 위험 지수: {total_risk_index:.1f}점 ★★★")
+print(f"\n 최종 KOSPI 위험 지수: {total_risk_index:.1f}점 ")
 
 # 7. 1주/1개월 전 비교
-print(f"\n{'━' * 70}")
-print(f"📊 [5단계] 최근 데이터 변동 추이 (점수 변동 원인 분석)")
-print(f"{'━' * 70}")
+print(f"\n{'━'* 70}")
+print(f"[5단계] 최근 데이터 변동 추이 (점수 변동 원인 분석)")
+print(f"{'━'* 70}")
 
 # 1주 전 데이터
 one_week_ago = ks_s.index.max() - pd.Timedelta(days=7)
@@ -182,8 +182,8 @@ for name, series, ticker in [
         curr = float(series.iloc[-1])
         chg = curr - prev
         pct = (chg / prev * 100) if prev != 0 else 0
-        arrow = "🔺" if chg > 0 else "🔻" if chg < 0 else "⬜"
+        arrow = "" if chg > 0 else "" if chg < 0 else ""
         print(f"  {name:<20} {prev:>12,.2f} {curr:>12,.2f} {arrow}{chg:>+10.2f} ({pct:+.1f}%)")
 
-print(f"\n{'=' * 70}")
+print(f"\n{'='* 70}")
 print("분석 완료")

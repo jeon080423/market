@@ -30,7 +30,7 @@ MOBILE_API_HEADERS = {
 
 
 def _fmt_num(v) -> str:
-    """'1234567' / '-9,000' 같은 값을 천단위 콤마 문자열로 변환"""
+    """'1234567' / '-9,000'같은 값을 천단위 콤마 문자열로 변환"""
     try:
         return f"{int(float(str(v).replace(',', ''))):,}"
     except Exception:
@@ -38,7 +38,7 @@ def _fmt_num(v) -> str:
 
 
 def _change_str(item: dict) -> str:
-    """신형 API 종목 아이템 → '▲ 1,000 (+2.35%)' 형식 문자열"""
+    """신형 API 종목 아이템 → '▲ 1,000 (+2.35%)'형식 문자열"""
     try:
         chg = float(str(item.get('prevChangePrice', '0')).replace(',', ''))
         rate = float(str(item.get('prevChangeRate', '0')).replace(',', ''))
@@ -311,17 +311,14 @@ def render_naver_sise_table(df: pd.DataFrame):
     KOSPI / KOSDAQ 공통 데이터 프레임 렌더링 테이블
     """
     if df.empty:
-        st.info("📊 실시간 데이터를 불러올 수 없습니다.")
+        st.info("실시간 데이터를 불러올 수 없습니다.")
         return
 
     df_display = df.head(10).copy()
     
-    # 순위 텍스트 이모지화
+    # 순위 텍스트 정리
     def make_rank_label(rank):
         r = str(rank).strip()
-        if r == "1": return "🥇 1"
-        elif r == "2": return "🥈 2"
-        elif r == "3": return "🥉 3"
         return r
         
     df_display["순위"] = df_display["순위"].apply(make_rank_label)
@@ -330,11 +327,11 @@ def render_naver_sise_table(df: pd.DataFrame):
     # 1, 2, 3위 행 강조 스타일링
     def row_style(row):
         rank_val = row["순위"]
-        if "🥇" in str(rank_val):
+        if str(rank_val).strip() == "1":
             return ["background-color: rgba(255, 215, 0, 0.15); font-weight: bold;"] * len(row)
-        elif "🥈" in str(rank_val):
+        elif str(rank_val).strip() == "2":
             return ["background-color: rgba(192, 192, 192, 0.15); font-weight: bold;"] * len(row)
-        elif "🥉" in str(rank_val):
+        elif str(rank_val).strip() == "3":
             return ["background-color: rgba(205, 127, 50, 0.15); font-weight: bold;"] * len(row)
         return [""] * len(row)
     
@@ -384,20 +381,17 @@ def render_naver_sise_table(df: pd.DataFrame):
 def render_analyst_reports_table(df: pd.DataFrame):
     """
     애널리스트 리포트 전용 렌더링 테이블
-    - '리포트 링크' 커럼을 LinkColumn으로 만들어 켜릭 시 최신 리포트를 새 브라우저 탭에서 열도록 구현
+    - '리포트 링크'커럼을 LinkColumn으로 만들어 켜릭 시 최신 리포트를 새 브라우저 탭에서 열도록 구현
     """
     if df.empty:
-        st.info("📊 리포트 데이터를 불러올 수 없습니다.")
+        st.info("리포트 데이터를 불러올 수 없습니다.")
         return
 
     df_display = df.head(10).copy()
 
-    # 순위 이모지화
+    # 순위 텍스트 정리
     def make_rank_label(rank):
         r = str(rank).strip()
-        if r == "1": return "🥇 1"
-        elif r == "2": return "🥈 2"
-        elif r == "3": return "🥉 3"
         return r
     df_display["순위"] = df_display["순위"].apply(make_rank_label)
     df_display = df_display.reset_index(drop=True)
@@ -405,11 +399,11 @@ def render_analyst_reports_table(df: pd.DataFrame):
     # 1~3위 행 강조 스타일
     def row_style(row):
         rank_val = row["순위"]
-        if "🥇" in str(rank_val):
+        if str(rank_val).strip() == "1":
             return ["background-color: rgba(255, 215, 0, 0.15); font-weight: bold;"] * len(row)
-        elif "🥈" in str(rank_val):
+        elif str(rank_val).strip() == "2":
             return ["background-color: rgba(192, 192, 192, 0.15); font-weight: bold;"] * len(row)
-        elif "🥉" in str(rank_val):
+        elif str(rank_val).strip() == "3":
             return ["background-color: rgba(205, 127, 50, 0.15); font-weight: bold;"] * len(row)
         return [""] * len(row)
     styled_df = df_display.style.apply(row_style, axis=1)
@@ -419,7 +413,7 @@ def render_analyst_reports_table(df: pd.DataFrame):
         "순위": st.column_config.TextColumn("순위", width="small"),
         "티커": None,  # 숨김
         "리포트 링크": st.column_config.LinkColumn(
-            "리포트 열기 ↗️",
+            "리포트 열기",
             display_text="최신 리포트 보기",
             width="medium"
         ),
@@ -444,7 +438,7 @@ def render_youtube_rank_page():
     """
     실시간 수급 및 가격 지표 기반 선행 종목 탐색 엔진 (app.py 호환 진입점)
     """
-    st.title("📊 실시간 코스피(KOSPI) 거래량 급증 및 주가 급등 종목 탐색")
+    st.title("실시간 코스피(KOSPI) 거래량 급증 및 주가 급등 종목 탐색")
     
     st.markdown("""
     이 대시보드는 주식 시장의 실시간 가격, 수급, 거래량 정보를 모니터링합니다.
@@ -452,7 +446,7 @@ def render_youtube_rank_page():
     """)
     
     # 아코디언 가이드 최적화
-    with st.expander("💡 실시간 거래량 및 가격 선행 지표 탐색기 작동 원리 자세히 보기", expanded=False):
+    with st.expander("실시간 거래량 및 가격 선행 지표 탐색기 작동 원리 자세히 보기", expanded=False):
         st.markdown("""
         이 탐색기는 뉴스 미디어의 정보 지연 문제를 완벽히 해결하기 위해 주식 트레이딩의 핵심 요소인 **'개인 관심도(Search)', '외국인 관심도(Foreigner Net Buy)', '유동성(Volume)', '모멘텀(Price)'**을 결합하여 시장의 자금 흐름을 선제적으로 포착합니다.
         
@@ -478,7 +472,7 @@ def render_youtube_rank_page():
     # 실시간 데이터 갱신 제어 및 마지막 업데이트 시간
     col_refresh, col_time = st.columns([1.5, 5])
     with col_refresh:
-        if st.button("🔄 실시간 수급 데이터 갱신", use_container_width=True):
+        if st.button("실시간 수급 데이터 갱신", use_container_width=True):
             st.cache_data.clear()
             if "market_data" in st.session_state:
                 del st.session_state["market_data"]
@@ -535,58 +529,58 @@ def render_youtube_rank_page():
     # --- 1행: 실시간 인기 검색 종목 (개인 관심도) & 외국인 순매수 상위 종목 (외국인 관심도) ---
     col_a, col_b = st.columns(2)
     with col_a:
-        st.subheader("🔥 1. 실시간 포털 인기 검색 종목 (개인 관심도)")
+        st.subheader("1. 실시간 포털 인기 검색 종목 (개인 관심도)")
         st.caption("네이버 금융에서 현재 개인 투자자들이 가장 집중적으로 검색하고 토론하는 실시간 관심 종목 리스트입니다.")
         render_naver_sise_table(df_popular)
         
     with col_b:
-        st.subheader("🌍 2. 외국인 실시간 순매수 상위 종목 (외국인 관심도)")
+        st.subheader("2. 외국인 실시간 순매수 상위 종목 (외국인 관심도)")
         st.caption("당일 외국인 투자자들의 자금이 유입되며 순매수 강세를 보이는 시장 주도 종목 리스트입니다.")
         render_naver_sise_table(df_foreigner)
         
     st.markdown("---")
 
     # --- 1.5행: 기관 순매수 상위 종목 ---
-    st.subheader("🏦 3. 기관 실시간 순매수 상위 종목 (기관 관심도)")
+    st.subheader("3. 기관 실시간 순매수 상위 종목 (기관 관심도)")
     st.caption("당일 기관 투자자들이 순매수하는 상위 종목입니다. 외국인과 함께 시장을 주도하는 스마트머니의 흐름을 파악할 수 있습니다.")
     col_inst, col_inst_fill = st.columns([1, 1])
     with col_inst:
         render_naver_sise_table(df_institution)
     with col_inst_fill:
-        st.info("💡 **기관 순매수 해석 가이드**\n\n기관과 외국인이 동시에 순매수하는 종목은 **'더블 수급 호재'** 신호로, 단기 상승 모멘텀이 발생할 가능성이 높습니다. 두 리스트의 공통 종목을 우선 주목하세요.")
+        st.info("**기관 순매수 해석 가이드**\n\n기관과 외국인이 동시에 순매수하는 종목은 **'더블 수급 호재'** 신호로, 단기 상승 모멘텀이 발생할 가능성이 높습니다. 두 리스트의 공통 종목을 우선 주목하세요.")
     
     st.markdown("---")
 
 
     # --- 2행: 실시간 거래량 상위 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("📊 4. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
+    st.subheader("4. 실시간 거래량 상위 종목 (기관/외인 수급 및 거래 유동성)")
     st.caption("KOSPI 및 KOSDAQ 시장에서 대량 거래가 유입되어 유동성 쏠림이 극대화된 종목 리스트입니다. 거래량은 수급의 선행 시그널입니다.")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### 🇰🇷 KOSPI 거래량 상위")
+        st.markdown("#### KOSPI 거래량 상위")
         render_naver_sise_table(df_vol_kospi)
     with col2:
-        st.markdown("#### 🇰🇷 KOSDAQ 거래량 상위")
+        st.markdown("#### KOSDAQ 거래량 상위")
         render_naver_sise_table(df_vol_kosdaq)
     st.markdown("---")
 
     # --- 3행: 실시간 주가 급등 종목 (KOSPI vs KOSDAQ) ---
-    st.subheader("⚡ 5. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
+    st.subheader("5. 실시간 주가 급등 종목 (상방 모멘텀 및 호재 돌파)")
     st.caption("당일 거래량 증가를 수반하며 가격 등락 변동률이 가장 높은 상방 돌파 주도 테마 종목 리스트입니다.")
     
     col3, col4 = st.columns(2)
     with col3:
-        st.markdown("#### 🇰🇷 KOSPI 주가 급등")
+        st.markdown("#### KOSPI 주가 급등")
         render_naver_sise_table(df_surge_kospi)
     with col4:
-        st.markdown("#### 🇰🇷 KOSDAQ 주가 급등")
+        st.markdown("#### KOSDAQ 주가 급등")
         render_naver_sise_table(df_surge_kosdaq)
 
     st.markdown("---")
 
     # --- 4행: 최근 증권사 애널리스트 리포트 언급 종목 ---
-    st.subheader("📑 6. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
+    st.subheader("6. 최근 증권사 애널리스트 리포트 언급 종목 (최신 분석 동향)")
     st.caption("국내 주요 증권사 리서치 센터에서 발행한 최신 종목 분석 리포트 현황입니다. 애널리스트의 분석 대상이 된 최신 관심 종목 흐름을 나타냅니다.")
     render_analyst_reports_table(df_reports)
 

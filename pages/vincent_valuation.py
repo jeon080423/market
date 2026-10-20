@@ -414,7 +414,7 @@ def render_vincent_valuation_page():
     """, unsafe_allow_html=True)
 
     # 헤더 및 가이드
-    st.title("📈 종목 가치 평가 (빈센트의 주가 방정식)")
+    st.title("종목 가치 평가 (빈센트의 주가 방정식)")
     st.markdown("""
     이 페이지는 빈센트 애널리스트가 제시한 핵심 주가 방정식을 개별 종목에 투사하여, 
     현재 종목의 주가가 미래 가치 대비 적정한 수준인지 동적으로 평가하고 시뮬레이션합니다.
@@ -423,7 +423,7 @@ def render_vincent_valuation_page():
     # 빈센트 주가 방정식 카드 설명
     st.markdown("""
         <div class="vincent-card">
-            <h3 style="margin-top: 0; color: white;">🎯 빈센트의 주가 결정 방정식</h3>
+            <h3 style="margin-top: 0; color: white;"> 빈센트의 주가 결정 방정식</h3>
             <p style="font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; color: #f8f9fa;">
                 주가 = PER(밸류에이션 멀티플) × EPS(미래 주당순이익)
             </p>
@@ -436,9 +436,9 @@ def render_vincent_valuation_page():
 
     # 메인 화면 탭 구성
     tab_indiv, tab_kospi, tab_kosdaq = st.tabs([
-        "🔍 개별 종목 가치 진단", 
-        "🏆 KOSPI 상승 여력 랭킹", 
-        "🏆 KOSDAQ 상승 여력 랭킹"
+        "개별 종목 가치 진단", 
+        "KOSPI 상승 여력 랭킹", 
+        "KOSDAQ 상승 여력 랭킹"
     ])
 
     # --- 탭 1: 개별 종목 가치 진단 ---
@@ -451,9 +451,9 @@ def render_vincent_valuation_page():
             # 시장 분리 선택 및 검색 필터링
             col_filter1, col_filter2 = st.columns([1, 2])
             with col_filter1:
-                market_type = st.radio("🏢 시장 구분", ["KOSPI", "KOSDAQ"], horizontal=True, key="indiv_market")
+                market_type = st.radio("시장 구분", ["KOSPI", "KOSDAQ"], horizontal=True, key="indiv_market")
             with col_filter2:
-                search_query = st.text_input("🔍 종목명 검색 (예: 삼성, 에코프로 - 공백 입력 시 전체 목록)", value="", key="indiv_search")
+                search_query = st.text_input("종목명 검색 (예: 삼성, 에코프로 - 공백 입력 시 전체 목록)", value="", key="indiv_search")
 
             # 데이터 필터링
             df_filtered = df_stocks[df_stocks['Market'] == market_type]
@@ -461,7 +461,7 @@ def render_vincent_valuation_page():
                 df_filtered = df_filtered[df_filtered['Name'].str.contains(search_query.strip(), case=False, na=False)]
 
             if df_filtered.empty:
-                st.warning(f"⚠️ {market_type} 시장에서 '{search_query}'(이)가 포함된 종목 검색 결과가 없습니다. 다른 검색어를 입력해 주세요.")
+                st.warning(f" {market_type} 시장에서 '{search_query}'(이)가 포함된 종목 검색 결과가 없습니다. 다른 검색어를 입력해 주세요.")
             else:
                 # 종목 선택 selectbox 구성 (SK하이닉스 000660를 기본 선택)
                 stock_options = [f"{row['Name']} ({row['Code']})" for _, row in df_filtered.iterrows()]
@@ -474,14 +474,14 @@ def render_vincent_valuation_page():
                 
                 col_sel1, col_sel2 = st.columns([3, 1])
                 with col_sel1:
-                    selected_option = st.selectbox("📦 분석할 종목 선택", stock_options, index=default_idx)
+                    selected_option = st.selectbox("분석할 종목 선택", stock_options, index=default_idx)
                     ticker = re.search(r'\(([0-9]{6})\)', selected_option).group(1)
                     company_name = selected_option.split(" (")[0]
                     
                 with col_sel2:
                     st.write("")
                     st.write("")
-                    if st.button("🔄 캐시 초기화", use_container_width=True, key="clear_cache_indiv"):
+                    if st.button("캐시 초기화", use_container_width=True, key="clear_cache_indiv"):
                         st.cache_data.clear()
                         st.rerun()
 
@@ -503,7 +503,7 @@ def render_vincent_valuation_page():
 
                     e_years = [y for y in cols_annual if '(E)' in y]
 
-                    st.subheader(f"📊 {company_name} ({ticker}) 기업 가치 진단")
+                    st.subheader(f" {company_name} ({ticker}) 기업 가치 진단")
 
                     selected_year = None
                     expected_eps = None
@@ -547,7 +547,7 @@ def render_vincent_valuation_page():
                         col_opt1, col_opt2 = st.columns(2)
                         with col_opt1:
                             selected_year = st.selectbox(
-                                "📅 가치 평가 기준 미래 시점 선택", 
+                                "가치 평가 기준 미래 시점 선택", 
                                 e_years, 
                                 index=0, 
                                 help="네이버 금융에 집계된 향후 시장 컨센서스(E) 연도입니다."
@@ -562,7 +562,7 @@ def render_vincent_valuation_page():
                                     expected_per = expected_per * price_ratio
                                 
                         if expected_eps is None:
-                            st.warning(f"⚠️ {selected_year}의 예상 EPS(이익) 공시 데이터가 존재하지 않습니다. 최근 확정 실적의 EPS({backup_eps:,.0f}원)를 대체 적용하여 평가합니다.")
+                            st.warning(f" {selected_year}의 예상 EPS(이익) 공시 데이터가 존재하지 않습니다. 최근 확정 실적의 EPS({backup_eps:,.0f}원)를 대체 적용하여 평가합니다.")
                             expected_eps_val = backup_eps
                             eps_str = f"정보 없음 (대체 적용: {backup_eps:,.0f}원)"
                         else:
@@ -570,10 +570,10 @@ def render_vincent_valuation_page():
                             eps_str = f"{expected_eps:,.0f}원"
                             
                         with col_opt2:
-                            st.info(f"💡 **시장의 컨센서스 ({selected_year})**\n* 예상 EPS: **{eps_str}**" + 
+                            st.info(f"**시장의 컨센서스 ({selected_year})**\n* 예상 EPS: **{eps_str}**" + 
                                     (f"\n* 예상 PER: **{expected_per:.1f}배**" if expected_per is not None else "\n* 예상 PER: 정보 없음"))
                     else:
-                        st.warning("⚠️ 해당 종목은 애널리스트의 미래 예상 실적(컨센서스) 데이터가 존재하지 않는 소형/비인기 주식입니다. 대신 최근 확정 실적을 기초 자료로 활용하며, 수동 조정을 권장합니다.")
+                        st.warning("해당 종목은 애널리스트의 미래 예상 실적(컨센서스) 데이터가 존재하지 않는 소형/비인기 주식입니다. 대신 최근 확정 실적을 기초 자료로 활용하며, 수동 조정을 권장합니다.")
                         if non_e_years:
                             selected_year = non_e_years[-1]
                             year_idx = cols.index(selected_year)
@@ -589,14 +589,14 @@ def render_vincent_valuation_page():
 
                     # 4. 슬라이더 및 수동 조정 패널
                     st.markdown("---")
-                    st.markdown("##### **🛠️ 가치 시뮬레이션 변수 커스터마이징**")
+                    st.markdown("##### ** 가치 시뮬레이션 변수 커스터마이징**")
                     
                     col_sim1, col_sim2 = st.columns(2)
                     with col_sim1:
                         custom_eps_check = st.checkbox("예상 EPS(이익) 직접 입력/수정하기", value=False)
                         if custom_eps_check:
                             init_eps = int(expected_eps_val) if expected_eps_val is not None else 1000
-                            user_eps = st.number_input("✍️ 적용할 예상 EPS (원)", min_value=1, value=init_eps, step=100)
+                            user_eps = st.number_input("적용할 예상 EPS (원)", min_value=1, value=init_eps, step=100)
                         else:
                             user_eps = int(expected_eps_val) if expected_eps_val is not None else 1000
                             st.metric("적용 예상 EPS", f"{user_eps:,.0f} 원", help="크롤링된 재무제표의 미래 예상 EPS가 자동 대입되었습니다.")
@@ -610,21 +610,21 @@ def render_vincent_valuation_page():
                             st.session_state[per_state_key] = round(default_per_val, 1)
 
                         # PER 프리셋 퀵 선택 버튼
-                        st.caption("🎯 **Target PER 퀵 프리셋 원클릭 적용:**")
+                        st.caption("**Target PER 퀵 프리셋 원클릭 적용:**")
                         pb_col1, pb_col2, pb_col3 = st.columns(3)
                         with pb_col1:
-                            if st.button(f"🏛️ 역사적 ({avg_past_per:.1f}배)", use_container_width=True, key=f"btn_hist_{ticker}", help="과거 3개년 정제 흑자 평균 PER"):
+                            if st.button(f"역사적 ({avg_past_per:.1f}배)", use_container_width=True, key=f"btn_hist_{ticker}", help="과거 3개년 정제 흑자 평균 PER"):
                                 st.session_state[per_state_key] = round(avg_past_per, 1)
                                 st.rerun()
                         with pb_col2:
-                            cons_btn_label = f"📈 컨센서스 ({expected_per:.1f}배)" if expected_per is not None else "📈 컨센서스 (N/A)"
+                            cons_btn_label = f"컨센서스 ({expected_per:.1f}배)" if expected_per is not None else "컨센서스 (N/A)"
                             if st.button(cons_btn_label, use_container_width=True, key=f"btn_cons_{ticker}", disabled=(expected_per is None), help="네이버 공시 기준 미래 예상 PER"):
                                 if expected_per is not None:
                                     st.session_state[per_state_key] = round(expected_per, 1)
                                     st.rerun()
                         with pb_col3:
                             std_per = 10.0 if market_type == "KOSPI" else 15.0
-                            if st.button(f"⚖️ 시장 표준 ({std_per:.1f}배)", use_container_width=True, key=f"btn_std_{ticker}", help="빈센트 주가 방정식 표준 PER"):
+                            if st.button(f"시장 표준 ({std_per:.1f}배)", use_container_width=True, key=f"btn_std_{ticker}", help="빈센트 주가 방정식 표준 PER"):
                                 st.session_state[per_state_key] = std_per
                                 st.rerun()
 
@@ -634,7 +634,7 @@ def render_vincent_valuation_page():
 
                         expected_per_str = f"{expected_per:.1f}배" if expected_per is not None else "정보 없음"
                         user_per = st.slider(
-                            "⚙️ 적용할 Target PER (밸류에이션 멀티플 배수)", 
+                            "적용할 Target PER (밸류에이션 멀티플 배수)", 
                             min_value=1.0, 
                             max_value=max_per_limit, 
                             value=round(curr_target_per, 1),
@@ -652,28 +652,28 @@ def render_vincent_valuation_page():
 
                     # 판정
                     if divergence > 20.0:
-                        val_status = "🟢 강력 저평가 (매수 기회)"
+                        val_status = "강력 저평가 (매수 기회)"
                         val_color = "#27ae60"
                         val_desc = f"현재 주가가 사용자가 계산한 적정 가치({user_fair_price:,.0f}원) 대비 20% 이상 크게 할인되어 거래되고 있습니다. 주가 회복 시 큰 기대 수익률을 보입니다."
                     elif 5.0 < divergence <= 20.0:
-                        val_status = "🟡 적정 저평가 (매수 관심)"
+                        val_status = "적정 저평가 (매수 관심)"
                         val_color = "#f1c40f"
                         val_desc = "현재 주가가 적정 주가보다 다소 낮아 안정 마진(안전 마진)이 어느 정도 확보된 상태입니다."
                     elif -5.0 <= divergence <= 5.0:
-                        val_status = "⚪ 적정 가치 (보유)"
+                        val_status = "적정 가치 (보유)"
                         val_color = "#7f8c8d"
                         val_desc = "현재 주가가 시장이 부여하는 미래 가치를 정확히 반영하고 있는 합리적인 상태입니다."
                     elif -20.0 <= divergence < -5.0:
-                        val_status = "🟠 약간 고평가 (비중 조절)"
+                        val_status = "약간 고평가 (비중 조절)"
                         val_color = "#e67e22"
                         val_desc = "현재 주가가 미래 예상 가치를 선반영하여 다소 높게 형성되어 있습니다. 신규 진입에는 주의가 필요합니다."
                     else:
-                        val_status = "🔴 과열 고평가 (주의/매도)"
+                        val_status = "과열 고평가 (주의/매도)"
                         val_color = "#c0392b"
                         val_desc = "현재 주가가 미래 이익 및 멀티플 대비 심각하게 과대평가 영역에 속해 있습니다. 단기 조정 또는 밸류에이션 부담이 큽니다."
 
                     st.markdown("---")
-                    st.markdown("##### **📊 적정 가치 평가 요약**")
+                    st.markdown("##### ** 적정 가치 평가 요약**")
                     m_col1, m_col2, m_col3 = st.columns(3)
                     with m_col1:
                         st.markdown(f"""
@@ -685,9 +685,9 @@ def render_vincent_valuation_page():
                         """, unsafe_allow_html=True)
                     with m_col2:
                         st.markdown(f"""
-                            <div class="metric-card" style="border-left: 5px solid {val_color};">
+                            <div class="metric-card"style="border-left: 5px solid {val_color};">
                                 <div class="metric-title">사용자 설정 적정 주가</div>
-                                <div class="metric-value" style="color: {val_color};">{user_fair_price:,.0f}원</div>
+                                <div class="metric-value"style="color: {val_color};">{user_fair_price:,.0f}원</div>
                                 <div class="metric-sub">PER {user_per:.1f}배 × EPS {user_eps:,.0f}원</div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -696,20 +696,20 @@ def render_vincent_valuation_page():
                         st.markdown(f"""
                             <div class="metric-card">
                                 <div class="metric-title">목표가 괴리율 (상승 여력)</div>
-                                <div class="metric-value" style="color: {val_color};">{div_sign}{divergence:.1f}%</div>
+                                <div class="metric-value"style="color: {val_color};">{div_sign}{divergence:.1f}%</div>
                                 <div class="metric-sub">적정 가치 대비 변동 여력</div>
                             </div>
                         """, unsafe_allow_html=True)
 
                     st.markdown(f"""
                         <div style="background-color: #f8f9fa; border-left: 6px solid {val_color}; padding: 15px; border-radius: 6px; margin-top: 15px; margin-bottom: 25px;">
-                            <strong style="font-size: 1.05rem; color: {val_color};">📢 종합 진단 의견: {val_status}</strong><br>
+                            <strong style="font-size: 1.05rem; color: {val_color};"> 종합 진단 의견: {val_status}</strong><br>
                             <p style="font-size: 0.9rem; color: #2c3e50; margin-top: 8px; margin-bottom: 0; line-height: 1.5;">{val_desc}</p>
                         </div>
                     """, unsafe_allow_html=True)
 
                     # 차트
-                    st.markdown("##### **📊 적정 주가 시나리오별 비교 차트**")
+                    st.markdown("##### ** 적정 주가 시나리오별 비교 차트**")
                     labels = [
                         '현재 주가', 
                         '빈센트 기준 주가<br>(PER 10배 적용)', 
@@ -739,7 +739,7 @@ def render_vincent_valuation_page():
                     st.plotly_chart(fig, use_container_width=True, key="chart_1")
 
                     # 상세 테이블
-                    with st.expander(f"📋 {company_name} 연간 기업실적분석 데이터 상세 보기", expanded=False):
+                    with st.expander(f" {company_name} 연간 기업실적분석 데이터 상세 보기", expanded=False):
                         # 연간 컬럼과 분기 컬럼의 중복 명칭 방지 (분기 컬럼명 뒤에 접미사 추가)
                         cols_unique = [col if i < 4 else f"{col}(분기)" for i, col in enumerate(cols)]
                         df_fin = pd.DataFrame(financials, index=cols_unique).T
@@ -769,7 +769,7 @@ def render_vincent_valuation_page():
 
     # --- 탭 2: KOSPI 상승 여력 랭킹 ---
     with tab_kospi:
-        st.subheader("🏆 KOSPI 시가총액 상위 상승 여력 랭킹")
+        st.subheader("KOSPI 시가총액 상위 상승 여력 랭킹")
         st.markdown("""
         코스피 시가총액 상위 종목의 **1년 뒤 예상 실적(컨센서스)**을 크롤링하고, 일괄적 기준선의 한계를 극복하기 위해 **각 종목 고유의 역사적 적정 기준선(최근 3개년 평균 PER)**을 동적 대입하여 **상승 여력(괴리율)이 높은 종목부터 내림차순**으로 정렬하여 제공합니다.
         """)
@@ -783,13 +783,13 @@ def render_vincent_valuation_page():
         if not df_kospi_rank.empty:
             # 스타일링된 데이터프레임 노출
             st.dataframe(df_kospi_rank, use_container_width=True, hide_index=True)
-            st.info("💡 **상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
+            st.info("**상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
         else:
             st.warning("데이터를 불러오지 못했습니다. 새로고침을 시도해 보세요.")
 
     # --- 탭 3: KOSDAQ 상승 여력 랭킹 ---
     with tab_kosdaq:
-        st.subheader("🏆 KOSDAQ 시가총액 상위 상승 여력 랭킹")
+        st.subheader("KOSDAQ 시가총액 상위 상승 여력 랭킹")
         st.markdown("""
         코스닥 시가총액 상위 종목의 **1년 뒤 예상 실적(컨센서스)**을 크롤링하고, 일괄적 기준선의 한계를 극복하기 위해 **각 종목 고유의 역사적 적정 기준선(최근 3개년 평균 PER)**을 동적 대입하여 **상승 여력(괴리율)이 높은 종목부터 내림차순**으로 정렬하여 제공합니다.
         """)
@@ -801,7 +801,7 @@ def render_vincent_valuation_page():
             
         if not df_kosdaq_rank.empty:
             st.dataframe(df_kosdaq_rank, use_container_width=True, hide_index=True)
-            st.info("💡 **상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
+            st.info("**상승 여력(괴리율) 해석**: +%가 높을수록 현재 주가가 해당 종목 고유의 역사적 밸류에이션(3개년 평균 PER) 대비 크게 할인되어 매수 메리트가 큼을 나타냅니다.")
         else:
             st.warning("데이터를 불러오지 못했습니다. 새로고침을 시도해 보세요.")
 
