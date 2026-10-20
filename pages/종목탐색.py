@@ -435,6 +435,8 @@ def render_analyst_reports_table(df: pd.DataFrame):
     )
 
 def render_youtube_rank_page():
+    from utils.ui_style import apply_common_style
+    apply_common_style()
     """
     실시간 수급 및 가격 지표 기반 선행 종목 탐색 엔진 (app.py 호환 진입점)
     """

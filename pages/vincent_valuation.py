@@ -375,6 +375,8 @@ def get_market_valuation_ranking(market_type: str, top_n: int = 35) -> pd.DataFr
         return pd.DataFrame()
 
 def render_vincent_valuation_page():
+    from utils.ui_style import apply_common_style, style_fig
+    apply_common_style()
     # 1. CSS 인젝션으로 화면 디자인 개선
     st.markdown("""
         <style>
@@ -423,7 +425,7 @@ def render_vincent_valuation_page():
     # 빈센트 주가 방정식 카드 설명
     st.markdown("""
         <div class="vincent-card">
-            <h3 style="margin-top: 0; color: white;"> 빈센트의 주가 결정 방정식</h3>
+            <h3 style="margin-top: 0; color: white;">빈센트의 주가 결정 방정식</h3>
             <p style="font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; color: #f8f9fa;">
                 주가 = PER(밸류에이션 멀티플) × EPS(미래 주당순이익)
             </p>
@@ -703,7 +705,7 @@ def render_vincent_valuation_page():
 
                     st.markdown(f"""
                         <div style="background-color: #f8f9fa; border-left: 6px solid {val_color}; padding: 15px; border-radius: 6px; margin-top: 15px; margin-bottom: 25px;">
-                            <strong style="font-size: 1.05rem; color: {val_color};"> 종합 진단 의견: {val_status}</strong><br>
+                            <strong style="font-size: 1.05rem; color: {val_color};">종합 진단 의견: {val_status}</strong><br>
                             <p style="font-size: 0.9rem; color: #2c3e50; margin-top: 8px; margin-bottom: 0; line-height: 1.5;">{val_desc}</p>
                         </div>
                     """, unsafe_allow_html=True)
@@ -736,7 +738,7 @@ def render_vincent_valuation_page():
                         plot_bgcolor='rgba(0,0,0,0)',
                         showlegend=False
                     )
-                    st.plotly_chart(fig, use_container_width=True, key="chart_1")
+                    st.plotly_chart(style_fig(fig), use_container_width=True, key="chart_1")
 
                     # 상세 테이블
                     with st.expander(f" {company_name} 연간 기업실적분석 데이터 상세 보기", expanded=False):

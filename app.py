@@ -276,7 +276,7 @@ st.markdown("""
     <style>
     /* 메인 제목 유동적 폰트 크기 설정 */
     h1 {
-        font-size: clamp(24px, 4vw, 48px) !important;
+        font-size: 1.75rem !important;
     }
     
     /* 지수 가이드북 제목 스타일 */
@@ -290,7 +290,7 @@ st.markdown("""
 
     /* 설명글 유동적 폰트 및 줄간격 설정 */
     .guide-text {
-        font-size: clamp(14px, 1.2vw, 20px) !important;
+        font-size: 0.95rem !important;
         line-height: 1.8 !important;
     }
     
@@ -302,7 +302,7 @@ st.markdown("""
     }
     div[data-testid="stMarkdownContainer"] table th,
     div[data-testid="stMarkdownContainer"] table td {
-        font-size: clamp(14px, 1.2vw, 20px) !important; /* 설명글 폰트 크기와 동일하게 수정 */
+        font-size: 0.9rem !important;
         word-wrap: break-word !important;
         padding: 12px 4px !important; 
         line-height: 1.8 !important; /* 줄간격 통일 */
@@ -402,6 +402,10 @@ elif st.session_state["active_tab"] == "overheat_signal":
 elif st.session_state["active_tab"] == "vincent_valuation":
     render_vincent_valuation_page()
     st.stop()
+
+# 메뉴 공통 스타일 적용
+from utils.ui_style import apply_common_style, style_fig
+apply_common_style()
 
 # 3. 제목 및 설명
 st.title("코스피(KOSPI) 전망 및 시장 과열 위험 모니터링")
@@ -988,7 +992,7 @@ try:
         ))
         fig_gauge.update_layout(height=320, margin=dict(l=20, r=20, t=60, b=10),
                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_gauge, use_container_width=True, key="chart_1", config={'displayModeBar': False})
+        st.plotly_chart(style_fig(fig_gauge), use_container_width=True, key="chart_1", config={'displayModeBar': False})
 
     with c_guide: 
         st.markdown("** 예측 컴포넌트별 위험도**")
@@ -1692,7 +1696,7 @@ if 'trump_data' in locals() and trump_data and ai_trump_container:
             if t_clean and "AI 모델 서버가 혼잡하여" not in t_clean and t_clean != "번역된 내용이 없습니다.":
                 st.markdown(f"""
                 <div class="ai-analysis-box">
-                    <strong> 트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
+                    <strong>트럼프 소셜 최신 브리핑 (번역)</strong><br><br>
                     {t_clean}
                 </div>
                 """, unsafe_allow_html=True)
@@ -1708,7 +1712,7 @@ if bt_analysis_container:
             clean_bt = clean_ai_output(st.session_state["ai_analysis_results"].get("bt", ""))
             st.markdown(f"""
             <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; font-size: 0.85rem; color: #31333F; line-height: 1.6; margin-bottom: 20px;">
-                <strong> 모델 유효성 진단:</strong><br>{clean_bt}
+                <strong>모델 유효성 진단:</strong><br>{clean_bt}
             </div>
             """, unsafe_allow_html=True)
 
