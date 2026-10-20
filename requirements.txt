@@ -5,7 +5,7 @@ numpy
 plotly
 requests
 beautifulsoup4
-google-generativeai
+google-genai
 streamlit-autorefresh
 youtube-transcript-api
 finance-datareader

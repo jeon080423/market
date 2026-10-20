@@ -11,7 +11,8 @@ import json
 import time
 import re
 from io import StringIO
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 from utils.ai_gsheet_cache import load_ai_cache, save_ai_cache, should_update_ai, is_data_changed_significantly
 
 # 이전 파일 자동 삭제 스크립트 (Windows 샌드박스 우회용)
@@ -119,11 +120,14 @@ sheet_id = "구글시트_ID"
 
 NEWS_API_KEY, GEMINI_API_KEY, ADMIN_ID, ADMIN_PW, SHEET_ID = check_secrets()
 
-# Gemini 설정 및 모델 초기화
-try:
-    genai.configure(api_key=GEMINI_API_KEY)
-except Exception as e:
-    st.error(f"Gemini 설정 중 오류 발생: {e}")
+# Gemini 클라이언트 (최신 google-genai SDK로 마이그레이션, 2026-10)
+_gemini_client = None
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
 
 # AI 분석 함수 정의 (할당량 보호를 위해 캐시 적용)
 @st.cache_data(ttl=86400) # cache for 1 day
@@ -131,6 +135,7 @@ def get_supported_gemini_models():
     # 최신 Gemini 3 및 2.5 지원 모델 목록으로 구성 (구버전 1.5 제외)
     default_models = [
         "gemini-3.5-flash",
+        "gemini-flash-latest",
         "gemini-3.1-pro-preview",
         "gemini-3-flash-preview",
         "gemini-3.1-flash-lite",
@@ -143,13 +148,14 @@ def get_supported_gemini_models():
     ]
     try:
         api_models = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
+        for m in _get_gemini_client().models.list():
+            if 'generateContent' in (getattr(m, 'supported_actions', None) or []):
                 model_name = m.name.replace('models/', '')
                 api_models.append(model_name)
         if api_models:
             priority_list = [
                 "gemini-3.5-flash",
+                "gemini-flash-latest",
                 "gemini-3.1-pro-preview",
                 "gemini-3-flash-preview",
                 "gemini-3.1-flash-lite",
@@ -177,17 +183,20 @@ def get_ai_analysis(prompt):
         max_retries = 2
         for attempt in range(max_retries):
             try:
-                model = genai.GenerativeModel(model_name)
-                # gemini-2.5-flash는 thinking 모드를 끄서 빠르게 응답하도록 설정
+                # gemini-2.5 계열은 thinking 모드를 끄서 빠르게 응답하도록 설정
                 if "2.5" in model_name:
-                    response = model.generate_content(
-                        prompt,
-                        generation_config=genai.GenerationConfig(
-                            thinking_config=genai.types.ThinkingConfig(thinking_budget=0)
+                    response = _get_gemini_client().models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(
+                            thinking_config=genai_types.ThinkingConfig(thinking_budget=0)
                         )
                     )
                 else:
-                    response = model.generate_content(prompt)
+                    response = _get_gemini_client().models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
                 if response and hasattr(response, 'text'):
                     return response.text
                 break

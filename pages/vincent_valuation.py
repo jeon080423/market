@@ -122,92 +122,99 @@ def get_krx_stock_list() -> pd.DataFrame:
     ]
     return pd.DataFrame(minimal_stocks)
 
+NAVER_MOBILE_API = "https://m.stock.naver.com/api"
+MOBILE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+    'Referer': 'https://m.stock.naver.com/'
+}
+
+
+def _parse_fin_value(v):
+    """네이버 재무 API 값('3,336,059', '-', '')을 숫자/None으로 변환"""
+    if v is None:
+        return None
+    s = str(v).replace(',', '').strip()
+    if not s or s == '-':
+        return None
+    try:
+        return float(s) if '.' in s else int(s)
+    except ValueError:
+        return s
+
+
 @st.cache_data(ttl=600)
 def get_stock_financials_naver(ticker: str) -> dict:
     """
-    네이버 금융에서 개별 종목의 현재가, 기업명, 기업실적분석 테이블을 크롤링
+    네이버 증권 신형 API에서 개별 종목의 현재가, 기업명, 기업실적분석 데이터를 가져옴
+    (구형 item/main.naver HTML 크롤링이 네이버 개편으로 중단되어 API로 교체, 2026-10)
+    - 반환: {ticker, company_name, current_price, columns(연간 4개+분기), financial_data{지표명: [값...]}}
     """
-    url = f"https://finance.naver.com/item/main.naver?code={ticker}"
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
+        # 1. 기본 정보 (기업명, 현재가)
+        res = requests.get(f"{NAVER_MOBILE_API}/stock/{ticker}/basic", headers=MOBILE_HEADERS, timeout=10)
         res.raise_for_status()
-        
-        # 네이버 금융이 UTF-8로 변경되었으므로 UTF-8로 안정적인 디코딩
-        html_content = res.content.decode('utf-8', errors='ignore')
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # 1. 현재가 가져오기
-        no_today = soup.find('p', {'class': 'no_today'})
-        current_price = None
-        if no_today:
-            blind = no_today.find('span', {'class': 'blind'})
-            if blind:
-                current_price = int(blind.get_text(strip=True).replace(',', ''))
-                
-        # 2. 기업명 가져오기
-        wrap_company = soup.find('div', {'class': 'wrap_company'})
-        company_name = ""
-        if wrap_company:
-            h2 = wrap_company.find('h2')
-            if h2:
-                company_name = h2.get_text(strip=True)
-                
-        # 3. 기업실적분석 테이블 가져오기
-        section_cop_anal = soup.find('div', {'class': 'section cop_analysis'})
-        if not section_cop_anal:
+        basic = res.json()
+        company_name = basic.get('stockName', '')
+        cp = basic.get('closePrice')
+        current_price = int(str(cp).replace(',', '')) if cp else None
+
+        # 2. 연간/분기 재무제표
+        def _fetch_finance(period: str) -> dict:
+            r = requests.get(f"{NAVER_MOBILE_API}/stock/{ticker}/finance/{period}", headers=MOBILE_HEADERS, timeout=10)
+            r.raise_for_status()
+            return r.json().get('financeInfo', {})
+
+        annual = _fetch_finance('annual')
+        if not annual:
             return {"error": "해당 종목의 기업실적분석 테이블을 찾을 수 없습니다."}
-            
-        table = section_cop_anal.find('table')
-        if not table:
-            return {"error": "재무분석 테이블 데이터를 파싱할 수 없습니다."}
-            
-        # 헤더 파싱 (연도/분기)
-        thead = table.find('thead')
-        cols = []
-        if thead:
-            trs = thead.find_all('tr')
-            if len(trs) >= 2:
-                th_cols = trs[1].find_all('th')
-                for th in th_cols:
-                    cols.append(th.get_text(strip=True))
-            else:
-                th_cols = thead.find_all('th')
-                for th in th_cols:
-                    cols.append(th.get_text(strip=True))
-        
-        # 바디 데이터 파싱
-        tbody = table.find('tbody')
-        rows = tbody.find_all('tr') if tbody else []
-        
+        try:
+            quarter = _fetch_finance('quarter')
+        except Exception:
+            quarter = {}
+
+        def _period_labels(info: dict):
+            labels, keys = [], []
+            for t in info.get('trTitleList', []):
+                label = str(t.get('title', '')).rstrip('.')
+                if t.get('isConsensus') == 'Y':
+                    label += '(E)'
+                labels.append(label)
+                keys.append(t.get('key'))
+            return labels, keys
+
+        a_labels, a_keys = _period_labels(annual)
+        q_labels, q_keys = _period_labels(quarter)
+        columns = a_labels + q_labels
+
+        def _rows_by_title(info: dict) -> dict:
+            rows = {}
+            for row in info.get('rowList', []) or []:
+                title = re.sub(r'\s+', '', str(row.get('title', '')))
+                rows[title] = row.get('columns', {})
+            return rows
+
+        a_rows = _rows_by_title(annual)
+        q_rows = _rows_by_title(quarter)
         financial_data = {}
-        for row in rows:
-            th = row.find('th')
-            if not th:
-                continue
-            metric_name = th.get_text(strip=True)
-            metric_name = re.sub(r'\s+', '', metric_name)
-            
-            tds = row.find_all('td')
-            values = []
-            for td in tds:
-                val_txt = td.get_text(strip=True).replace(',', '')
-                if not val_txt or val_txt == '-':
-                    values.append(None)
-                else:
-                    try:
-                        if '.' in val_txt:
-                            values.append(float(val_txt))
-                        else:
-                            values.append(int(val_txt))
-                    except ValueError:
-                        values.append(val_txt)
-            financial_data[metric_name] = values
-            
+        titles = list(a_rows.keys()) + [t for t in q_rows.keys() if t not in a_rows]
+        for title in titles:
+            vals = []
+            for k in a_keys:
+                cell = a_rows.get(title, {}).get(k, {})
+                vals.append(_parse_fin_value(cell.get('value') if isinstance(cell, dict) else None))
+            for k in q_keys:
+                cell = q_rows.get(title, {}).get(k, {})
+                vals.append(_parse_fin_value(cell.get('value') if isinstance(cell, dict) else None))
+            financial_data[title] = vals
+
+        if not financial_data:
+            return {"error": "재무분석 테이블 데이터를 파싱할 수 없습니다."}
+
         return {
             "ticker": ticker,
             "company_name": company_name,
             "current_price": current_price,
-            "columns": cols,
+            "columns": columns,
             "financial_data": financial_data
         }
     except Exception as e:

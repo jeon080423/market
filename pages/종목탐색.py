@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 import re
+import html
 import concurrent.futures
 
 # Header for crawler requests
@@ -11,266 +12,171 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
 
+# ─────────────────────────────────────────────────────────────
+# 네이버 금융 개편(2026) 대응: 구형 sise HTML 크롤링 → 신형 API로 전면 교체
+#  - 종목 랭킹(인기검색/거래량/급등/외국인·기관 순매수): stock.naver.com 공식 API
+#  - 애널리스트 리포트: m.stock.naver.com 리서치 API
+# ─────────────────────────────────────────────────────────────
+STOCK_RANK_API = "https://stock.naver.com/api/domestic/market/stock/default"
+RESEARCH_API = "https://m.stock.naver.com/api/research/company"
+STOCK_API_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+    'Referer': 'https://stock.naver.com/',
+}
+MOBILE_API_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+    'Referer': 'https://m.stock.naver.com/',
+}
+
+
+def _fmt_num(v) -> str:
+    """'1234567' / '-9,000' 같은 값을 천단위 콤마 문자열로 변환"""
+    try:
+        return f"{int(float(str(v).replace(',', ''))):,}"
+    except Exception:
+        return str(v) if v is not None else ""
+
+
+def _change_str(item: dict) -> str:
+    """신형 API 종목 아이템 → '▲ 1,000 (+2.35%)' 형식 문자열"""
+    try:
+        chg = float(str(item.get('prevChangePrice', '0')).replace(',', ''))
+        rate = float(str(item.get('prevChangeRate', '0')).replace(',', ''))
+    except Exception:
+        return ""
+    if chg > 0:
+        direction = "▲"
+    elif chg < 0:
+        direction = "▼"
+    else:
+        direction = ""
+    return f"{direction} {abs(int(chg)):,} ({rate:+.2f}%)".strip()
+
+
+def _change_dir(item: dict) -> str:
+    try:
+        chg = float(str(item.get('prevChangePrice', '0')).replace(',', ''))
+    except Exception:
+        return ""
+    if chg > 0:
+        return "▲"
+    if chg < 0:
+        return "▼"
+    return ""
+
+
+def _fetch_stock_rank(order_type: str, market_type: str = None, count: int = 30) -> list:
+    """stock.naver.com 랭킹 API 호출 (orderType: searchTop/quantTop/up/foreignPureBuy/organizationPureBuy 등)"""
+    params = {'orderType': order_type, 'startIdx': 0, 'pageSize': count}
+    if market_type:
+        params['marketType'] = market_type
+    res = requests.get(STOCK_RANK_API, params=params, headers=STOCK_API_HEADERS, timeout=10)
+    res.raise_for_status()
+    data = res.json()
+    return data if isinstance(data, list) else []
+
+
+def _rank_to_df(items: list, with_volume: bool = False) -> pd.DataFrame:
+    stocks = []
+    for i, item in enumerate(items, 1):
+        row = {
+            '순위': str(i),
+            '종목명': item.get('itemname', ''),
+            '티커': item.get('itemcode', ''),
+            '현재가': _fmt_num(item.get('nowPrice')),
+            '등락률': _change_str(item),
+        }
+        if with_volume:
+            row['거래량'] = _fmt_num(item.get('tradeVolume'))
+        stocks.append(row)
+    return pd.DataFrame(stocks)
+
+
 @st.cache_data(ttl=60)  # 60초 캐싱으로 실시간성을 극대화하되 단기간 반복 로딩 부담 제어
 def crawl_naver_popular_stocks() -> pd.DataFrame:
     """
-    네이버 금융 실시간 인기 검색 종목 (Top 30) 크롤링
-    - 반환: DataFrame [순위, 종목명, 티커, 검색 비율, 현재가, 등락률]
+    네이버 증권 실시간 인기 검색 종목 (상위 30) - 신형 API(searchTop)
+    - 반환: DataFrame [순위, 종목명, 티커, 현재가, 등락률]
     """
-    url = "https://finance.naver.com/sise/lastsearch2.naver"
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-        
-        table = soup.find('table', {'class': 'type_5'})
-        if not table: return pd.DataFrame()
-            
-        rows = table.find_all('tr')
-        stocks = []
-        for row in rows:
-            cols = row.find_all('td')
-            if len(cols) >= 6:
-                rank_txt = cols[0].get_text(strip=True)
-                name_a = cols[1].find('a')
-                if name_a:
-                    name = name_a.get_text(strip=True)
-                    ticker = name_a['href'].split('code=')[-1]
-                    search_ratio = cols[2].get_text(strip=True)
-                    price = cols[3].get_text(strip=True)
-                    change_val = cols[4].get_text(strip=True)
-                    change_dir = ""
-                    change_span = cols[4].find('span')
-                    if change_span:
-                        change_class = change_span.get('class', [])
-                        if 'red' in "".join(change_class) or 'ico_up' in "".join(change_class):
-                            change_dir = "▲"
-                        elif 'blue' in "".join(change_class) or 'ico_down' in "".join(change_class):
-                            change_dir = "▼"
-                    pct_change = cols[5].get_text(strip=True)
-                    
-                    stocks.append({
-                        '순위': rank_txt,
-                        '종목명': name,
-                        '티커': ticker,
-                        '검색 비율': search_ratio,
-                        '현재가': price,
-                        '등락률': f"{change_dir} {change_val} ({pct_change})"
-                    })
-        return pd.DataFrame(stocks)
+        items = _fetch_stock_rank('searchTop', count=30)
+        if not items:
+            return pd.DataFrame()
+        return _rank_to_df(items)
     except Exception as e:
         st.warning(f"인기 검색 종목 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
+
 @st.cache_data(ttl=60)
 def crawl_naver_volume_top(sosok: int) -> pd.DataFrame:
     """
-    네이버 금융 실시간 거래량 상위 종목 크롤링
+    네이버 증권 실시간 거래량 상위 종목 - 신형 API(quantTop)
     - sosok: 0 = KOSPI, 1 = KOSDAQ
     """
-    url = f"https://finance.naver.com/sise/sise_quant.naver?sosok={sosok}"
+    market = 'KOSPI' if sosok == 0 else 'KOSDAQ'
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-        table = soup.find('table', {'class': 'type_2'})
-        if not table: return pd.DataFrame()
-        
-        rows = table.find_all('tr')
-        stocks = []
-        rank_counter = 1
-        for row in rows:
-            cols = row.find_all('td')
-            if len(cols) >= 10:
-                name_a = cols[1].find('a')
-                if name_a:
-                    name = name_a.get_text(strip=True)
-                    ticker = name_a['href'].split('code=')[-1]
-                    price = cols[2].get_text(strip=True)
-                    chg_span = cols[3].find('span')
-                    change_dir = ""
-                    if chg_span:
-                        change_class = chg_span.get('class', [])
-                        if 'red' in "".join(change_class) or 'ico_up' in "".join(change_class):
-                            change_dir = "▲"
-                        elif 'blue' in "".join(change_class) or 'ico_down' in "".join(change_class):
-                            change_dir = "▼"
-                    change_val = cols[3].get_text(strip=True)
-                    pct = cols[4].get_text(strip=True)
-                    vol = cols[5].get_text(strip=True)
-                    
-                    stocks.append({
-                        '순위': str(rank_counter),
-                        '종목명': name,
-                        '티커': ticker,
-                        '현재가': price,
-                        '등락률': f"{change_dir} {change_val} ({pct})",
-                        '거래량': vol
-                    })
-                    rank_counter += 1
-        return pd.DataFrame(stocks)
+        items = _fetch_stock_rank('quantTop', market_type=market, count=30)
+        if not items:
+            return pd.DataFrame()
+        return _rank_to_df(items, with_volume=True)
     except Exception as e:
         st.warning(f"거래량 상위 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
+
 @st.cache_data(ttl=60)
 def crawl_naver_price_surge(sosok: int) -> pd.DataFrame:
     """
-    네이버 금융 실시간 주가 급등 종목 크롤링
+    네이버 증권 실시간 주가 급등(상승률 상위) 종목 - 신형 API(up)
     - sosok: 0 = KOSPI, 1 = KOSDAQ
     """
-    url = f"https://finance.naver.com/sise/sise_low_up.naver?sosok={sosok}"
+    market = 'KOSPI' if sosok == 0 else 'KOSDAQ'
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-        table = soup.find('table', {'class': 'type_2'})
-        if not table: return pd.DataFrame()
-        
-        rows = table.find_all('tr')
-        stocks = []
-        rank_counter = 1
-        for row in rows:
-            cols = row.find_all('td')
-            if len(cols) >= 10:
-                name_a = cols[2].find('a')  # 급등 비율 컬럼이 1번에 오므로, 2번에서 이름 추출
-                if name_a:
-                    name = name_a.get_text(strip=True)
-                    ticker = name_a['href'].split('code=')[-1]
-                    price = cols[3].get_text(strip=True)
-                    chg_span = cols[4].find('span')
-                    change_dir = ""
-                    if chg_span:
-                        change_class = chg_span.get('class', [])
-                        if 'red' in "".join(change_class) or 'ico_up' in "".join(change_class):
-                            change_dir = "▲"
-                        elif 'blue' in "".join(change_class) or 'ico_down' in "".join(change_class):
-                            change_dir = "▼"
-                    change_val = cols[4].get_text(strip=True)
-                    pct = cols[5].get_text(strip=True)
-                    vol = cols[6].get_text(strip=True)
-                    
-                    stocks.append({
-                        '순위': str(rank_counter),
-                        '종목명': name,
-                        '티커': ticker,
-                        '현재가': price,
-                        '등락률': f"{change_dir} {change_val} ({pct})",
-                        '거래량': vol
-                    })
-                    rank_counter += 1
-        return pd.DataFrame(stocks)
+        items = _fetch_stock_rank('up', market_type=market, count=30)
+        if not items:
+            return pd.DataFrame()
+        return _rank_to_df(items, with_volume=True)
     except Exception as e:
         st.warning(f"주가 급등 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
+
+def _investor_top_df(order_type: str) -> pd.DataFrame:
+    items = _fetch_stock_rank(order_type, market_type='KOSPI', count=30)
+    stocks = []
+    for i, item in enumerate(items, 1):
+        stocks.append({
+            '순위': str(i),
+            '종목명': item.get('itemname', ''),
+            '티커': item.get('itemcode', ''),
+            '현재가': _fmt_num(item.get('nowPrice')),
+            '등락': _change_dir(item),
+        })
+    return pd.DataFrame(stocks)
+
+
 @st.cache_data(ttl=60)
 def crawl_naver_foreigner_top() -> pd.DataFrame:
     """
-    네이버 금융 실시간 외국인 순매수 상위 종목 크롤링
-    URL: sise_trans_style.naver?sosok=0 (KOSPI 투자자별 매매동향)
-    - Table[0]: 외국인 순매수 상위 / Table[1]: 기관 순매수 상위
-    - 반환: DataFrame [순위, 종목명, 티커, 현재가]
+    네이버 증권 외국인 순매수 상위 종목 - 신형 API(foreignPureBuy)
+    - 반환: DataFrame [순위, 종목명, 티커, 현재가, 등락]
     """
-    url = "https://finance.naver.com/sise/sise_trans_style.naver?sosok=0"
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-        
-        # Table[0] = 외국인 순매수 상위
-        tables = soup.find_all('table', {'class': 'type_r1'})
-        if not tables: return pd.DataFrame()
-        table = tables[0]  # 외국인 순매수
-            
-        rows = table.find_all('tr')
-        stocks = []
-        rank_counter = 1
-        for row in rows:
-            cols = row.find_all('td')
-            # cols[0]=빈셀, cols[1]=종목명(링크포함), cols[2]=현재가, cols[3]=등락 이미지
-            if len(cols) >= 3:
-                name_a = cols[1].find('a')
-                if name_a:
-                    name = name_a.get_text(strip=True)
-                    href = name_a.get('href', '')
-                    ticker = href.split('code=')[-1] if 'code=' in href else ''
-                    price = cols[2].get_text(strip=True)
-                    
-                    change_dir = ""
-                    if len(cols) >= 4:
-                        change_img = cols[3].find('img')
-                        if change_img:
-                            alt_val = change_img.get('alt', '').lower()
-                            if 'up' in alt_val or '상승' in alt_val:
-                                change_dir = "▲"
-                            elif 'down' in alt_val or '하락' in alt_val:
-                                change_dir = "▼"
-                                
-                    stocks.append({
-                        '순위': str(rank_counter),
-                        '종목명': name,
-                        '티커': ticker,
-                        '현재가': price,
-                        '등락': change_dir
-                    })
-                    rank_counter += 1
-        return pd.DataFrame(stocks)
+        return _investor_top_df('foreignPureBuy')
     except Exception as e:
         st.warning(f"외국인 순매수 상위 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
 
+
 @st.cache_data(ttl=60)
 def crawl_naver_institution_top() -> pd.DataFrame:
     """
-    네이버 금융 실시간 기관 순매수 상위 종목 크롤링
-    URL: sise_trans_style.naver?sosok=0 (KOSPI 투자자별 매매동향)
-    - Table[1]: 기관 순매수 상위
-    - 반환: DataFrame [순위, 종목명, 티커, 현재가]
+    네이버 증권 기관 순매수 상위 종목 - 신형 API(organizationPureBuy)
+    - 반환: DataFrame [순위, 종목명, 티커, 현재가, 등락]
     """
-    url = "https://finance.naver.com/sise/sise_trans_style.naver?sosok=0"
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-        
-        # Table[1] = 기관 순매수 상위
-        tables = soup.find_all('table', {'class': 'type_r1'})
-        if len(tables) < 2: return pd.DataFrame()
-        table = tables[1]  # 기관 순매수
-            
-        rows = table.find_all('tr')
-        stocks = []
-        rank_counter = 1
-        for row in rows:
-            cols = row.find_all('td')
-            if len(cols) >= 3:
-                name_a = cols[1].find('a')
-                if name_a:
-                    name = name_a.get_text(strip=True)
-                    href = name_a.get('href', '')
-                    ticker = href.split('code=')[-1] if 'code=' in href else ''
-                    price = cols[2].get_text(strip=True)
-                    
-                    change_dir = ""
-                    if len(cols) >= 4:
-                        change_img = cols[3].find('img')
-                        if change_img:
-                            alt_val = change_img.get('alt', '').lower()
-                            if 'up' in alt_val or '상승' in alt_val:
-                                change_dir = "▲"
-                            elif 'down' in alt_val or '하락' in alt_val:
-                                change_dir = "▼"
-                                
-                    stocks.append({
-                        '순위': str(rank_counter),
-                        '종목명': name,
-                        '티커': ticker,
-                        '현재가': price,
-                        '등락': change_dir
-                    })
-                    rank_counter += 1
-        return pd.DataFrame(stocks)
+        return _investor_top_df('organizationPureBuy')
     except Exception as e:
         st.warning(f"기관 순매수 상위 크롤링 중 오류가 발생했습니다: {e}")
         return pd.DataFrame()
@@ -279,76 +185,41 @@ def crawl_naver_institution_top() -> pd.DataFrame:
 @st.cache_data(ttl=300)  # 리포트는 업데이트 주기가 길어 5분 캐싱
 def crawl_naver_analyst_reports() -> pd.DataFrame:
     """
-    네이버 금융 리서치 종목분석 리포트 크롤링 (언급 빈도 순 정렬)
-    - 반환: DataFrame [순위, 종목명, 티커, 언급 빈도, 최근 리포트 제목, 발행 증권사, 최근 발행일]
+    네이버 증권 리서치 종목분석 리포트 (언급 빈도 순 정렬) - 신형 리서치 API
+    - 반환: DataFrame [순위, 종목명, 티커, 언급 빈도, 최근 리포트 제목, 핵심 키워드, 발행 증권사, 최근 발행일, 리포트 링크]
     """
     reports = []
-    # 2개 페이지(60개 리포트) 수집하여 빈도 집계의 정확성 향상
+    # 2개 페이지(40개 리포트) 수집하여 빈도 집계의 정확성 향상
     for page in [1, 2]:
-        url = f"https://finance.naver.com/research/company_list.naver?page={page}"
         try:
-            res = requests.get(url, headers=HEADERS, timeout=10)
+            res = requests.get(RESEARCH_API, params={'page': page}, headers=MOBILE_API_HEADERS, timeout=10)
             res.raise_for_status()
-            soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-            
-            table = soup.find('table', {'class': 'type_1'})
-            if not table: continue
-                
-            rows = table.find_all('tr')
-            for row in rows:
-                cols = row.find_all('td')
-                if len(cols) >= 5:
-                    stock_td = cols[0]
-                    stock_a = stock_td.find('a')
-                    stock_name = stock_a.get_text(strip=True) if stock_a else stock_td.get_text(strip=True)
-                    
-                    ticker = ""
-                    if stock_a and 'code=' in stock_a.get('href', ''):
-                        ticker = stock_a['href'].split('code=')[-1]
-                    
-                    title_td = cols[1]
-                    title_a = title_td.find('a')
-                    title = title_a.get_text(strip=True) if title_a else title_td.get_text(strip=True)
-
-                    # 리포트 페이지 URL (company_read.naver?nid=XXXXX)
-                    report_href = title_a.get('href', '') if title_a else ''
-                    report_url = f"https://finance.naver.com/research/{report_href}" if report_href and not report_href.startswith('http') else report_href
-
-                    # PDF 직접 링크 (cols[3]에 있음)
-                    pdf_url = ""
-                    if len(cols) > 3:
-                        pdf_a = cols[3].find('a')
-                        if pdf_a:
-                            pdf_url = pdf_a.get('href', '')
-
-                    brokerage = cols[2].get_text(strip=True)
-                    date = cols[4].get_text(strip=True)
-                    
-                    if stock_name and title:
-                        reports.append({
-                            'stock_name': stock_name,
-                            'ticker': ticker,
-                            'title': title,
-                            'report_url': report_url,
-                            'pdf_url': pdf_url,
-                            'brokerage': brokerage,
-                            'date': date
-                        })
+            for item in res.json():
+                reports.append({
+                    'stock_name': item.get('itemName', ''),
+                    'ticker': item.get('itemCode', ''),
+                    'title': item.get('title', ''),
+                    'report_url': item.get('endUrl', ''),
+                    'pdf_url': '',
+                    'brokerage': item.get('brokerName', ''),
+                    'date': item.get('writeDate', ''),
+                    'research_id': item.get('researchId'),
+                })
         except Exception as e:
             st.warning(f"애널리스트 리포트 크롤링(페이지 {page}) 중 오류가 발생했습니다: {e}")
-            
+
     if not reports:
         return pd.DataFrame()
-        
+
     # 종목별 그룹화 및 빈도 집계
     from collections import defaultdict
     stock_groups = defaultdict(list)
     for rep in reports:
         stock_groups[rep['stock_name']].append(rep)
-        
+
     freq_list = []
     for stock_name, reps in stock_groups.items():
-        # reps[0]은 스크래핑 순서상 가장 최신 리포트
+        # reps[0]은 수집 순서상 가장 최신 리포트
         latest_rep = reps[0]
         freq_list.append({
             'stock_name': stock_name,
@@ -358,51 +229,40 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
             'latest_report_url': latest_rep['report_url'],
             'latest_pdf_url': latest_rep['pdf_url'],
             'latest_brokerage': latest_rep['brokerage'],
-            'latest_date': latest_rep['date']
+            'latest_date': latest_rep['date'],
+            'research_id': latest_rep.get('research_id'),
         })
-        
+
     # 빈도(count) 내림차순, 동일 빈도 시 최신 발행일(latest_date) 내림차순 정렬
     freq_list.sort(key=lambda x: (x['count'], x['latest_date']), reverse=True)
     top_items = freq_list[:10]
 
-    # 상위 10개 종목의 리포트 상세 페이지를 병렬 크롤링하여 투자의견/목표가/요약 키워드 추출
+    # 상위 10개 종목의 리포트 상세를 병렬 조회하여 투자의견/목표가/요약 추출
     def _fetch_report_detail(item: dict) -> dict:
-        """Thread worker: 리포트 상세 페이지에서 투자의견, 목표가, 핵심 요약 키워드 크롤링"""
+        """Thread worker: 리서치 상세 API에서 투자의견, 목표가, 핵심 요약 추출"""
         result = {'opinion': '', 'target_price': '', 'summary': ''}
-        url = item.get('latest_report_url', '')
-        if not url:
+        rid = item.get('research_id')
+        if not rid:
             return result
         try:
-            r = requests.get(url, headers=HEADERS, timeout=8)
+            r = requests.get(f"{RESEARCH_API}/{rid}", headers=MOBILE_API_HEADERS, timeout=8)
             r.raise_for_status()
-            soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
-            content_area = soup.find(id='contentarea')
-            if not content_area:
-                return result
-
-            # 소스 태그(목표가|투자의견) 찾기
-            source_p = content_area.find('p', {'class': 'source'})
-            if source_p:
-                src_txt = source_p.get_text(strip=True)
-                # 목표가 판두 e.g. "목표가 1,600,000|투자의견 Buy"
-                tp_m = re.search(r'목표가\s*([\d,]+)', src_txt)
-                op_m = re.search(r'투자의견\s*([\w ]+)', src_txt)
-                if tp_m:
-                    result['target_price'] = f"목표가 {tp_m.group(1)}"
-                if op_m:
-                    result['opinion'] = op_m.group(1).strip()[:20]
-
-            # 학습 view_cnt td 내 핸실 요약 문단
-            view_td = content_area.find('td', {'class': 'view_cnt'})
-            if view_td:
-                paras = [p.get_text(strip=True) for p in view_td.find_all('p') if len(p.get_text(strip=True)) > 20]
-                if paras:
-                    result['summary'] = paras[0][:160]  # 첫 번째 단락의 첫 160자
+            rc = r.json().get('researchContent', {})
+            if rc.get('opinion'):
+                result['opinion'] = str(rc['opinion']).strip()
+            if rc.get('goalPrice'):
+                result['target_price'] = f"목표가 {_fmt_num(rc['goalPrice'])}"
+            content = rc.get('content', '')
+            if content:
+                text_only = re.sub(r'<[^>]+>', ' ', content)
+                text_only = html.unescape(text_only)
+                text_only = re.sub(r'\s+', ' ', text_only).strip()
+                if len(text_only) > 20:
+                    result['summary'] = text_only[:160]
         except Exception:
             pass
         return result
 
-    # ThreadPoolExecutor로 병렬 요청 (max 5 스레드, TTL 5분 캐싱으로 부담 최소화)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         detail_futures = {executor.submit(_fetch_report_detail, item): i for i, item in enumerate(top_items)}
         detail_results = [None] * len(top_items)
@@ -418,7 +278,6 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
     rank_counter = 1
     for i, item in enumerate(top_items):
         detail = detail_results[i] or {'opinion': '', 'target_price': '', 'summary': ''}
-        # 투자의견 + 목표가 조합
         opinion_str = detail.get('opinion', '')
         tp_str = detail.get('target_price', '')
         summary_str = detail.get('summary', '')
@@ -431,7 +290,6 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
             keyword_parts.append(summary_str)
         keywords = " | ".join(keyword_parts) if keyword_parts else "-"
 
-        # 리포트 페이지 URL 우선, 없으면 PDF URL 사용
         link_url = item['latest_report_url'] or item['latest_pdf_url'] or ""
         sorted_reports.append({
             '순위': str(rank_counter),
@@ -445,7 +303,7 @@ def crawl_naver_analyst_reports() -> pd.DataFrame:
             '리포트 링크': link_url
         })
         rank_counter += 1
-        
+
     return pd.DataFrame(sorted_reports)
 
 def render_naver_sise_table(df: pd.DataFrame):
