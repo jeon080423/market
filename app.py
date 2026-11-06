@@ -1431,7 +1431,15 @@ try:
     def create_chart(series, title, threshold, desc_text):
         # 데이터가 비어있지 않은지 확인 후 그래프 생성
         if series is not None and not series.empty and not series.isnull().all():
+            # 데이터가 실제로 존재하는 구간부터 표시: KOSPI 기준(1999~)으로
+            # reindex하면 환율(2003~)·구리/WTI(2000-08~)·BDRY(2018~)처럼
+            # 데이터 시작이 늦은 지표는 앞부분이 NaN이라 왼쪽이 빈 채로 그려짐.
+            # 앞부분 NaN 구간을 잘라내고 X축 범위를 실제 데이터 구간으로 고정한다.
+            first_valid = series.first_valid_index()
+            if first_valid is not None:
+                series = series.loc[first_valid:]
             fig = go.Figure(go.Scatter(x=series.index, y=series.values, name=title, connectgaps=True)) # connectgaps 추가
+            fig.update_xaxes(range=[series.index[0], series.index[-1]])
             fig.add_hline(y=threshold, line_width=2, line_color="red")
             # 주석 위치 계산을 위한 안전장치
             annot_idx = len(series)//2 if len(series) > 0 else 0
