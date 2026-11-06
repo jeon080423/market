@@ -266,8 +266,8 @@ def clean_news_translation(text):
     # 번호가 매겨진 행을 찾지 못한 경우 일반 정제 로직으로 대체
     return clean_ai_output(text)
 
-# 코로나19 폭락 기점 날짜 정의 (S&P 500 고점 기준)
-COVID_EVENT_DATE = "2020-02-19"
+# 닷컴버블 폭락 기점 날짜 정의 (S&P 500 고점 기준, 2000-03-24 종가 1,527.46)
+DOTCOM_EVENT_DATE = "2000-03-24"
 
 # 구글 시트 URL 생성
 GSHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
@@ -468,7 +468,7 @@ def load_data():
 def _load_data_internal():
     # 오늘 데이터를 포함하기 위해 내일 날짜로 end_date 설정
     end_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-    start_date = "2019-01-01"
+    start_date = "1999-01-01"  # 닷컴버블 기점(2000-03-24)이 차트에 표시되도록 1999년부터 로드
     
     # 여러 티커를 한 번에 다운로드
     tickers = {
@@ -1436,8 +1436,8 @@ try:
             # 주석 위치 계산을 위한 안전장치
             annot_idx = len(series)//2 if len(series) > 0 else 0
             fig.add_annotation(x=series.index[annot_idx], y=threshold, text=desc_text, showarrow=False, font=dict(color="red"), bgcolor="white", yshift=10)
-            fig.add_vline(x=COVID_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
-            fig.add_annotation(x=COVID_EVENT_DATE, y=1, yref="paper", text="COVID 지수 폭락 기점", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
+            fig.add_vline(x=DOTCOM_EVENT_DATE, line_width=1.5, line_dash="dash", line_color="blue")
+            fig.add_annotation(x=DOTCOM_EVENT_DATE, y=1, yref="paper", text="닷컴버블 폭락 기점", showarrow=False, font=dict(color="blue"), xanchor="left", xshift=5, bgcolor="white")
             return fig
         return go.Figure()
 
